@@ -35,7 +35,7 @@ export function useSignUp() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["session"] });
-      router.push("/dashboard");
+      router.push("/events");
       router.refresh();
     },
   });

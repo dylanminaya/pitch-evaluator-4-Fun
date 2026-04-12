@@ -32,7 +32,7 @@ export function useSignIn() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["session"] });
-      router.push("/dashboard");
+      router.push("/events");
       router.refresh();
     },
   });

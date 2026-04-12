@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 const publicRoutes = ["/", "/signup"];
-const authRoutes = ["/", "/signup"]; // Routes that should redirect to dashboard if logged in
+const authRoutes = ["/", "/signup"]; // Routes that should redirect to events if logged in
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -21,7 +21,7 @@ export async function middleware(request: NextRequest) {
   }
 
   if (sessionToken && isAuthRoute) {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
+    return NextResponse.redirect(new URL("/events", request.url));
   }
 
   return NextResponse.next();

@@ -1,17 +1,26 @@
 "use client";
 
 
+import { useMemo } from "react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
+  ArrowLeft,
   ArrowUpRight,
   CircleDot,
   QrCode,
   // Share2,
   Sparkles,
-  Trophy,
 } from "lucide-react";
 import { Button } from "@workspace/ui/components/button";
 import { useSignOut } from "@/hooks/auth";
-import { useEvents, usePitches, useRanking, usePitchQr } from "@/hooks/dashboard";
+import {
+  useEvents,
+  usePitches,
+  useRanking,
+  usePitchQr,
+  useUpdateEventStatus,
+} from "@/hooks/dashboard";
 //helper
 import { exportEvent, exportPitch } from "@/lib/dashboard-api";
 
@@ -50,11 +59,20 @@ function QrDisplay({ url }: { url?: string }) {
 }
 
 export default function DashboardPage() {
+  const searchParams = useSearchParams();
   const { mutate: logout, isPending } = useSignOut();
+  const { mutateAsync: mutateEventStatus, isPending: isUpdatingEventStatus } =
+    useUpdateEventStatus();
 
   //query
   const {data: events = [] } = useEvents();
-  const selectedEventId = events[0]?.id;//selecciona el primer evento automaticamente
+  const requestedEventId = searchParams.get("eventId");
+  const selectedEvent = useMemo(() => {
+    if (!events.length) return undefined;
+
+    return events.find((event) => event.id === requestedEventId) ?? events[0];
+  }, [events, requestedEventId]);
+  const selectedEventId = selectedEvent?.id;
 
   const {data: pitches = [] } = usePitches(selectedEventId);//trae pitches del eventos
   const selectedPitchId = pitches[0]?.id;
@@ -63,6 +81,16 @@ export default function DashboardPage() {
   const { data: qrData } = usePitchQr(selectedPitchId);
 
   const selectedPitchVotes = rankingData.find(item => item.id === selectedPitchId)?.votesCount ?? 0;
+  const eventIsOpen = selectedEvent?.status === "OPEN";
+
+  async function handleToggleEventStatus() {
+    if (!selectedEventId || !selectedEvent) return;
+
+    await mutateEventStatus({
+      eventId: selectedEventId,
+      status: eventIsOpen ? "CLOSED" : "OPEN",
+    });
+  }
 
   async function handlerExportEvent() {
     if(!selectedEventId) return;
@@ -124,38 +152,77 @@ export default function DashboardPage() {
       accent: "text-fuchsia-400",
     },
   ];
+
+  const shellClass =
+    "rounded-[20px] border border-[#263550] bg-[#121d30] shadow-[0_22px_60px_rgba(2,8,23,0.42)]";
+  const panelClass =
+    "rounded-2xl border border-[#263550] bg-[#1a2640] shadow-[0_18px_45px_rgba(2,8,23,0.35)]";
+  const eyebrowClass =
+    "text-[10px] font-bold uppercase italic tracking-[0.32em] text-[#83ce00]";
   
   return (
-    <main className="min-h-svh bg-[#0a0a0f] text-white">
+    <main className="min-h-svh bg-[#0d1526] text-white">
       <div className="mx-auto flex min-h-svh w-full max-w-[1440px] flex-col gap-4 px-4 py-4 md:px-8 md:py-6">
-        <header className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <header className={`${shellClass} flex flex-col gap-4 px-5 py-4 md:flex-row md:items-center md:justify-between md:px-8`}>
           <div className="flex items-center gap-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#ccff00] text-xs font-black text-black">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#83ce00] text-xs font-black text-[#0d1526] shadow-[0_0_0_4px_rgba(131,206,0,0.12)]">
               P
             </div>
-            <div className="flex items-center gap-2">
-              <span className="text-lg font-semibold tracking-tight">pitch4fun</span>
-              <span className="text-sm text-[#555566]">/</span>
-              <span className="font-mono text-xs uppercase tracking-[0.2em] text-[#8888aa]">
-                {events[0]?.name ?? "Sin eventos"}
+            <div className="flex flex-col">
+              <div className="flex items-center gap-2">
+                <span className="text-lg font-black italic tracking-tight">PITCH 4 FUN</span>
+                <span className="text-sm text-[#263550]">/</span>
+                <span className="text-xs font-bold uppercase italic tracking-[0.28em] text-[#83ce00]">
+                  Organizer Dashboard
+                </span>
+              </div>
+              <span className="text-sm text-[#8899aa]">
+                {selectedEvent?.name ?? "Sin eventos"}
               </span>
             </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            <div className="inline-flex items-center gap-2 rounded-full border border-[#ff2d78] bg-[#1a0a0a] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#ff6ea7]">
+            <Link href="/events">
+              <Button
+                variant="outline"
+                className="rounded-full border-[#263550] bg-[#0d1526] text-white hover:bg-[#1a2640] hover:text-white"
+              >
+                <ArrowLeft className="size-4" />
+                Volver a eventos
+              </Button>
+            </Link>
+            <div
+              className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] ${
+                eventIsOpen
+                  ? "border-[#263550] bg-[#0d1526] text-[#83ce00]"
+                  : "border-[#263550] bg-[#0d1526] text-[#8899aa]"
+              }`}
+            >
               <CircleDot className="size-3 fill-current" />
-              En vivo
-            </div>
-
-            <div className="inline-flex items-center gap-2 rounded-lg border border-[#2a2a3a] bg-[#22222f] px-4 py-2 text-sm text-[#d8d8e6]">
-              <Trophy className="size-4 text-[#9ea0bf]" />
-              Proyectar
+              {eventIsOpen ? "En vivo" : "Cerrado"}
             </div>
 
             <Button
+              type="button"
+              onClick={handleToggleEventStatus}
+              disabled={!selectedEventId || isUpdatingEventStatus}
+              className={`rounded-full px-5 text-sm font-bold italic ${
+                eventIsOpen
+                  ? "bg-[#1a2640] text-[#83ce00] hover:bg-[#22314f]"
+                  : "bg-[#83ce00] text-[#0d1526] hover:bg-[#a7ea2e]"
+              }`}
+            >
+              {isUpdatingEventStatus
+                ? "Actualizando..."
+                : eventIsOpen
+                  ? "Marcar cerrado"
+                  : "Reabrir evento"}
+            </Button>
+
+            <Button
               variant="outline"
-              className="border-[#2a2a3a] bg-[#14141d] text-white hover:bg-[#1d1d29] hover:text-white"
+              className="rounded-full border-[#263550] bg-[#0d1526] text-white hover:bg-[#1a2640] hover:text-white"
               onClick={() => logout()}
               disabled={isPending}
             >
@@ -171,29 +238,29 @@ export default function DashboardPage() {
               {stats.map((stat) => ( 
                 <article
                   key={stat.label}
-                  className="rounded-xl border border-[#2a2a3a] bg-[#1a1a25] px-4 py-4"
+                  className={`${panelClass} px-5 py-5`}
                 >
-                  <p className="font-mono text-[11px] uppercase tracking-[0.24em] text-[#6f7088]">
+                  <p className="text-[10px] font-bold uppercase italic tracking-[0.3em] text-[#8899aa]">
                     {stat.label} {/*mostrar nombre*/}
                   </p>
-                  <p className={`mt-3 text-3xl font-semibold tracking-tight ${stat.accent}`}>
+                  <p className={`mt-3 text-4xl font-extrabold tracking-tight ${stat.accent}`}>
                     {stat.value}{/*mostrar valor*/}
                   </p>
                 </article>
               ))}
             </div>
 
-            <section className="min-w-0 overflow-hidden rounded-xl border border-[#2a2a3a] bg-[#1a1a25]">
-              <div className="flex items-center justify-between border-b border-[#262636] px-4 py-3">
+            <section className={`${panelClass} min-w-0 overflow-hidden`}>
+              <div className="flex items-center justify-between border-b border-[#263550] bg-[#0d1526] px-5 py-4">
                 <div>
-                  <p className="font-mono text-[11px] uppercase tracking-[0.24em] text-[#7f8099]">
+                  <p className={eyebrowClass}>
                     Ranking en vivo
                   </p>
                   <p className="mt-1 text-sm text-[#a7a8be]">
                     Tabla proyectable para moderacion y jurado.
                   </p>
                 </div>
-                <div className="rounded-full bg-[#223100] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-[#ccff00]">
+                <div className="rounded-full border border-[#2a4a2a] bg-[#0a1a0a] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-[#ccff00]">
                   Actualizado
                 </div>
               </div>
@@ -201,7 +268,7 @@ export default function DashboardPage() {
               <div className="overflow-x-auto">
                 <table className="min-w-full text-left">
                   <thead>
-                    <tr className="border-b border-[#262636] text-[10px] uppercase tracking-[0.22em] text-[#66677f]">
+                    <tr className="border-b border-[#263550] bg-[#0d1526] text-[10px] uppercase tracking-[0.24em] text-[#8899aa]">
                       <th className="px-4 py-3 font-medium">#</th>
                       <th className="px-4 py-3 font-medium">Proyecto</th>
                       <th className="px-4 py-3 font-medium">Inn</th>
@@ -215,9 +282,13 @@ export default function DashboardPage() {
                     {rankingData.map((item, index) => (
                       <tr
                         key={item.id}
-                        className="border-b border-[#20202d] text-sm text-[#d7d8e5] last:border-b-0"
+                        className={`text-sm text-[#d7d8e5] last:border-b-0 ${
+                          index === 0
+                            ? "bg-[linear-gradient(90deg,rgba(131,206,0,0.1),rgba(13,21,38,0.08))]"
+                            : "border-b border-[#263550]"
+                        }`}
                       >
-                        <td className="px-4 py-4 font-mono text-xs text-[#8c8da4]">
+                        <td className={`px-4 py-4 text-xs font-bold ${index === 0 ? "text-[#83ce00]" : "text-[#8c8da4]"}`}>
                           {String(index + 1).padStart(2, "0")} {/*muestra el numero de posicion */}
                         </td>
                         <td className="px-4 py-4">
@@ -227,7 +298,7 @@ export default function DashboardPage() {
                                 index === 0 ? "bg-[#ccff00]" : "bg-[#53546a]"//resaltar ganador
                               }`} 
                             />
-                            <span className={index === 0 ? "font-semibold text-[#f8ffcf]" : ""}>
+                            <span className={index === 0 ? "font-semibold text-[#f8ffcf]" : "font-semibold"}>
                               {item.name} {/*nombre del proyecto */}
                             </span>
                           </div>
@@ -248,11 +319,11 @@ export default function DashboardPage() {
           </div>
 
           <aside className="flex flex-col gap-4">
-            <section className="rounded-xl border border-[#2a2a3a] bg-[#1a1a25] p-5">
+            <section className={`${panelClass} p-6`}>
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <p className="font-mono text-[11px] uppercase tracking-[0.24em] text-[#7f8099]">
-                    Codigo de acceso
+                  <p className={eyebrowClass}>
+                    Codigo QR activo
                   </p>
                   <h2 className="mt-2 text-xl font-semibold tracking-tight">{qrData?.name ?? pitches[0]?.name ?? "Sin pitch seleccionado"}</h2>
                 </div>
@@ -263,18 +334,18 @@ export default function DashboardPage() {
                 <QrDisplay url={qrData?.publicVoteUrl} />
               </div>
 
-              <p className="mt-4 text-center text-xs text-[#7f8099]">
+              <p className="mt-4 text-center text-xs text-[#8899aa]">
                 escanea para abrir el formulario de voto
               </p>
 
-              <div className="mt-4 rounded-lg bg-[#202726] px-4 py-3">
+              <div className="mt-4 rounded-2xl bg-[#0d1526] px-4 py-3 ring-1 ring-[#263550]">
                 <div className="flex items-end justify-between gap-4">
                   <div>
                     <p className="text-2xl font-semibold text-[#ccff00]">{selectedPitchVotes}</p>
                     <p className="text-xs text-[#97a093]">votos recibidos</p>
                   </div>
                   {/*boton descarga los datos del pitch */}
-                  <Button className="bg-[#ccff00] text-black hover:bg-[#e0ff66]"
+                  <Button className="rounded-full bg-[#83ce00] px-5 text-[#0d1526] hover:bg-[#a7ea2e]"
                     onClick={handlerExportPitch}
                     disabled={!selectedPitchId}//si desactiva si no hay pitch seleccionado
                   >
@@ -285,23 +356,23 @@ export default function DashboardPage() {
 
               <div className="mt-4 flex items-center justify-end gap-2 text-[#7f8099]">
                 <button
-                  className="rounded-lg border border-[#2a2a3a] p-2 transition hover:bg-[#212130] disabled:cursor-not-allowed disabled:opacity-40"
+                  className="rounded-full border border-[#0595f0] p-2 transition hover:bg-[#0d1526] disabled:cursor-not-allowed disabled:opacity-40"
                   onClick={handlerExportEvent}
                   disabled={!selectedEventId}
                 >
                   <ArrowUpRight className="size-4" />
                 </button>
-                <button className="rounded-lg border border-[#2a2a3a] p-2 transition hover:bg-[#212130]">
+                <button className="rounded-full border border-[#263550] p-2 transition hover:bg-[#0d1526]">
                   <ArrowUpRight className="size-4" />
                 </button>
               </div>
             </section>
 
-            <section className="flex flex-1 flex-col rounded-xl border border-[#2a2a3a] bg-[#1a1a25] p-5">
+            <section className={`${panelClass} flex flex-1 flex-col p-5`}>
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                   <Sparkles className="size-4 text-[#d06bff]" />
-                  <p className="font-mono text-[11px] uppercase tracking-[0.24em] text-[#a88cc8]">
+                  <p className="text-[11px] font-bold uppercase italic tracking-[0.24em] text-[#a88cc8]">
                     Resumen IA
                   </p>
                 </div>
@@ -314,7 +385,7 @@ export default function DashboardPage() {
                 {summaryBlocks.map((block) => (
                   <article
                     key={block.title}
-                    className="rounded-xl border border-[#252538] bg-[#151520] p-4"
+                    className="rounded-2xl border border-[#263550] bg-[#0d1526] p-4"
                   >
                     <div className="flex items-center gap-2">
                       <span
@@ -322,7 +393,7 @@ export default function DashboardPage() {
                           block.tone === "positive" ? "bg-[#ccff00]" : "bg-[#ff4c83]"
                         }`}
                       />
-                      <h3 className="text-sm font-semibold text-white">{block.title}</h3>
+                      <h3 className={`text-sm font-semibold ${block.tone === "positive" ? "text-[#ccff00]" : "text-[#ff4c83]"}`}>{block.title}</h3>
                     </div>
                     <p className="mt-3 text-sm leading-6 text-[#aeb0c4]">{block.body}</p>
                   </article>

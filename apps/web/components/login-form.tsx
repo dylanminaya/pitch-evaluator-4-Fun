@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { cn } from "@workspace/ui/lib/utils";
 import { Button } from "@workspace/ui/components/button";
 import {
@@ -36,23 +37,30 @@ export function LoginForm({
 
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
-      <Card>
-        <CardHeader>
-          <CardTitle>Login to your account</CardTitle>
-          <CardDescription>
-            Enter your email below to login to your account
+      <Card className="rounded-[28px] border border-[#263550] bg-[#1a2640] py-0 text-white shadow-[0_24px_60px_rgba(2,8,23,0.36)]">
+        <CardHeader className="gap-3 border-b border-[#263550] px-6 py-6">
+          <p className="text-[10px] font-bold uppercase italic tracking-[0.32em] text-[#83ce00]">
+            Login
+          </p>
+          <CardTitle className="text-3xl font-black italic tracking-tight text-white">
+            Entra a tu cuenta
+          </CardTitle>
+          <CardDescription className="text-sm leading-6 text-[#a9b3c9]">
+            Usa tu correo y contraseña para abrir el panel del organizer.
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-6 py-6">
           <form onSubmit={handleSubmit}>
-            <FieldGroup>
+            <FieldGroup className="gap-6">
               {error && (
-                <div className="rounded-md bg-red-50 p-3 text-sm text-red-600 dark:bg-red-900/20 dark:text-red-400">
+                <div className="rounded-2xl border border-[#5a2433] bg-[#2a1018] p-3 text-sm text-[#ff8cab]">
                   {error.message}
                 </div>
               )}
               <Field>
-                <FieldLabel htmlFor="email">Email</FieldLabel>
+                <FieldLabel htmlFor="email" className="text-xs font-bold uppercase italic tracking-[0.24em] text-[#8899aa]">
+                  Email
+                </FieldLabel>
                 <Input
                   id="email"
                   name="email"
@@ -60,17 +68,20 @@ export function LoginForm({
                   placeholder="m@example.com"
                   required
                   disabled={isPending}
+                  className="h-12 rounded-2xl border-[#263550] bg-[#0d1526] px-4 text-white placeholder:text-[#66738f] focus-visible:border-[#0595f0] focus-visible:ring-[#0595f0]/25"
                 />
               </Field>
               <Field>
                 <div className="flex items-center">
-                  <FieldLabel htmlFor="password">Password</FieldLabel>
-                  <a
+                  <FieldLabel htmlFor="password" className="text-xs font-bold uppercase italic tracking-[0.24em] text-[#8899aa]">
+                    Password
+                  </FieldLabel>
+                  <Link
                     href="#"
-                    className="ml-auto inline-block text-sm underline-offset-4 hover:underline"
+                    className="ml-auto inline-block text-sm text-[#83ce00] underline-offset-4 hover:underline"
                   >
                     Forgot your password?
-                  </a>
+                  </Link>
                 </div>
                 <Input
                   id="password"
@@ -78,21 +89,22 @@ export function LoginForm({
                   type="password"
                   required
                   disabled={isPending}
+                  className="h-12 rounded-2xl border-[#263550] bg-[#0d1526] px-4 text-white placeholder:text-[#66738f] focus-visible:border-[#0595f0] focus-visible:ring-[#0595f0]/25"
                 />
               </Field>
               <Field>
                 <Button
                   type="submit"
-                  className="w-full cursor-pointer"
+                  className="h-12 w-full cursor-pointer rounded-full bg-[#83ce00] text-sm font-bold italic text-[#0d1526] shadow-[0_10px_24px_rgba(131,206,0,0.22)] hover:bg-[#a9e92f]"
                   disabled={isPending}
                 >
-                  {isPending ? "Signing in..." : "Login"}
+                  {isPending ? "Entrando..." : "Entrar al dashboard"}
                 </Button>
-                <FieldDescription className="text-center">
+                <FieldDescription className="pt-2 text-center text-sm text-[#8899aa]">
                   Don&apos;t have an account?{" "}
-                  <a href="/signup" className="underline underline-offset-4">
+                  <Link href="/signup" className="font-semibold text-[#83ce00] underline underline-offset-4">
                     Sign up
-                  </a>
+                  </Link>
                 </FieldDescription>
               </Field>
             </FieldGroup>

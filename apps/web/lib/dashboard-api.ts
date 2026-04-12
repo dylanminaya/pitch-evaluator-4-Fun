@@ -1,5 +1,6 @@
-import { apiFetch, apiFetchBlob } from "./api/client";
+import { apiFetch, apiFetchBlob, apiFetchVoid } from "./api/client";
 import type {
+  CreateDashboardEvent,
   DashboardEvent,
   DashboardPitch,
   DashboardRankingItem,
@@ -9,6 +10,7 @@ import type {
 } from "@workspace/shared/api";
 
 export type {
+  CreateDashboardEvent,
   DashboardEvent,
   DashboardPitch,
   DashboardRankingItem,
@@ -19,6 +21,13 @@ export type {
 
 export function getEvents() {
   return apiFetch<DashboardEvent[]>("/api/event");
+}
+
+export function createEvent(data: CreateDashboardEvent) {
+  return apiFetch<DashboardEvent>("/api/event", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
 }
 
 export function getPitches(eventId: string) {
@@ -47,6 +56,22 @@ export function getPitchQr(pitchId: string) {
 
 export function exportEvent(eventId: string) {
   return apiFetchBlob(`/api/event/${eventId}/export`);
+}
+
+export function deleteEvent(eventId: string) {
+  return apiFetchVoid(`/api/event/${eventId}`, {
+    method: "DELETE",
+  });
+}
+
+export function updateEventStatus(
+  eventId: string,
+  status: "OPEN" | "CLOSED",
+) {
+  return apiFetch<DashboardEvent>(`/api/event/${eventId}/status`, {
+    method: "PATCH",
+    body: JSON.stringify({ status }),
+  });
 }
 
 export function exportPitch(pitchId: string) {

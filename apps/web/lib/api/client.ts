@@ -35,3 +35,19 @@ export async function apiFetchBlob(path: string, init?: RequestInit): Promise<Bl
 
     return res.blob()
 }
+
+export async function apiFetchVoid(path: string, init?: RequestInit): Promise<void> {
+    const res = await fetch(`${NEXT_PUBLIC_API_URL}${path}`, {
+        ...init,
+        credentials: "include",
+        headers: {
+            "Content-Type": "application/json",
+            ...(init?.headers ?? {}),
+        },
+    });
+
+    if (!res.ok) {
+        const errorBody = await res.json().catch(() => null);
+        throw new Error(errorBody?.message ?? "Request failed");
+    }
+}
