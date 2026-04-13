@@ -164,7 +164,7 @@ eventRouter.get("/:eventId/export", async (req, res) => {
       SELECT
         p.id AS pitchId,
         p.name AS pitchName,
-        COUNT(v.id)::int AS "cotesCount",
+        COUNT(v.id)::int AS "votesCount",
         COALESCE(ROUND(AVG(v.innovation)::numeric, 2), 0) AS "innovationAvg",
         COALESCE(ROUND(AVG(v.viability)::numeric, 2), 0) AS "viabilityAvg",
         COALESCE(ROUND(AVG(v.impact)::numeric, 2),0) AS "impactAvg",

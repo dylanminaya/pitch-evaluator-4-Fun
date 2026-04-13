@@ -2,6 +2,7 @@
 
 
 import { Suspense, useMemo } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
@@ -172,12 +173,9 @@ function DashboardPageContent() {
       <div className="mx-auto flex min-h-svh w-full max-w-[1440px] flex-col gap-4 px-4 py-4 md:px-8 md:py-6">
         <header className={`${shellClass} flex flex-col gap-4 px-5 py-4 md:flex-row md:items-center md:justify-between md:px-8`}>
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#83ce00] text-xs font-black text-[#0d1526] shadow-[0_0_0_4px_rgba(131,206,0,0.12)]">
-              P
-            </div>
+            <Image src="/logo.svg" alt="Pitch 4 Fun" width={98} height={42} className="h-10 w-auto" />
             <div className="flex flex-col">
               <div className="flex items-center gap-2">
-                <span className="text-lg font-black italic tracking-tight">PITCH 4 FUN</span>
                 <span className="text-sm text-[#263550]">/</span>
                 <span className="text-xs font-bold uppercase italic tracking-[0.28em] text-[#83ce00]">
                   Organizer Dashboard

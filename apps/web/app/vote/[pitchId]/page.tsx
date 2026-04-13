@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { CheckCircle2, Sparkles } from "lucide-react";
@@ -78,12 +79,9 @@ export default function VotingScreenPage() {
       <div className="mx-auto flex min-h-svh w-full max-w-[1440px] flex-col gap-4">
         <header className="flex flex-col gap-4 rounded-[20px] border border-[#263550] bg-[#121d30] px-5 py-4 shadow-[0_22px_60px_rgba(2,8,23,0.42)] md:flex-row md:items-center md:justify-between md:px-8">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#83ce00] text-xs font-black text-[#0d1526]">
-              P
-            </div>
+            <Image src="/logo.svg" alt="Pitch 4 Fun" width={98} height={42} className="h-10 w-auto" />
             <div className="flex flex-col">
               <div className="flex items-center gap-2">
-                <span className="text-lg font-black italic tracking-tight">PITCH 4 FUN</span>
                 <span className="text-sm text-[#263550]">/</span>
                 <span className="text-xs font-bold uppercase italic tracking-[0.28em] text-[#83ce00]">
                   Voting Screen

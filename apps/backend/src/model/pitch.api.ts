@@ -373,8 +373,8 @@ pitchRouter.post("/:pitchId/summary", async (req, res) => {
         v."createdAt"
       FROM vote v
       WHERE v."pitchId" = $1
-        AND v.comments IS NOT null
-        AND TRIM(v.comments) <> ''
+        AND v.comment IS NOT null
+        AND TRIM(v.comment) <> ''
       ORDER by v."createdAt" DESC
       `,
       [req.params.pitchId],
@@ -473,8 +473,8 @@ pitchRouter.get("/:pitchId/export", async (req, res) => {
 
     const csvRows = [
       pitch.id,
-      `{String(pitch.name).replace(/"/g, '""')}"`,
-      `{String(pitch.description).replace(/"/g, '""')}"`,
+      `"${String(pitch.name).replace(/"/g, '""')}"`,
+      `"${String(pitch.description).replace(/"/g, '""')}"`,
       pitch.color,
       pitch.logoUrl ?? "",
       pitch.votesCount,

@@ -4,7 +4,6 @@ import { validateServerEnv } from "@workspace/shared/env/server";
 import type { Request, Response } from "express";
 import { fromNodeHeaders } from "better-auth/node";
 
-
 const env = validateServerEnv();
 
 export const auth = betterAuth({

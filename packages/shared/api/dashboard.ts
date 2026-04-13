@@ -60,6 +60,52 @@ export const dashboardPitchQrSchema = z.object({
   publicVoteUrl: z.string().url(),
 });
 
+export const createDashboardEventSchema = z.object({
+  name: z
+    .string()
+    .min(3, "Name must have at least 3 characters")
+    .max(100, "Name cannot exceed 100 characters"),
+  description: z
+    .string()
+    .min(5, "Description must have at least 5 characters")
+    .max(500, "Description cannot exceed 500 characters"),
+});
+
+export const createDashboardPitchSchema = z.object({
+  eventId: z.string().min(1, "Event id is required"),
+  name: z
+    .string()
+    .min(3, "Project name must have at least 3 characters")
+    .max(150, "Project name cannot exceed 150 characters"),
+  description: z
+    .string()
+    .min(5, "Project description must have at least 5 characters")
+    .max(500, "Project description cannot exceed 500 characters"),
+  color: z
+    .string()
+    .regex(/^#([A-Fa-f0-9]{6})$/, "Color must be a valid hex code"),
+  logoUrl: z.string().url().nullable().optional(),
+});
+
+export const publicPitchSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string(),
+  color: z.string(),
+  logoUrl: z.string().nullable(),
+  eventStatus: z.enum(["OPEN", "CLOSED"]),
+});
+
+export const createPublicVoteSchema = z.object({
+  pitchId: z.string().min(1, "Pitch id is required"),
+  evaluatorId: z.string().nullable().optional(),
+  innovation: z.number().int().min(1).max(5),
+  viability: z.number().int().min(1).max(5),
+  impact: z.number().int().min(1).max(5),
+  presentation: z.number().int().min(1).max(5),
+  comment: z.string().max(500).optional().nullable(),
+});
+
 // Inferred types
 export type DashboardEvent = z.infer<typeof dashboardEventSchema>;
 export type DashboardPitch = z.infer<typeof dashboardPitchSchema>;
@@ -67,3 +113,7 @@ export type DashboardRankingItem = z.infer<typeof dashboardRankingItemSchema>;
 export type DashboardPitchDetail = z.infer<typeof dashboardPitchDetailSchema>;
 export type DashboardPitchComment = z.infer<typeof dashboardPitchCommentSchema>;
 export type DashboardPitchQr = z.infer<typeof dashboardPitchQrSchema>;
+export type CreateDashboardEvent = z.infer<typeof createDashboardEventSchema>;
+export type CreateDashboardPitch = z.infer<typeof createDashboardPitchSchema>;
+export type PublicPitch = z.infer<typeof publicPitchSchema>;
+export type CreatePublicVote = z.infer<typeof createPublicVoteSchema>;

@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, CircleDot, Sparkles } from "lucide-react";
 
@@ -35,15 +36,7 @@ export function AuthShell({
 
           <div className="relative z-10 mx-auto flex w-full max-w-[620px] flex-col gap-8">
             <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#83ce00] text-sm font-black text-[#0d1526] shadow-[0_0_0_6px_rgba(131,206,0,0.12)]">
-                P
-              </div>
-              <div>
-                <p className="text-lg font-black italic tracking-tight">PITCH 4 FUN</p>
-                <p className="text-xs font-bold uppercase italic tracking-[0.3em] text-[#83ce00]">
-                  Menos show, mas ejecucion
-                </p>
-              </div>
+              <Image src="/logo.svg" alt="Pitch 4 Fun" width={131} height={56} className="h-16 w-auto" />
             </div>
 
             <div className="flex max-w-[560px] flex-col gap-4">

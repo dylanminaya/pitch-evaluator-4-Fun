@@ -13,7 +13,7 @@ export const presentPitch = (pitch: {
   description: pitch.description,
   color: pitch.color,
   logoUrl: pitch.logoUrl ?? null,
-  createdAt: pitch.createdAt ?? null,
+  createdAt: pitch.createdAt instanceof Date ? pitch.createdAt.toISOString() : (pitch.createdAt ?? null),
 });
 
 export const presentPublicPitch = (pitch: {

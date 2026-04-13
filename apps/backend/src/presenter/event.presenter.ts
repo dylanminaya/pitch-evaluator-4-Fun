@@ -10,6 +10,6 @@ export const presentEvent = (event: {
   name: event.name,
   description: event.description,
   status: event.status,
-  createdAt: event.createdAt ?? null,
+  createdAt: event.createdAt instanceof Date ? event.createdAt.toISOString() : (event.createdAt ?? null),
   organizerId: event.organizerId,
 });
