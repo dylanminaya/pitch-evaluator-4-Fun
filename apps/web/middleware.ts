@@ -11,7 +11,10 @@ export async function middleware(request: NextRequest) {
     request.cookies.get("better-auth.session_token")?.value ??
     request.cookies.get("__Secure-better-auth.session_token")?.value;
 
-  const isPublicRoute = publicRoutes.includes(pathname);
+  const isPublicRoute =
+    publicRoutes.includes(pathname) ||
+    pathname.startsWith("/invitation/") ||
+    pathname.startsWith("/vote/");
   const isAuthRoute = authRoutes.includes(pathname);
 
   if (!sessionToken && !isPublicRoute) {

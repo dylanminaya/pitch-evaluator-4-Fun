@@ -1,13 +1,14 @@
 "use client";
 
 
-import { useMemo } from "react";
+import { Suspense, useMemo } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
   ArrowLeft,
   ArrowUpRight,
   CircleDot,
+  Plus,
   QrCode,
   // Share2,
   Sparkles,
@@ -58,7 +59,7 @@ function QrDisplay({ url }: { url?: string }) {
   );
 }
 
-export default function DashboardPage() {
+function DashboardPageContent() {
   const searchParams = useSearchParams();
   const { mutate: logout, isPending } = useSignOut();
   const { mutateAsync: mutateEventStatus, isPending: isUpdatingEventStatus } =
@@ -67,6 +68,7 @@ export default function DashboardPage() {
   //query
   const {data: events = [] } = useEvents();
   const requestedEventId = searchParams.get("eventId");
+  const requestedPitchId = searchParams.get("pitchId");
   const selectedEvent = useMemo(() => {
     if (!events.length) return undefined;
 
@@ -75,7 +77,12 @@ export default function DashboardPage() {
   const selectedEventId = selectedEvent?.id;
 
   const {data: pitches = [] } = usePitches(selectedEventId);//trae pitches del eventos
-  const selectedPitchId = pitches[0]?.id;
+  const selectedPitch = useMemo(() => {
+    if (!pitches.length) return undefined;
+
+    return pitches.find((pitch) => pitch.id === requestedPitchId) ?? pitches[0];
+  }, [pitches, requestedPitchId]);
+  const selectedPitchId = selectedPitch?.id;
 
   const { data: rankingData = [] } = useRanking(selectedEventId);
   const { data: qrData } = usePitchQr(selectedPitchId);
@@ -325,9 +332,18 @@ export default function DashboardPage() {
                   <p className={eyebrowClass}>
                     Codigo QR activo
                   </p>
-                  <h2 className="mt-2 text-xl font-semibold tracking-tight">{qrData?.name ?? pitches[0]?.name ?? "Sin pitch seleccionado"}</h2>
+                  <h2 className="mt-2 text-xl font-semibold tracking-tight">{qrData?.name ?? selectedPitch?.name ?? "Sin pitch seleccionado"}</h2>
                 </div>
-                <QrCode className="size-5 text-[#ccff00]" />
+                <Link href={selectedEventId ? `/events/${selectedEventId}/pitches/new` : "#"}>
+                  <Button
+                    type="button"
+                    disabled={!selectedEventId}
+                    className="rounded-full bg-[#83ce00] text-sm font-bold italic text-[#0d1526] hover:bg-[#a7ea2e]"
+                  >
+                    <Plus className="size-4" />
+                    Nuevo pitch
+                  </Button>
+                </Link>
               </div>
 
               <div className="mt-5 flex justify-center">
@@ -337,6 +353,24 @@ export default function DashboardPage() {
               <p className="mt-4 text-center text-xs text-[#8899aa]">
                 escanea para abrir el formulario de voto
               </p>
+
+              {qrData?.publicVoteUrl && (
+                <div className="mt-4 rounded-2xl border border-[#263550] bg-[#0d1526] p-4">
+                  <p className="text-[10px] font-bold uppercase italic tracking-[0.24em] text-[#83ce00]">
+                    Link de invitacion
+                  </p>
+                  <p className="mt-3 break-all text-sm leading-6 text-[#a9b3c9]">
+                    {qrData.publicVoteUrl}
+                  </p>
+                  <div className="mt-4">
+                    <Link href={qrData.publicVoteUrl} target="_blank" rel="noreferrer">
+                      <Button className="rounded-full bg-[#83ce00] text-sm font-bold italic text-[#0d1526] hover:bg-[#a7ea2e]">
+                        Abrir invitacion
+                      </Button>
+                    </Link>
+                  </div>
+                </div>
+              )}
 
               <div className="mt-4 rounded-2xl bg-[#0d1526] px-4 py-3 ring-1 ring-[#263550]">
                 <div className="flex items-end justify-between gap-4">
@@ -368,7 +402,7 @@ export default function DashboardPage() {
               </div>
             </section>
 
-            <section className={`${panelClass} flex flex-1 flex-col p-5`}>
+            {/* <section className={`${panelClass} flex flex-1 flex-col p-5`}>
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                   <Sparkles className="size-4 text-[#d06bff]" />
@@ -399,10 +433,28 @@ export default function DashboardPage() {
                   </article>
                 ))}
               </div>
-            </section>
+            </section> */}
           </aside>
         </section>
       </div>
     </main>
+  );
+}
+
+export default function DashboardPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-svh bg-[#0d1526] text-white">
+          <div className="mx-auto flex min-h-svh w-full max-w-[1440px] items-center justify-center px-4 py-4 md:px-8 md:py-6">
+            <div className="rounded-[20px] border border-[#263550] bg-[#121d30] px-6 py-4 text-sm text-[#8899aa]">
+              Cargando dashboard...
+            </div>
+          </div>
+        </main>
+      }
+    >
+      <DashboardPageContent />
+    </Suspense>
   );
 }

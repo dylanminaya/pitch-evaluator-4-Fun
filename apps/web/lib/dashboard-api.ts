@@ -1,22 +1,28 @@
 import { apiFetch, apiFetchBlob, apiFetchVoid } from "./api/client";
 import type {
+  CreatePublicVote,
   CreateDashboardEvent,
+  CreateDashboardPitch,
   DashboardEvent,
   DashboardPitch,
   DashboardRankingItem,
   DashboardPitchDetail,
   DashboardPitchComment,
   DashboardPitchQr,
+  PublicPitch,
 } from "@workspace/shared/api";
 
 export type {
+  CreatePublicVote,
   CreateDashboardEvent,
+  CreateDashboardPitch,
   DashboardEvent,
   DashboardPitch,
   DashboardRankingItem,
   DashboardPitchDetail,
   DashboardPitchComment,
   DashboardPitchQr,
+  PublicPitch,
 };
 
 export function getEvents() {
@@ -32,6 +38,13 @@ export function createEvent(data: CreateDashboardEvent) {
 
 export function getPitches(eventId: string) {
   return apiFetch<DashboardPitch[]>(`/api/pitch?eventId=${eventId}`);
+}
+
+export function createPitch(data: CreateDashboardPitch) {
+  return apiFetch<DashboardPitch>("/api/pitch", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
 }
 
 export function getRanking(eventId: string) {
@@ -52,6 +65,10 @@ export function getPitchComments(pitchId: string) {
 
 export function getPitchQr(pitchId: string) {
   return apiFetch<DashboardPitchQr>(`/api/pitch/${pitchId}/qr`);
+}
+
+export function getPublicPitch(pitchId: string) {
+  return apiFetch<PublicPitch>(`/api/pitch/public/${pitchId}`);
 }
 
 export function exportEvent(eventId: string) {
@@ -76,4 +93,11 @@ export function updateEventStatus(
 
 export function exportPitch(pitchId: string) {
   return apiFetchBlob(`/api/pitch/${pitchId}/export`);
+}
+
+export function submitPublicVote(data: CreatePublicVote) {
+  return apiFetch("/api/vote", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
 }

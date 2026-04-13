@@ -167,7 +167,7 @@ export default function NewEventPage() {
                   />
                 </div>
 
-                <div className="rounded-2xl border border-dashed border-[#263550] bg-[#0d1526] p-5">
+                {/* <div className="rounded-2xl border border-dashed border-[#263550] bg-[#0d1526] p-5">
                   <div className="flex items-start gap-3">
                     <Sparkles className="mt-0.5 size-4 text-[#83ce00]" />
                     <div>
@@ -179,7 +179,7 @@ export default function NewEventPage() {
                       </p>
                     </div>
                   </div>
-                </div>
+                </div> */}
               </div>
             </form>
 
