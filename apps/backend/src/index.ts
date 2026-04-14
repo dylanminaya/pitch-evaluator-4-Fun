@@ -3,9 +3,9 @@ import cors from "cors";
 import { toNodeHandler } from "better-auth/node";
 import { validateServerEnv } from "@workspace/shared/env/server";
 import { auth } from "./auth.js";
-import { eventRouter } from "./model/event.api.js";
-import { pitchRouter } from "./model/pitch.api.js";
-import { voteRouter } from "./model/vote.api.js";
+import { eventRouter } from "./model/api/event.api.js";
+import { pitchRouter } from "./model/api/pitch.api.js";
+import { voteRouter } from "./model/api/vote.api.js";
 
 const env = validateServerEnv();
 const app = express();

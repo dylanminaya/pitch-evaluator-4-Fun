@@ -58,15 +58,15 @@ export const presentPitchDetail = (pitch: {
   presentationAvg: pitch.presentationAvg,
 });
 
-export const presentPitchQr = (pitch: {
-  id: string;
-  name: string;
-  publicVoteUrl: string;
-}) => ({
-  id: pitch.id,
-  name: pitch.name,
-  publicVoteUrl: pitch.publicVoteUrl,
-});
+// export const presentPitchQr = (pitch: {
+//   id: string;
+//   name: string;
+//   publicVoteUrl: string;
+// }) => ({
+//   id: pitch.id,
+//   name: pitch.name,
+//   publicVoteUrl: pitch.publicVoteUrl,
+// });
 
 export const presentPitchComment = (comment: {
   id: string;

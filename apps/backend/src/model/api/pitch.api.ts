@@ -1,16 +1,15 @@
 import { Router } from "express";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
-import { requireSession } from "../auth.js";
-import { db } from "../db.js";
-import { createPitchSchema, updatePitchSchema } from "./pitch.schema.js";
+import { requireSession } from "../../auth.js";
+import { db } from "../../db.js";
+import { createPitchSchema, updatePitchSchema } from "./../pitch.schema.js";
 import { validateServerEnv } from "@workspace/shared/env/server";
-import { presentPitch, presentPitchComment, presentPitchQr, presentPitchDetail,presentPitchSummary, presentPublicPitch } from "../presenter/pitch.presenter.js";
+import { presentPitch, presentPitchComment, presentPitchDetail,presentPitchSummary, presentPublicPitch } from "../../presenter/pitch.presenter.js";
 import {
   dashboardPitchSchema,
   dashboardPitchDetailSchema,
   dashboardPitchCommentSchema,
-  dashboardPitchQrSchema,
 } from "@workspace/shared/api";
 
 export const pitchRouter: Router = Router();
@@ -326,13 +325,11 @@ pitchRouter.get("/:pitchId/qr", async (req, res) => {
 
     const publicVoteUrl = `${env.FRONTEND_URL}/vote/${pitch.id}`;//se convierte en endpoint público
 
-    return res.json(
-      dashboardPitchQrSchema.parse(presentPitchQr({
-        id: pitch.id,
-        name: pitch.name,
-        publicVoteUrl
-      }))
-    )
+    return res.json({
+      id: pitch.id,
+      name: pitch.name,
+      publicVoteUrl,
+    })
   } catch(error) {
     console.error(error)
     return res.status(500).json({ message: "Failed to generate pitch access URL" })

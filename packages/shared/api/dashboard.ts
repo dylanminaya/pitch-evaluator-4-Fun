@@ -54,10 +54,23 @@ export const dashboardPitchCommentSchema = z.object({
   createdAt: z.string(),
 });
 
-export const dashboardPitchQrSchema = z.object({
+export const dashboardEventQrSchema = z.object({
   id: z.string(),
   name: z.string(),
   publicVoteUrl: z.string().url(),
+});
+
+export const publicEventInvitationSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  status: z.enum(["OPEN", "CLOSED"]),
+  targetPitch: z.object({
+    id: z.string(),
+    name: z.string(),
+    description: z.string(),
+    color: z.string(),
+    logoUrl: z.string().nullable(),
+  }).nullable(),
 });
 
 export const createDashboardEventSchema = z.object({
@@ -112,7 +125,8 @@ export type DashboardPitch = z.infer<typeof dashboardPitchSchema>;
 export type DashboardRankingItem = z.infer<typeof dashboardRankingItemSchema>;
 export type DashboardPitchDetail = z.infer<typeof dashboardPitchDetailSchema>;
 export type DashboardPitchComment = z.infer<typeof dashboardPitchCommentSchema>;
-export type DashboardPitchQr = z.infer<typeof dashboardPitchQrSchema>;
+export type DashboardPitchQr = z.infer<typeof dashboardEventQrSchema>;
+export type PublicEventInvitation = z.infer<typeof publicEventInvitationSchema>;
 export type CreateDashboardEvent = z.infer<typeof createDashboardEventSchema>;
 export type CreateDashboardPitch = z.infer<typeof createDashboardPitchSchema>;
 export type PublicPitch = z.infer<typeof publicPitchSchema>;

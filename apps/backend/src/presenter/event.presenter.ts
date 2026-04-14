@@ -13,3 +13,13 @@ export const presentEvent = (event: {
   createdAt: event.createdAt instanceof Date ? event.createdAt.toISOString() : (event.createdAt ?? null),
   organizerId: event.organizerId,
 });
+
+export const presentEventQr = (pitch: {
+  id: string;
+  name: string;
+  publicVoteUrl: string;
+}) => ({
+  id: pitch.id,
+  name: pitch.name,
+  publicVoteUrl: pitch.publicVoteUrl,
+});

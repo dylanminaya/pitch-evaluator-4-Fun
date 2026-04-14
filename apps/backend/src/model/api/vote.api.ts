@@ -1,10 +1,10 @@
 import { Router } from "express";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
-import { requireSession } from "../auth.js";
-import { db } from "../db.js";
-import { voteSchema } from "./vote.schema.js";
-import { presentPitchRanking, presentVote } from "../presenter/vote.presenter.js";
+import { requireSession } from "../../auth.js";
+import { db } from "../../db.js";
+import { voteSchema } from "./../vote.schema.js";
+import { presentPitchRanking, presentVote } from "../../presenter/vote.presenter.js";
 import { dashboardRankingItemSchema } from "@workspace/shared/api";
 
 export const voteRouter: Router = Router();
