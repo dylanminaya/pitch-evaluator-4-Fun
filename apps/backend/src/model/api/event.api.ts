@@ -10,6 +10,12 @@ import { validateServerEnv } from "@workspace/shared/env/server";
 
 export const eventRouter: Router = Router();
 
+const hasPgErrorCode = (error: unknown, code: string) =>
+  typeof error === "object" &&
+  error !== null &&
+  "code" in error &&
+  error.code === code;
+
 eventRouter.get("/public/:eventId", async (req, res) => {
   try {
     const eventResult = await db.query(
@@ -112,17 +118,36 @@ eventRouter.post("/", async (req, res) => {
     });
   }
 
-  const { name, description } = parsed.data;
+  const { name, description, criteria } = parsed.data;
 
   try {
-    const result = await db.query(
-      `
-        INSERT INTO event (id, name, description, status, "createdAt", "organizerId")
-        VALUES ($1, $2, $3, $4, NOW(), $5)
-        RETURNING id, name, description, status, "createdAt", "organizerId"
-      `,
-      [randomUUID(), name, description, "OPEN", session.user.id],
-    );
+    const eventId = randomUUID();
+    let result;
+
+    try {
+      result = await db.query(
+        `
+          INSERT INTO event (id, name, description, status, criteria, "createdAt", "organizerId")
+          VALUES ($1, $2, $3, $4, $5::jsonb, NOW(), $6)
+          RETURNING id, name, description, status, "createdAt", "organizerId"
+        `,
+        [eventId, name, description, "OPEN", JSON.stringify(criteria), session.user.id],
+      );
+    } catch (error) {
+      // Fallback for databases that still use the old event table without `criteria`.
+      if (!hasPgErrorCode(error, "42703")) {
+        throw error;
+      }
+
+      result = await db.query(
+        `
+          INSERT INTO event (id, name, description, status, "createdAt", "organizerId")
+          VALUES ($1, $2, $3, $4, NOW(), $5)
+          RETURNING id, name, description, status, "createdAt", "organizerId"
+        `,
+        [eventId, name, description, "OPEN", session.user.id],
+      );
+    }
 
     res.status(201).json(dashboardEventSchema.parse(presentEvent(result.rows[0])));
   } catch (error) {

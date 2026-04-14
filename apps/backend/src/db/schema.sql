@@ -6,6 +6,12 @@ CREATE TABLE IF NOT EXISTS event (
   name          TEXT        NOT NULL,
   description   TEXT        NOT NULL,
   status        TEXT        NOT NULL DEFAULT 'OPEN' CHECK (status IN ('OPEN', 'CLOSED')),
+  criteria      JSONB       NOT NULL DEFAULT '[
+    {"id":"innovation","label":"Innovacion","weight":25,"isDefault":true},
+    {"id":"viability","label":"Viabilidad","weight":25,"isDefault":true},
+    {"id":"impact","label":"Impacto","weight":25,"isDefault":true},
+    {"id":"presentation","label":"Presentacion","weight":25,"isDefault":true}
+  ]'::jsonb,
   "createdAt"   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   "organizerId" TEXT        NOT NULL REFERENCES "user"(id) ON DELETE CASCADE
 );
@@ -25,6 +31,7 @@ CREATE TABLE IF NOT EXISTS vote (
   "pitchId"     TEXT        NOT NULL REFERENCES pitch(id) ON DELETE CASCADE,
   "evaluatorId" TEXT,
   "ipAddress"   TEXT,
+  "criteriaScores" JSONB    NOT NULL DEFAULT '[]'::jsonb,
   innovation    INTEGER     NOT NULL CHECK (innovation BETWEEN 1 AND 5),
   viability     INTEGER     NOT NULL CHECK (viability BETWEEN 1 AND 5),
   impact        INTEGER     NOT NULL CHECK (impact BETWEEN 1 AND 5),

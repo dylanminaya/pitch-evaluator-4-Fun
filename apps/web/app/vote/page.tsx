@@ -6,15 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { CheckCircle2, Sparkles } from "lucide-react";
 import { Button } from "@workspace/ui/components/button";
 import { usePublicPitch, useSubmitPublicVote } from "@/hooks/dashboard";
-
-const criteria = [
-  { key: "innovation", label: "Innovacion", helper: "Que tan original es la idea?" },
-  { key: "viability", label: "Viabilidad", helper: "Se puede construir en el mundo real?" },
-  { key: "impact", label: "Impacto", helper: "Que tanto cambia la experiencia?" },
-  { key: "presentation", label: "Presentacion", helper: "La explicacion fue clara y potente?" },
-] as const;
-
-type ScoreKey = (typeof criteria)[number]["key"];
+import type { EventCriterion } from "@workspace/shared/api";
 
 export default function VotingScreenPage() {
   const params = useParams<{ pitchId: string }>();
@@ -24,14 +16,11 @@ export default function VotingScreenPage() {
   const { mutateAsync: submitVote, isPending, isSuccess, error: voteError } =
     useSubmitPublicVote();
   const [comment, setComment] = useState("");
-  const [scores, setScores] = useState<Record<ScoreKey, number>>({
-    innovation: 4,
-    viability: 3,
-    impact: 5,
-    presentation: 4,
-  });
+  const [scores, setScores] = useState<Record<string, number>>({});
 
-  function updateScore(key: ScoreKey, value: number) {
+  const criteria: EventCriterion[] = pitch?.criteria ?? [];
+
+  function updateScore(key: string, value: number) {
     setScores((current) => ({ ...current, [key]: value }));
   }
 
@@ -40,10 +29,10 @@ export default function VotingScreenPage() {
 
     await submitVote({
       pitchId,
-      innovation: scores.innovation,
-      viability: scores.viability,
-      impact: scores.impact,
-      presentation: scores.presentation,
+      criteriaScores: criteria.map((criterion) => ({
+        criterionId: criterion.id,
+        score: scores[criterion.id] ?? 3,
+      })),
       comment: comment.trim() || null,
     });
   }
@@ -125,23 +114,25 @@ export default function VotingScreenPage() {
             <div className="grid gap-4 md:grid-cols-2">
               {criteria.map((criterion) => (
                 <section
-                  key={criterion.key}
+                  key={criterion.id}
                   className="rounded-[24px] border border-[#263550] bg-[#1a2640] p-6 shadow-[0_18px_45px_rgba(2,8,23,0.35)]"
                 >
                   <div className="inline-flex items-center gap-2 text-[11px] font-bold uppercase italic tracking-[0.24em] text-[#83ce00]">
                     <Sparkles className="size-4 text-[#8899aa]" />
                     {criterion.label}
                   </div>
-                  <p className="mt-3 text-sm text-[#a9b3c9]">{criterion.helper}</p>
+                  <p className="mt-3 text-sm text-[#a9b3c9]">
+                    Peso configurado: {criterion.weight}%
+                  </p>
                   <div className="mt-8 flex items-center justify-between gap-2">
                     {[1, 2, 3, 4, 5].map((value) => {
-                      const selected = scores[criterion.key] === value;
+                      const selected = (scores[criterion.id] ?? 3) === value;
 
                       return (
                         <button
                           key={value}
                           type="button"
-                          onClick={() => updateScore(criterion.key, value)}
+                          onClick={() => updateScore(criterion.id, value)}
                           className={`flex h-10 w-10 items-center justify-center rounded-xl border text-sm font-bold transition ${
                             selected
                               ? "border-[#83ce00] bg-[#83ce00] text-[#0d1526]"

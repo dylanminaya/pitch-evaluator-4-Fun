@@ -3,17 +3,11 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { requireSession } from "../../auth.js";
 import { db } from "../../db.js";
-import { voteSchema } from "./../vote.schema.js";
+import { createPublicVoteSchema } from "@workspace/shared/api";
 import { presentPitchRanking, presentVote } from "../../presenter/vote.presenter.js";
 import { dashboardRankingItemSchema } from "@workspace/shared/api";
 
 export const voteRouter: Router = Router();
-
-const createVoteSchema = voteSchema.omit({
-  id: true,
-  createdAt: true,
-  ipAddress: true,
-});
 
 const getClientIpAddress = (value: string | string[] | undefined) => {
   if (Array.isArray(value)) {
@@ -26,6 +20,17 @@ const getClientIpAddress = (value: string | string[] | undefined) => {
 
   return null;
 };
+
+const getRequiredScore = (
+  criteriaScores: Array<{ criterionId: string; score: number }>,
+  criterionId: string,
+) => criteriaScores.find((item) => item.criterionId === criterionId)?.score ?? null;
+
+const hasPgErrorCode = (error: unknown, code: string) =>
+  typeof error === "object" &&
+  error !== null &&
+  "code" in error &&
+  error.code === code;
 
 voteRouter.get("/", async (req, res) => {
   const session = await requireSession(req, res);
@@ -72,7 +77,7 @@ voteRouter.get("/", async (req, res) => {
 });
 
 voteRouter.post("/", async (req, res) => {
-  const parsed = createVoteSchema.safeParse(req.body);
+  const parsed = createPublicVoteSchema.safeParse(req.body);
 
   if (!parsed.success) {
     return res.status(400).json({
@@ -84,12 +89,25 @@ voteRouter.post("/", async (req, res) => {
   const {
     pitchId,
     evaluatorId,
-    innovation,
-    viability,
-    impact,
-    presentation,
+    criteriaScores,
     comment,
   } = parsed.data;
+
+  const innovation = getRequiredScore(criteriaScores, "innovation");
+  const viability = getRequiredScore(criteriaScores, "viability");
+  const impact = getRequiredScore(criteriaScores, "impact");
+  const presentation = getRequiredScore(criteriaScores, "presentation");
+
+  if (
+    innovation === null ||
+    viability === null ||
+    impact === null ||
+    presentation === null
+  ) {
+    return res.status(400).json({
+      message: "Missing one or more required default criteria scores",
+    });
+  }
 
   try {
     const pitchResult = await db.query(
@@ -132,51 +150,97 @@ voteRouter.post("/", async (req, res) => {
     let result;
 
     try {
-      result = await db.query(
-      `
-        INSERT INTO vote (
-          id,
-          "pitchId",
-          "evaluatorId",
-          "ipAddress",
-          innovation,
-          viability,
-          impact,
-          presentation,
-          comment,
-          "createdAt"
-        )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
-        RETURNING
-          id,
-          "pitchId",
-          "evaluatorId",
-          "ipAddress",
-          innovation,
-          viability,
-          impact,
-          presentation,
-          comment,
-          "createdAt"
-      `,
-      [
-        randomUUID(),
-        pitchId,
-        evaluatorId ?? null,
-        ipAddress,
-        innovation,
-        viability,
-        impact,
-        presentation,
-        comment ?? null,
-      ],
-    );
-  }catch(error) {
+      try {
+        result = await db.query(
+          `
+            INSERT INTO vote (
+              id,
+              "pitchId",
+              "evaluatorId",
+              "ipAddress",
+              "criteriaScores",
+              innovation,
+              viability,
+              impact,
+              presentation,
+              comment,
+              "createdAt"
+            )
+            VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7, $8, $9, $10, NOW())
+            RETURNING
+              id,
+              "pitchId",
+              "evaluatorId",
+              "ipAddress",
+              innovation,
+              viability,
+              impact,
+              presentation,
+              comment,
+              "createdAt"
+          `,
+          [
+            randomUUID(),
+            pitchId,
+            evaluatorId ?? null,
+            ipAddress,
+            JSON.stringify(criteriaScores),
+            innovation,
+            viability,
+            impact,
+            presentation,
+            comment ?? null,
+          ],
+        );
+      } catch (error) {
+        // Fallback for databases that still use the old vote table without `criteriaScores`.
+        if (!hasPgErrorCode(error, "42703")) {
+          throw error;
+        }
+
+        result = await db.query(
+          `
+            INSERT INTO vote (
+              id,
+              "pitchId",
+              "evaluatorId",
+              "ipAddress",
+              innovation,
+              viability,
+              impact,
+              presentation,
+              comment,
+              "createdAt"
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
+            RETURNING
+              id,
+              "pitchId",
+              "evaluatorId",
+              "ipAddress",
+              innovation,
+              viability,
+              impact,
+              presentation,
+              comment,
+              "createdAt"
+          `,
+          [
+            randomUUID(),
+            pitchId,
+            evaluatorId ?? null,
+            ipAddress,
+            innovation,
+            viability,
+            impact,
+            presentation,
+            comment ?? null,
+          ],
+        );
+      }
+    } catch(error) {
     if (
-      typeof error === "object" &&
-      error !== null &&
-      "code" in error &&
-      error.code === "23505"
+      hasPgErrorCode(error, "23505")
     ){
       return res.status(409).json({
         message: "You have already voted for this pitch"

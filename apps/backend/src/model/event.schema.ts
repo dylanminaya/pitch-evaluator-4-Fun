@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { eventCriterionSchema } from "@workspace/shared/api";
 
 export const eventStatusSchema = z.enum(["OPEN", "CLOSED"]);
 
@@ -13,6 +14,7 @@ export const eventSchema = z.object({
     .min(5, "Description must have at least 5 characters")
     .max(500, "Description cannot exceed 500 characters"),
   status: eventStatusSchema,
+  criteria: z.array(eventCriterionSchema),
   createdAt: z.string(),
   organizerId: z.string().min(1, "Organizer id is required"),
 });
@@ -24,6 +26,7 @@ export const createEventSchema = z.object({
   description: z.string()
     .min(5, "Description must have at least 5 characters")
     .max(500, "Description cannot exceed 500 characters"),
+  criteria: z.array(eventCriterionSchema).min(4, "At least 4 criteria are required"),
 })
 
 export const updateEventStatusSchema = z.object({

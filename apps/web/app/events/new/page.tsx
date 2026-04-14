@@ -1,25 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   Check,
+  Plus,
   Settings2,
-  Sparkles,
+  // Sparkles,
   Target,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@workspace/ui/components/button";
 import { Input } from "@workspace/ui/components/input";
 import { useCreateEvent } from "@/hooks/dashboard";
-
-const criteria = [
-  { label: "Innovacion", weight: "25%" },
-  { label: "Viabilidad", weight: "25%" },
-  { label: "Impacto", weight: "25%" },
-  { label: "Presentacion", weight: "25%" },
-];
+import type { EventCriterion } from "@workspace/shared/api";
 
 const setupItems = [
   {
@@ -41,6 +37,57 @@ export default function NewEventPage() {
   const { mutateAsync, isPending, error } = useCreateEvent();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  //
+  const [criteria, setCriteria] = useState<EventCriterion[]>([
+    { id: "innovation", label: "Innovacion", weight: 25, isDefault: true },
+    { id: "viability", label: "Viabilidad", weight: 25, isDefault: true },
+    { id: "impact", label: "Impacto", weight: 25, isDefault: true },
+    { id: "presentation", label: "Presentacion", weight: 25, isDefault: true },
+  ]);
+
+  const totalWeight = useMemo(
+    () => criteria.reduce((sum, criterion) => sum + criterion.weight, 0),
+    [criteria],
+  );
+
+  function handleAddCriterion() {
+    setCriteria((current) => [
+      ...current,
+      {
+        id: `criterion-${crypto.randomUUID()}`,
+        label: `Criterio ${current.length + 1}`,
+        weight: 0,
+        isDefault: false,
+      },
+    ]);
+  }
+
+  function handleCriterionLabelChange(id: string, label: string) {
+    setCriteria((current) =>
+      current.map((criterion) =>
+        criterion.id === id ? { ...criterion, label } : criterion,
+      ),
+    );
+  }
+
+  function handleCriterionWeightChange(id: string, weight: number) {
+    const normalizedWeight = Number.isNaN(weight)
+      ? 0
+      : Math.min(100, Math.max(0, weight));
+
+    setCriteria((current) =>
+      current.map((criterion) =>
+        criterion.id === id
+          ? { ...criterion, weight: normalizedWeight }
+          : criterion,
+      ),
+    );
+  }
+
+  function handleRemoveCriterion(id: string) {
+    setCriteria((current) => current.filter((criterion) => criterion.id !== id));
+  }
+  //
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -48,6 +95,7 @@ export default function NewEventPage() {
     const createdEvent = await mutateAsync({
       name,
       description,
+      criteria,
     });
 
     router.push(`/dashboard?eventId=${createdEvent.id}`);
@@ -120,7 +168,8 @@ export default function NewEventPage() {
                 </p>
                 <p className="text-sm text-[#a9b3c9]">
                   Define el nombre y una descripcion clara para identificar el
-                  evento dentro del dashboard del organizer.
+                  evento dentro del dashboard del organizer. Tambien puedes
+                  ajustar el peso de cada criterio de evaluacion.
                 </p>
               </div>
 
@@ -192,24 +241,88 @@ export default function NewEventPage() {
                       Criterios de evaluacion
                     </p>
                   </div>
-                  <span className="text-xs text-[#8899aa]">Default</span>
+                  <div className="flex items-center gap-3">
+                    <span className={`text-xs ${totalWeight === 100 ? "text-[#83ce00]" : "text-[#ff8cab]"}`}>
+                      Total {totalWeight}%
+                    </span>
+                    <Button
+                      type="button"
+                      onClick={handleAddCriterion}
+                      className="h-9 rounded-full bg-[#83ce00] px-4 text-xs font-bold italic text-[#0d1526] hover:bg-[#a7ea2e]"
+                      disabled={isPending}
+                    >
+                      <Plus className="size-4" />
+                      Agregar
+                    </Button>
+                  </div>
                 </div>
 
                 <div className="mt-5 flex flex-col gap-3">
                   {criteria.map((criterion) => (
                     <div
-                      key={criterion.label}
-                      className="flex items-center justify-between rounded-2xl border border-[#263550] bg-[#0d1526] px-4 py-3"
+                      key={criterion.id}
+                      className="rounded-2xl border border-[#263550] bg-[#0d1526] px-4 py-3"
                     >
-                      <span className="text-sm font-medium text-white">
-                        {criterion.label}
-                      </span>
-                      <span className="text-sm font-bold text-[#83ce00]">
-                        {criterion.weight}
-                      </span>
+                      <div className="flex items-center justify-between gap-4">
+                        <Input
+                          value={criterion.label}
+                          onChange={(event) =>
+                            handleCriterionLabelChange(criterion.id, event.target.value)
+                          }
+                          disabled={isPending}
+                          className="h-10 border-[#263550] bg-[#121d30] text-white"
+                        />
+                        <span className="text-sm font-bold text-[#83ce00]">
+                          {criterion.weight}%
+                        </span>
+                      </div>
+                      <div className="mt-3 flex items-center gap-3">
+                        <input
+                          type="range"
+                          min={0}
+                          max={100}
+                          step={5}
+                          value={criterion.weight}
+                          onChange={(event) =>
+                            handleCriterionWeightChange(
+                              criterion.id,
+                              Number(event.target.value),
+                            )
+                          }
+                          disabled={isPending}
+                          className="w-full accent-[#83ce00]"
+                        />
+                        <Input
+                          type="number"
+                          min={0}
+                          max={100}
+                          step={5}
+                          value={criterion.weight}
+                          onChange={(event) =>
+                            handleCriterionWeightChange(
+                              criterion.id,
+                              Number(event.target.value || 0),
+                            )
+                          }
+                          disabled={isPending}
+                          className="h-11 w-24 rounded-2xl border-[#263550] bg-[#121d30] px-3 text-white"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => handleRemoveCriterion(criterion.id)}
+                          disabled={isPending || criterion.isDefault}
+                          className="h-11 rounded-2xl border-[#263550] bg-transparent px-3 text-white hover:bg-[#1a2640] hover:text-white"
+                        >
+                          <Trash2 className="size-4" />
+                        </Button>
+                      </div>
                     </div>
                   ))}
                 </div>
+                <p className="mt-4 text-xs leading-5 text-[#8899aa]">
+                  Puedes preparar los criterios aqui. Por ahora esta configuracion es visual y no se guarda todavia en la base de datos.
+                </p>
               </section>
 
               <section className="rounded-[24px] border border-[#263550] bg-[#1a2640] p-6 shadow-[0_18px_45px_rgba(2,8,23,0.35)]">

@@ -10,9 +10,23 @@ import {
   dashboardPitchSchema,
   dashboardPitchDetailSchema,
   dashboardPitchCommentSchema,
+  publicPitchSchema,
 } from "@workspace/shared/api";
 
 export const pitchRouter: Router = Router();
+
+const defaultCriteria = [
+  { id: "innovation", label: "Innovacion", weight: 25, isDefault: true },
+  { id: "viability", label: "Viabilidad", weight: 25, isDefault: true },
+  { id: "impact", label: "Impacto", weight: 25, isDefault: true },
+  { id: "presentation", label: "Presentacion", weight: 25, isDefault: true },
+];
+
+const hasPgErrorCode = (error: unknown, code: string) =>
+  typeof error === "object" &&
+  error !== null &&
+  "code" in error &&
+  error.code === code;
 
 pitchRouter.get("/", async (req, res) => {
   const session = await requireSession(req, res);
@@ -175,21 +189,47 @@ pitchRouter.delete("/:id", async (req, res) => {
 // Endpoint publico para la pantalla de voto
 pitchRouter.get("/public/:pitchId", async (req, res) => {
   try {
-    const result = await db.query(
-      `
-        SELECT
-          p.id,
-          p.name,
-          p.description,
-          p.color,
-          p."logoUrl",
-          e.status AS "eventStatus"
-        FROM pitch p
-        INNER JOIN event e ON e.id = p."eventId"
-        WHERE p.id = $1
-      `,
-      [req.params.pitchId],
-    );
+    let result;
+
+    try {
+      result = await db.query(
+        `
+          SELECT
+            p.id,
+            p.name,
+            p.description,
+            p.color,
+            p."logoUrl",
+            e.status AS "eventStatus",
+            e.criteria
+          FROM pitch p
+          INNER JOIN event e ON e.id = p."eventId"
+          WHERE p.id = $1
+        `,
+        [req.params.pitchId],
+      );
+    } catch (error) {
+      // Fallback for databases that still use the old event table without `criteria`.
+      if (!hasPgErrorCode(error, "42703")) {
+        throw error;
+      }
+
+      result = await db.query(
+        `
+          SELECT
+            p.id,
+            p.name,
+            p.description,
+            p.color,
+            p."logoUrl",
+            e.status AS "eventStatus"
+          FROM pitch p
+          INNER JOIN event e ON e.id = p."eventId"
+          WHERE p.id = $1
+        `,
+        [req.params.pitchId],
+      );
+    }
 
     if (result.rowCount === 0) {
       return res.status(404).json({
@@ -197,7 +237,10 @@ pitchRouter.get("/public/:pitchId", async (req, res) => {
       });
     }
 
-    return res.status(200).json(presentPublicPitch(result.rows[0]));
+    return res.status(200).json(publicPitchSchema.parse({
+      ...presentPublicPitch(result.rows[0]),
+      criteria: Array.isArray(result.rows[0].criteria) ? result.rows[0].criteria : defaultCriteria,
+    }));
   } catch (error) {
     console.error(error);
     return res.status(500).json({ message: "Failed to get pitch" });

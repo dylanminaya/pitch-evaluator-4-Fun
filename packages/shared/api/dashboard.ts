@@ -1,5 +1,17 @@
 import { z } from "zod";
 
+export const eventCriterionSchema = z.object({
+  id: z.string(),
+  label: z.string().min(1),
+  weight: z.number().int().min(0).max(100),
+  isDefault: z.boolean().optional(),
+});
+
+export const voteCriterionScoreSchema = z.object({
+  criterionId: z.string(),
+  score: z.number().int().min(1).max(5),
+});
+
 export const dashboardEventSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -82,6 +94,7 @@ export const createDashboardEventSchema = z.object({
     .string()
     .min(5, "Description must have at least 5 characters")
     .max(500, "Description cannot exceed 500 characters"),
+  criteria: z.array(eventCriterionSchema).min(4, "At least 4 criteria are required"),
 });
 
 export const createDashboardPitchSchema = z.object({
@@ -122,15 +135,13 @@ export const publicPitchSchema = z.object({
   color: z.string(),
   logoUrl: z.string().nullable(),
   eventStatus: z.enum(["OPEN", "CLOSED"]),
+  criteria: z.array(eventCriterionSchema),
 });
 
 export const createPublicVoteSchema = z.object({
   pitchId: z.string().min(1, "Pitch id is required"),
   evaluatorId: z.string().nullable().optional(),
-  innovation: z.number().int().min(1).max(5),
-  viability: z.number().int().min(1).max(5),
-  impact: z.number().int().min(1).max(5),
-  presentation: z.number().int().min(1).max(5),
+  criteriaScores: z.array(voteCriterionScoreSchema).min(4, "At least 4 scores are required"),
   comment: z.string().max(500).optional().nullable(),
 });
 
@@ -145,5 +156,7 @@ export type PublicEventInvitation = z.infer<typeof publicEventInvitationSchema>;
 export type CreateDashboardEvent = z.infer<typeof createDashboardEventSchema>;
 export type CreateDashboardPitch = z.infer<typeof createDashboardPitchSchema>;
 export type UpdateDashboardPitch = z.infer<typeof updateDashboardPitchSchema>;
+export type EventCriterion = z.infer<typeof eventCriterionSchema>;
+export type VoteCriterionScore = z.infer<typeof voteCriterionScoreSchema>;
 export type PublicPitch = z.infer<typeof publicPitchSchema>;
 export type CreatePublicVote = z.infer<typeof createPublicVoteSchema>;
