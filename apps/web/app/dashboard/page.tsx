@@ -303,9 +303,12 @@ function DashboardPageContent() {
                                 index === 0 ? "bg-[#ccff00]" : "bg-[#53546a]"//resaltar ganador
                               }`} 
                             />
-                            <span className={index === 0 ? "font-semibold text-[#f8ffcf]" : "font-semibold"}>
-                              {item.name} {/*nombre del proyecto */}
-                            </span>
+                            <Link
+                              href={`/events/${item.eventId}/pitches/${item.id}/edit`}
+                              className={`transition hover:text-[#83ce00] hover:underline ${index === 0 ? "font-semibold text-[#f8ffcf]" : "font-semibold"}`}
+                            >
+                              {item.name}
+                            </Link>
                           </div>
                         </td>{/*muestra las puntuaciones en cada categoria */}
                         <td className="px-4 py-4 text-[#9da0bc]">{item.innovationAvg}</td>

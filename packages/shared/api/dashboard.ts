@@ -100,6 +100,21 @@ export const createDashboardPitchSchema = z.object({
   logoUrl: z.string().url().nullable().optional(),
 });
 
+export const updateDashboardPitchSchema = z.object({
+  name: z
+    .string()
+    .min(3, "Project name must have at least 3 characters")
+    .max(150, "Project name cannot exceed 150 characters"),
+  description: z
+    .string()
+    .min(5, "Project description must have at least 5 characters")
+    .max(500, "Project description cannot exceed 500 characters"),
+  color: z
+    .string()
+    .regex(/^#([A-Fa-f0-9]{6})$/, "Color must be a valid hex code"),
+  logoUrl: z.string().url().nullable().optional(),
+});
+
 export const publicPitchSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -129,5 +144,6 @@ export type DashboardPitchQr = z.infer<typeof dashboardEventQrSchema>;
 export type PublicEventInvitation = z.infer<typeof publicEventInvitationSchema>;
 export type CreateDashboardEvent = z.infer<typeof createDashboardEventSchema>;
 export type CreateDashboardPitch = z.infer<typeof createDashboardPitchSchema>;
+export type UpdateDashboardPitch = z.infer<typeof updateDashboardPitchSchema>;
 export type PublicPitch = z.infer<typeof publicPitchSchema>;
 export type CreatePublicVote = z.infer<typeof createPublicVoteSchema>;

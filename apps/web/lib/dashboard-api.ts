@@ -3,6 +3,7 @@ import type {
   CreatePublicVote,
   CreateDashboardEvent,
   CreateDashboardPitch,
+  UpdateDashboardPitch,
   DashboardEvent,
   DashboardPitch,
   DashboardRankingItem,
@@ -16,6 +17,7 @@ export type {
   CreatePublicVote,
   CreateDashboardEvent,
   CreateDashboardPitch,
+  UpdateDashboardPitch,
   DashboardEvent,
   DashboardPitch,
   DashboardRankingItem,
@@ -43,6 +45,13 @@ export function getPitches(eventId: string) {
 export function createPitch(data: CreateDashboardPitch) {
   return apiFetch<DashboardPitch>("/api/pitch", {
     method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export function updatePitch(pitchId: string, data: UpdateDashboardPitch) {
+  return apiFetch<DashboardPitch>(`/api/pitch/${pitchId}`, {
+    method: "PATCH",
     body: JSON.stringify(data),
   });
 }
