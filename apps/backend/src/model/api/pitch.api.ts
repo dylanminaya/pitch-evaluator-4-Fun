@@ -3,7 +3,8 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { requireSession } from "../../auth.js";
 import { db } from "../../db.js";
-import { createPitchSchema, updatePitchSchema } from "./../pitch.schema.js";
+import { createPitchSchema, updatePitchSchema } from "../schema/pitch.schema.js";
+import { canManageEvent, getEventIdForPitch } from "../event.permissions.js";
 import { validateServerEnv } from "@workspace/shared/env/server";
 import { presentPitch, presentPitchComment, presentPitchDetail,presentPitchSummary, presentPublicPitch } from "../../presenter/pitch.presenter.js";
 import {
@@ -42,15 +43,20 @@ pitchRouter.get("/", async (req, res) => {
   }
 
   try {
+    const canManage = await canManageEvent(session.user.id, eventId);
+
+    if (!canManage) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
     const result = await db.query(
       `
         SELECT p.id, p."eventId", p.name, p.description, p.color, p."logoUrl", p."createdAt"
         FROM pitch p
-        INNER JOIN event e ON e.id = p."eventId"
-        WHERE p."eventId" = $1 AND e."organizerId" = $2
+        WHERE p."eventId" = $1
         ORDER BY p."createdAt" DESC
       `,
-      [eventId, session.user.id],
+      [eventId],
     );
 
     return res.json(z.array(dashboardPitchSchema).parse(result.rows.map(presentPitch)));
@@ -79,18 +85,10 @@ pitchRouter.post("/", async (req, res) => {
   const { eventId, name, description, color, logoUrl } = parsed.data;
 
   try {
-    //comprueba que el evento existe y pertenece al organizador
-    const eventResult = await db.query(
-      `
-        SELECT id
-        FROM event
-        WHERE id = $1 AND "organizerId" = $2
-      `,
-      [eventId, session.user.id],
-    );
+    const canManage = await canManageEvent(session.user.id, eventId);
 
-    if (eventResult.rowCount === 0) {
-      return res.status(404).json({ message: "Event not found" });
+    if (!canManage) {
+      return res.status(403).json({ message: "Forbidden" });
     }
 
     const result = await db.query(
@@ -128,21 +126,30 @@ pitchRouter.patch("/:id", async (req, res) => {
   const { name, description, color, logoUrl } = parsed.data;
 
   try {
+    const eventId = await getEventIdForPitch(req.params.id);
+
+    if (!eventId) {
+      return res.status(404).json({ message: "Pitch not found" });
+    }
+
+    const canManage = await canManageEvent(session.user.id, eventId);
+
+    if (!canManage) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
     const result = await db.query(
       `
-        UPDATE pitch p
+        UPDATE pitch
         SET
           name = $1,
           description = $2,
           color = $3,
           "logoUrl" = $4
-        FROM event e
-        WHERE p.id = $5
-          AND e.id = p."eventId"
-          AND e."organizerId" = $6
-        RETURNING p.id, p."eventId", p.name, p.description, p.color, p."logoUrl", p."createdAt"
+        WHERE id = $5
+        RETURNING id, "eventId", name, description, color, "logoUrl", "createdAt"
       `,
-      [name, description, color, logoUrl ?? null, req.params.id, session.user.id],
+      [name, description, color, logoUrl ?? null, req.params.id],
     );
 
     if (result.rowCount === 0) {
@@ -164,15 +171,24 @@ pitchRouter.delete("/:id", async (req, res) => {
   }
 
   try {
+    const eventId = await getEventIdForPitch(req.params.id);
+
+    if (!eventId) {
+      return res.status(404).json({ message: "Pitch not found" });
+    }
+
+    const canManage = await canManageEvent(session.user.id, eventId);
+
+    if (!canManage) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
     const result = await db.query(
       `
-        DELETE FROM pitch p
-        USING event e
-        WHERE p.id = $1
-          AND e.id = p."eventId"
-          AND e."organizerId" = $2
+        DELETE FROM pitch
+        WHERE id = $1
       `,
-      [req.params.id, session.user.id],
+      [req.params.id],
     );
 
     if (result.rowCount === 0) {
@@ -256,6 +272,20 @@ pitchRouter.get("/detail/:pitchId", async (req, res) => {
   }
 
   try {
+    const eventId = await getEventIdForPitch(req.params.pitchId);
+
+    if (!eventId) {
+      return res.status(404).json({
+        message: "Pitch not found",
+      });
+    }
+
+    const canManage = await canManageEvent(session.user.id, eventId);
+
+    if (!canManage) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
     const result = await db.query(
       `
       SELECT 
@@ -271,10 +301,8 @@ pitchRouter.get("/detail/:pitchId", async (req, res) => {
         COALESCE(ROUND(AVG(v.impact)::numeric, 2), 0) AS "impactAvg",
         COALESCE(ROUND(AVG(v.presentation)::numeric, 2), 0) AS "presentationAvg"
       FROM pitch p
-      INNER JOIN event e ON e.id = p."eventId"
       LEFT JOIN vote v ON v."pitchId" = p.id
       WHERE p.id = $1
-        AND e."organizerId" = $2
       GROUP BY
         p.id,
         p."eventId",
@@ -283,7 +311,7 @@ pitchRouter.get("/detail/:pitchId", async (req, res) => {
         p.color,
         p."logoUrl"
       `,
-      [req.params.pitchId, session.user.id],
+      [req.params.pitchId],
     )
 
     if (result.rowCount === 0) {
@@ -315,21 +343,30 @@ pitchRouter.get("/comments", async (req, res) => {
   }
 
   try {
+    const eventId = await getEventIdForPitch(pitchId);
+
+    if (!eventId) {
+      return res.status(404).json({ message: "Pitch not found" });
+    }
+
+    const canManage = await canManageEvent(session.user.id, eventId);
+
+    if (!canManage) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
     const result = await db.query(
       `SELECT
         v.id,
         v.comment,
         v."createdAt"
       FROM vote v
-      INNER JOIN pitch p ON p.id = v."pitchId"
-      INNER JOIN event e ON e.id = p."eventId"
       WHERE v."pitchId" = $1
-        AND e."organizerId" = $2
         AND v.comment IS NOT null
         AND TRIM(v.comment) <> ''
       ORDER BY v."createdAt" DESC
       `,
-      [pitchId, session.user.id]
+      [pitchId]
     );
 
     res.status(200).json(z.array(dashboardPitchCommentSchema).parse(result.rows.map(presentPitchComment)))
@@ -349,15 +386,26 @@ pitchRouter.get("/:pitchId/qr", async (req, res) => {
   }
 
   try {
+    const eventId = await getEventIdForPitch(req.params.pitchId);
+
+    if (!eventId) {
+      return res.status(404).json({ message: "Pitch not found" });
+    }
+
+    const canManage = await canManageEvent(session.user.id, eventId);
+
+    if (!canManage) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
     const result = await db.query(
       `SELECT
         p.id,
         p.name
       FROM pitch p
-      INNER JOIN event e ON e.id = p."eventId"
       WHERE p.id = $1
-        AND e."organizerId" = $2
-        `, [req.params.pitchId, session.user.id]
+        `,
+      [req.params.pitchId],
     )
 
     if (result.rowCount === 0) {
@@ -388,17 +436,27 @@ pitchRouter.post("/:pitchId/summary", async (req, res) => {
   }
 
   try {
+    const eventId = await getEventIdForPitch(req.params.pitchId);
+
+    if (!eventId) {
+      return res.status(404).json({ message: "Pitch not found" });
+    }
+
+    const canManage = await canManageEvent(session.user.id, eventId);
+
+    if (!canManage) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
     const pitchResult = await db.query(
       `
       SELECT
         p.id,
         p.name
       FROM pitch p
-      INNER join event e ON e.id = p."eventId"
       WHERE p.id = $1
-        AND e."organizerId" = $2
         `,
-        [req.params.pitchId, session.user.id],
+        [req.params.pitchId],
     )
 
     if (pitchResult.rowCount === 0) {
@@ -449,6 +507,18 @@ pitchRouter.get("/:pitchId/export", async (req, res) => {
   }
 
   try {
+    const eventId = await getEventIdForPitch(req.params.pitchId);
+
+    if (!eventId) {
+      return res.status(404).json({ message: "Pitch not found"});
+    }
+
+    const canManage = await canManageEvent(session.user.id, eventId);
+
+    if (!canManage) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
     const detailResult = await db.query(
       `
         SELECT
@@ -472,10 +542,8 @@ pitchRouter.get("/:pitchId/export", async (req, res) => {
             0
           ) AS "scoreAvg"
         FROM pitch p
-        INNER JOIN event e ON e.id = p."eventId"
         LEFT JOIN vote v ON v."pitchId" = p.id
         WHERE p.id = $1
-          AND e."organizerId" = $2
         GROUP BY
           p.id,
           p.name,
@@ -483,7 +551,7 @@ pitchRouter.get("/:pitchId/export", async (req, res) => {
           p.color,
           p."logoUrl"
       `,
-    [req.params.pitchId, session.user.id]
+    [req.params.pitchId]
     )
 
     if (detailResult.rowCount === 0) {

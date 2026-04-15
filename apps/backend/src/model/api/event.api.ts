@@ -3,7 +3,8 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { requireSession } from "../../auth.js";
 import { db } from "../../db.js";
-import { createEventSchema, updateEventStatusSchema } from "../event.schema.js";
+import { createEventSchema, updateEventStatusSchema } from "../schema/event.schema.js";
+import { canManageEvent } from "../event.permissions.js";
 import { presentEvent, presentEventQr } from "../../presenter/event.presenter.js";
 import { dashboardEventSchema, dashboardEventQrSchema, publicEventInvitationSchema } from "@workspace/shared/api";
 import { validateServerEnv } from "@workspace/shared/env/server";
@@ -85,9 +86,17 @@ eventRouter.get("/", async (req, res) => {
   try {
     const result = await db.query(
       `
-        SELECT id, name, description, status, "createdAt", "organizerId"
-        FROM event
-        WHERE "organizerId" = $1
+        SELECT DISTINCT
+          e.id,
+          e.name,
+          e.description,
+          e.status,
+          e."createdAt",
+          e."organizerId"
+        FROM event e
+        LEFT JOIN event_organizer eo ON eo."eventId" = e.id
+        WHERE e."organizerId" = $1
+          OR eo."userId" = $1
         ORDER BY "createdAt" DESC
       `,
       [session.user.id],
@@ -173,17 +182,23 @@ eventRouter.patch("/:id/status", async (req, res) => {
   }
 
   try {
+    const canManage = await canManageEvent(session.user.id, req.params.id);
+
+    if (!canManage) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
     const result = await db.query(
       `
         UPDATE event
         SET status = $1
-        WHERE id = $2 AND "organizerId" = $3
+        WHERE id = $2
         RETURNING id, name, description, status, "createdAt", "organizerId"
       `,
-      [parsed.data.status, req.params.id, session.user.id],
+      [parsed.data.status, req.params.id],
     );
 
-    if (result.rowCount === 0) {
+    if ((result.rowCount ?? 0) === 0) {
       return res.status(404).json({ message: "Event not found" });
     }
 
@@ -202,15 +217,21 @@ eventRouter.delete("/:id", async (req, res) => {
   }
 
   try {
+    const canManage = await canManageEvent(session.user.id, req.params.id);
+
+    if (!canManage) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
     const result = await db.query(
       `
         DELETE FROM event
-        WHERE id = $1 AND "organizerId" = $2
+        WHERE id = $1
       `,
-      [req.params.id, session.user.id],
+      [req.params.id],
     );
 
-    if (result.rowCount === 0) {
+    if ((result.rowCount ?? 0) === 0) {
       return res.status(404).json({ message: "Event not found" });
     }
 
@@ -230,17 +251,22 @@ eventRouter.get("/:eventId/export", async (req, res) => {
   }
 
   try {
+    const canManage = await canManageEvent(session.user.id, req.params.eventId);
+
+    if (!canManage) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
     const eventResult = await db.query(
       `
       SELECT id, name
       FROM event
       WHERE id = $1
-        AND "organizerId" = $2
       `,
-      [req.params.eventId, session.user.id],
+      [req.params.eventId],
     );
 
-    if (eventResult.rowCount === 0) {
+    if ((eventResult.rowCount ?? 0) === 0) {
       return res.status(404).json({ message: "Event not found" });
     }
 
@@ -264,14 +290,12 @@ eventRouter.get("/:eventId/export", async (req, res) => {
            0
         ) AS "scoreAvg"
         FROM pitch p
-        INNER JOIN event e ON e.id = p."eventId"
         LEFT JOIN vote v ON v."pitchId" = p.id
         WHERE p."eventId" = $1
-          AND e."organizerId" = $2
         GROUP by p.id, p.name, p."createdAt"
         ORDER by "scoreAvg" DESC, "votesCount" DESC, p."createdAt" ASC
         `,
-      [req.params.eventId, session.user.id],
+      [req.params.eventId],
     );
 
     //crea encabezado del csv
@@ -333,17 +357,23 @@ eventRouter.get("/:eventId/qr", async (req, res) => {
   }
 
   try {
+    const canManage = await canManageEvent(session.user.id, req.params.eventId);
+
+    if (!canManage) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
     const result = await db.query(
       `SELECT
         e.id,
         e.name
       FROM event e
       WHERE e.id = $1
-        AND e."organizerId" = $2
-        `, [req.params.eventId, session.user.id]
+        `,
+      [req.params.eventId],
     )
 
-    if (result.rowCount === 0) {
+    if ((result.rowCount ?? 0) === 0) {
       return res.status(404).json({ message: "Event not found" })
     }
 

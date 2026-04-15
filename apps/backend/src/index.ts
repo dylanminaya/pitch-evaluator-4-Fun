@@ -4,6 +4,7 @@ import { toNodeHandler } from "better-auth/node";
 import { validateServerEnv } from "@workspace/shared/env/server";
 import { auth } from "./auth.js";
 import { eventRouter } from "./model/api/event.api.js";
+import { organizerInvitationRouter } from "./model/api/organizer-invitation.api.js";
 import { pitchRouter } from "./model/api/pitch.api.js";
 import { voteRouter } from "./model/api/vote.api.js";
 
@@ -26,6 +27,7 @@ app.get("/health", (_req, res) => {
 });
 
 app.use("/api/event", eventRouter);
+app.use("/api/organizer-invitations", organizerInvitationRouter);
 app.use("/api/pitch", pitchRouter);
 app.use("/api/vote", voteRouter);
 

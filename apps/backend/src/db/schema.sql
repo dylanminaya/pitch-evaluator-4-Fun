@@ -40,3 +40,34 @@ CREATE TABLE IF NOT EXISTS vote (
   "createdAt"   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE ("pitchId", "ipAddress")
 );
+
+
+--tabla para el co-organizador
+CREATE TABLE IF NOT EXISTS event_organizer (
+  id                TEXT        PRIMARY KEY,
+  "eventId"         UUID        NOT NULL REFERENCES event(id) ON DELETE CASCADE,
+  "userId"          TEXT        NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+  role              TEXT        NOT NULL DEFAULT 'ORGANIZER' CHECK (role IN ('ORGANIZER')),
+  "invitedByUserId" TEXT        REFERENCES "user"(id) ON DELETE SET NULL,
+  "createdAt"       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE ("eventId", "userId")
+);
+
+--tabla para cuando envien el link de invitacion 
+CREATE TABLE IF NOT EXISTS event_organizer_invitation (
+  id                TEXT        PRIMARY KEY,
+  "eventId"         UUID        NOT NULL REFERENCES event(id) ON DELETE CASCADE,
+  email             TEXT        NOT NULL,
+  role              TEXT        NOT NULL DEFAULT 'ORGANIZER' CHECK (role IN ('ORGANIZER')),
+  token             TEXT        NOT NULL UNIQUE,
+  status            TEXT        NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'ACCEPTED', 'CANCELED', 'EXPIRED')),
+  "invitedByUserId" TEXT        REFERENCES "user"(id) ON DELETE SET NULL,
+  "acceptedByUserId" TEXT       REFERENCES "user"(id) ON DELETE SET NULL,
+  "expiresAt"       TIMESTAMPTZ NOT NULL,
+  "createdAt"       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+--no enviar otra invitacion si ya le mandamos--
+CREATE UNIQUE INDEX IF NOT EXISTS event_organizer_invitation_pending_unique
+ON event_organizer_invitation ("eventId", email, status)
+WHERE status = 'PENDING';

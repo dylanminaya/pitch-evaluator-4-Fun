@@ -32,3 +32,23 @@ export const createEventSchema = z.object({
 export const updateEventStatusSchema = z.object({
   status: eventStatusSchema,
 }); 
+
+
+
+export const organizerRoleSchema = z.enum(["ORGANIZER"]);
+
+export const invitationStatusSchema = z.enum([
+  "PENDING",
+  "ACCEPTED",
+  "CANCELED",
+  "EXPIRED",
+])
+
+export const createEventOrganizerInvitationSchema = z.object({
+  email: z.string().email("Please enter a valid email address"),
+  role: organizerRoleSchema.default("ORGANIZER"),
+})
+
+export const acceptEventOrganizerInvitationSchema = z.object({
+  token: z.string().min(1, "Invitation token is required")
+})

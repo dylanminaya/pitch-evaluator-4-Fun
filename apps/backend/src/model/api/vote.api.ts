@@ -6,6 +6,7 @@ import { db } from "../../db.js";
 import { createPublicVoteSchema } from "@workspace/shared/api";
 import { presentPitchRanking, presentVote } from "../../presenter/vote.presenter.js";
 import { dashboardRankingItemSchema } from "@workspace/shared/api";
+import { canManageEvent, getEventIdForPitch } from "../event.permissions.js";
 
 export const voteRouter: Router = Router();
 
@@ -46,6 +47,18 @@ voteRouter.get("/", async (req, res) => {
   }
 
   try {
+    const eventId = await getEventIdForPitch(pitchId);
+
+    if (!eventId) {
+      return res.status(404).json({ message: "Pitch not found" });
+    }
+
+    const canManage = await canManageEvent(session.user.id, eventId);
+
+    if (!canManage) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
     const result = await db.query(
       `
         SELECT
@@ -60,13 +73,10 @@ voteRouter.get("/", async (req, res) => {
           v.comment,
           v."createdAt"
         FROM vote v
-        INNER JOIN pitch p ON p.id = v."pitchId"
-        INNER JOIN event e ON e.id = p."eventId"
         WHERE v."pitchId" = $1
-          AND e."organizerId" = $2
         ORDER BY v."createdAt" DESC
       `,
-      [pitchId, session.user.id],
+      [pitchId],
     );
 
     return res.json(result.rows.map(presentVote));
@@ -266,11 +276,17 @@ voteRouter.get("/ranking", async (req, res) => {
 
     const eventId = req.query.eventId;
 
-    if (typeof eventId !== "string" || eventId.length === 0 ) {
+  if (typeof eventId !== "string" || eventId.length === 0 ) {
         return res.status(400).json({ message: "eventId is required" })
     }
 
     try {
+      const canManage = await canManageEvent(session.user.id, eventId);
+
+      if (!canManage) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+
         const result = await db.query(
       `
         SELECT
@@ -295,10 +311,8 @@ voteRouter.get("/ranking", async (req, res) => {
             0
           ) AS "scoreAvg"
         FROM pitch p
-        INNER JOIN event e ON e.id = p."eventId"
         LEFT JOIN vote v ON v."pitchId" = p.id
         WHERE p."eventId" = $1
-          AND e."organizerId" = $2
         GROUP BY
           p.id,
           p."eventId",
@@ -309,7 +323,7 @@ voteRouter.get("/ranking", async (req, res) => {
           p."createdAt"
         ORDER BY "scoreAvg" DESC, "votesCount" DESC, p."createdAt" ASC
       `,
-      [eventId, session.user.id],
+      [eventId],
       );
       return res.json(z.array(dashboardRankingItemSchema).parse(result.rows.map(presentPitchRanking)));
     } catch (error) {
