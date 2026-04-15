@@ -4,6 +4,7 @@ export type Pitch = {
   eventId: string;
   name: string;
   description: string;
+  status: "OPEN" | "CLOSED";
   color: string;
   logoUrl?: string | null;
   createdAt: Date;
@@ -14,6 +15,7 @@ export type PublicPitch = {
   id: string;
   name: string;
   description: string;
+  pitchStatus: "OPEN" | "CLOSED";
   color: string;
   logoUrl?: string | null;
   eventStatus: "OPEN" | "CLOSED";

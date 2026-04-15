@@ -132,6 +132,7 @@ voteRouter.post("/", async (req, res) => {
         INNER JOIN event e ON e.id = p."eventId"
         WHERE p.id = $1
           AND e.status = 'OPEN'
+          AND p.status = 'OPEN'
       `,
       [pitchId],
     );

@@ -18,6 +18,7 @@ import {
   usePitches,
   useRanking,
   usePitchQr,
+  useUpdatePitchStatus,
   useUpdateEventStatus,
 } from "@/hooks/dashboard";
 //helper
@@ -47,6 +48,8 @@ function DashboardPageContent() {
   const { mutate: logout, isPending } = useSignOut();
   const { mutateAsync: mutateEventStatus, isPending: isUpdatingEventStatus } =
     useUpdateEventStatus();
+  const { mutateAsync: mutatePitchStatus, isPending: isUpdatingPitchStatus } =
+    useUpdatePitchStatus();
 
   //query
   const {data: events = [] } = useEvents();
@@ -72,6 +75,7 @@ function DashboardPageContent() {
 
   const selectedPitchVotes = rankingData.find(item => item.id === selectedPitchId)?.votesCount ?? 0;
   const eventIsOpen = selectedEvent?.status === "OPEN";
+  const pitchStatusById = new Map(pitches.map((pitch) => [pitch.id, pitch.status]));
 
   async function handleToggleEventStatus() {
     if (!selectedEventId || !selectedEvent) return;
@@ -269,6 +273,7 @@ function DashboardPageContent() {
                     <tr className="border-b border-[#263550] bg-[#0d1526] text-[10px] uppercase tracking-[0.24em] text-[#8899aa]">
                       <th className="px-4 py-3 font-medium">#</th>
                       <th className="px-4 py-3 font-medium">Proyecto</th>
+                      <th className="px-4 py-3 font-medium">Estado</th>
                       <th className="px-4 py-3 font-medium">Inn</th>
                       <th className="px-4 py-3 font-medium">Via</th>
                       <th className="px-4 py-3 font-medium">Imp</th>
@@ -277,7 +282,11 @@ function DashboardPageContent() {
                     </tr>
                   </thead>
                   <tbody>
-                    {rankingData.map((item, index) => (
+                    {rankingData.map((item, index) => {
+                      const pitchStatus = pitchStatusById.get(item.id) ?? "OPEN";
+                      const nextStatus = pitchStatus === "OPEN" ? "CLOSED" : "OPEN";
+
+                      return (
                       <tr
                         key={item.id}
                         className={`text-sm text-[#d7d8e5] last:border-b-0 ${
@@ -310,6 +319,25 @@ function DashboardPageContent() {
                             )}
                           </div>
                         </td>{/*muestra las puntuaciones en cada categoria */}
+                        <td className="px-4 py-4">
+                          <Button
+                            type="button"
+                            disabled={isUpdatingPitchStatus}
+                            onClick={() =>
+                              mutatePitchStatus({
+                                pitchId: item.id,
+                                status: nextStatus,
+                              })
+                            }
+                            className={`rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.2em] ${
+                              pitchStatus === "OPEN"
+                                ? "bg-[#13210a] text-[#83ce00] hover:bg-[#1a2b0e]"
+                                : "bg-[#2a1018] text-[#ff8cab] hover:bg-[#3a1522]"
+                            }`}
+                          >
+                            {pitchStatus === "OPEN" ? "Activado" : "Cerrado"}
+                          </Button>
+                        </td>
                         <td className="px-4 py-4 text-[#9da0bc]">{item.innovationAvg}</td>
                         <td className="px-4 py-4 text-[#9da0bc]">{item.viabilityAvg}</td>
                         <td className="px-4 py-4 text-[#9da0bc]">{item.impactAvg}</td>
@@ -318,7 +346,8 @@ function DashboardPageContent() {
                           {item.scoreAvg} {/*puntaje final */}
                         </td>
                       </tr>
-                    ))}
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

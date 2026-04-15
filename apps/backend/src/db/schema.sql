@@ -21,10 +21,14 @@ CREATE TABLE IF NOT EXISTS pitch (
   "eventId"     TEXT        NOT NULL REFERENCES event(id) ON DELETE CASCADE,
   name          TEXT        NOT NULL,
   description   TEXT        NOT NULL,
+  status        TEXT        NOT NULL DEFAULT 'OPEN' CHECK (status IN ('OPEN', 'CLOSED')),
   color         TEXT        NOT NULL,
   "logoUrl"     TEXT,
   "createdAt"   TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE pitch
+ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'OPEN';
 
 CREATE TABLE IF NOT EXISTS vote (
   id            TEXT        PRIMARY KEY,

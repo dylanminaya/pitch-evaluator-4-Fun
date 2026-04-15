@@ -65,6 +65,16 @@ export function updatePitch(pitchId: string, data: UpdateDashboardPitch) {
   });
 }
 
+export function updatePitchStatus(
+  pitchId: string,
+  status: "OPEN" | "CLOSED",
+) {
+  return apiFetch<DashboardPitch>(`/api/pitch/${pitchId}/status`, {
+    method: "PATCH",
+    body: JSON.stringify({ status }),
+  });
+}
+
 export function getRanking(eventId: string) {
   return apiFetch<DashboardRankingItem[]>(
     `/api/vote/ranking?eventId=${eventId}`,

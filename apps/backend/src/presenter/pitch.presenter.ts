@@ -4,6 +4,7 @@ export const presentPitch = (pitch: {
   eventId: string;
   name: string;
   description: string;
+  status: "OPEN" | "CLOSED";
   color: string;
   logoUrl?: string | null;
   createdAt?: Date | string;
@@ -12,6 +13,7 @@ export const presentPitch = (pitch: {
   eventId: pitch.eventId,
   name: pitch.name,
   description: pitch.description,
+  status: pitch.status,
   color: pitch.color,
   logoUrl: pitch.logoUrl ?? null,
   createdAt: pitch.createdAt instanceof Date ? pitch.createdAt.toISOString() : (pitch.createdAt ?? null),
@@ -22,6 +24,7 @@ export const presentPublicPitch = (pitch: {
   id: string;
   name: string;
   description: string;
+  pitchStatus: "OPEN" | "CLOSED";
   color: string;
   logoUrl?: string | null;
   eventStatus: "OPEN" | "CLOSED";
@@ -29,6 +32,7 @@ export const presentPublicPitch = (pitch: {
   id: pitch.id,
   name: pitch.name,
   description: pitch.description,
+  pitchStatus: pitch.pitchStatus,
   color: pitch.color,
   logoUrl: pitch.logoUrl ?? null,
   eventStatus: pitch.eventStatus,

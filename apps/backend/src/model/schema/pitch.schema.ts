@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+export const pitchStatusSchema = z.enum(["OPEN", "CLOSED"]);
+
 // Forma completa de un pitch ya persistido.
 export const pitchSchema = z.object({
   id: z.string().min(1, "Id is required"),
@@ -12,6 +14,7 @@ export const pitchSchema = z.object({
     .string()
     .min(5, "Project description must have at least 5 characters")
     .max(500, "Project description cannot exceed 500 characters"),
+  status: pitchStatusSchema,
   color: z
     .string()
     .regex(/^#([A-Fa-f0-9]{6})$/, "Color must be a valid hex code"),
@@ -50,4 +53,8 @@ export const updatePitchSchema = z.object({
     .string()
     .regex(/^#([A-Fa-f0-9]{6})$/, "Color must be a valid hex code"),
   logoUrl: z.string().url().nullable().optional(),
+});
+
+export const updatePitchStatusSchema = z.object({
+  status: pitchStatusSchema,
 });

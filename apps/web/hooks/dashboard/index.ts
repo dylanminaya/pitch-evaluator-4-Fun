@@ -11,6 +11,7 @@ export { usePitchDetail } from "./use-pitch-detail";
 export { usePitchQr } from "./use-pitch-qr";
 export { useEventQr } from "./use-event-qr";
 export { useUpdatePitch } from "./use-update-pitch";
+export { useUpdatePitchStatus } from "./use-update-pitch-status";
 export { useEventOrganizers } from "./use-event-organizers";
 export { useCreateOrganizerInvitation } from "./use-create-organizer-invitation";
 export { useCancelOrganizerInvitation } from "./use-cancel-organizer-invitation";

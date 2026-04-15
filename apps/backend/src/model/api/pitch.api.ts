@@ -3,7 +3,11 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { requireSession } from "../../auth.js";
 import { db } from "../../db.js";
-import { createPitchSchema, updatePitchSchema } from "../schema/pitch.schema.js";
+import {
+  createPitchSchema,
+  updatePitchSchema,
+  updatePitchStatusSchema,
+} from "../schema/pitch.schema.js";
 import { canManageEvent, getEventIdForPitch } from "../event.permissions.js";
 import { validateServerEnv } from "@workspace/shared/env/server";
 import { presentPitch, presentPitchComment, presentPitchDetail,presentPitchSummary, presentPublicPitch } from "../../presenter/pitch.presenter.js";
@@ -54,7 +58,7 @@ pitchRouter.get("/", async (req, res) => {
 
     const result = await db.query(
       `
-        SELECT p.id, p."eventId", p.name, p.description, p.color, p."logoUrl", p."createdAt"
+        SELECT p.id, p."eventId", p.name, p.description, p.status, p.color, p."logoUrl", p."createdAt"
         FROM pitch p
         WHERE p."eventId" = $1
         ORDER BY p."createdAt" DESC
@@ -66,6 +70,57 @@ pitchRouter.get("/", async (req, res) => {
   } catch (error) {
     console.error(error);
     return res.status(500).json({ message: "Failed to fetch pitches" });
+  }
+});
+
+// Cambia solo el estado del pitch.
+pitchRouter.patch("/:id/status", async (req, res) => {
+  const session = await requireSession(req, res);
+
+  if (!session) {
+    return;
+  }
+
+  const parsed = updatePitchStatusSchema.safeParse(req.body);
+
+  if (!parsed.success) {
+    return res.status(400).json({
+      message: "Invalid pitch status",
+      errors: parsed.error.flatten(),
+    });
+  }
+
+  try {
+    const eventId = await getEventIdForPitch(req.params.id);
+
+    if (!eventId) {
+      return res.status(404).json({ message: "Pitch not found" });
+    }
+
+    const canManage = await canManageEvent(session.user.id, eventId);
+
+    if (!canManage) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    const result = await db.query(
+      `
+        UPDATE pitch
+        SET status = $1
+        WHERE id = $2
+        RETURNING id, "eventId", name, description, status, color, "logoUrl", "createdAt"
+      `,
+      [parsed.data.status, req.params.id],
+    );
+
+    if ((result.rowCount ?? 0) === 0) {
+      return res.status(404).json({ message: "Pitch not found" });
+    }
+
+    return res.json(dashboardPitchSchema.parse(presentPitch(result.rows[0])));
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: "Failed to update pitch status" });
   }
 });
 
@@ -222,6 +277,7 @@ pitchRouter.get("/public/:pitchId", async (req, res) => {
             p.id,
             p.name,
             p.description,
+            p.status AS "pitchStatus",
             p.color,
             p."logoUrl",
             e.status AS "eventStatus",
@@ -244,6 +300,7 @@ pitchRouter.get("/public/:pitchId", async (req, res) => {
             p.id,
             p.name,
             p.description,
+            p.status AS "pitchStatus",
             p.color,
             p."logoUrl",
             e.status AS "eventStatus"

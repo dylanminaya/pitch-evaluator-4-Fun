@@ -53,7 +53,7 @@ export default function VotingScreenPage() {
     );
   }
 
-  if (pitch.eventStatus !== "OPEN") {
+  if (pitch.eventStatus !== "OPEN" || pitch.pitchStatus !== "OPEN") {
     return (
       <main className="flex min-h-svh items-center justify-center bg-[#0d1526] px-6 text-center text-white">
         <div className="rounded-[24px] border border-[#263550] bg-[#1a2640] px-8 py-10">
