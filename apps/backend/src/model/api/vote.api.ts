@@ -10,6 +10,7 @@ import { canManageEvent, getEventIdForPitch } from "../event.permissions.js";
 
 export const voteRouter: Router = Router();
 
+// Normaliza la IP aunque venga por proxy o encabezados encadenados.
 const getClientIpAddress = (value: string | string[] | undefined) => {
   if (Array.isArray(value)) {
     return value[0] ?? null;
@@ -22,17 +23,20 @@ const getClientIpAddress = (value: string | string[] | undefined) => {
   return null;
 };
 
+// Busca el score de un criterio obligatorio dentro del payload.
 const getRequiredScore = (
   criteriaScores: Array<{ criterionId: string; score: number }>,
   criterionId: string,
 ) => criteriaScores.find((item) => item.criterionId === criterionId)?.score ?? null;
 
+// Detecta errores de Postgres por codigo para aplicar fallbacks o respuestas claras.
 const hasPgErrorCode = (error: unknown, code: string) =>
   typeof error === "object" &&
   error !== null &&
   "code" in error &&
   error.code === code;
 
+// Lista los votos de un pitch para dashboard.
 voteRouter.get("/", async (req, res) => {
   const session = await requireSession(req, res);
 
@@ -86,6 +90,7 @@ voteRouter.get("/", async (req, res) => {
   }
 });
 
+// Registra un voto publico.
 voteRouter.post("/", async (req, res) => {
   const parsed = createPublicVoteSchema.safeParse(req.body);
 
@@ -136,7 +141,7 @@ voteRouter.post("/", async (req, res) => {
         message: "Pitch not found or voting is closed",
       });
     }
-    //no doble votos
+    // Evita voto duplicado por IP.
     const ipAddress =
       getClientIpAddress(req.headers["x-forwarded-for"]) ?? req.ip ?? null;
 
@@ -203,7 +208,7 @@ voteRouter.post("/", async (req, res) => {
           ],
         );
       } catch (error) {
-        // Fallback for databases that still use the old vote table without `criteriaScores`.
+        // Fallback para bases viejas sin `criteriaScores`.
         if (!hasPgErrorCode(error, "42703")) {
           throw error;
         }
@@ -266,7 +271,7 @@ voteRouter.post("/", async (req, res) => {
   }
 });
 
-//endpoint ranking
+// Devuelve el ranking de pitches de un evento.
 voteRouter.get("/ranking", async (req, res) => {
     const session = await requireSession(req, res)
 

@@ -1,3 +1,4 @@
+// Normaliza la entidad event para la respuesta del dashboard.
 export const presentEvent = (event: {
   id: string;
   name: string;
@@ -14,6 +15,7 @@ export const presentEvent = (event: {
   organizerId: event.organizerId,
 });
 
+// Da forma estable a la respuesta usada para generar el QR del evento.
 export const presentEventQr = (pitch: {
   id: string;
   name: string;

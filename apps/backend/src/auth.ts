@@ -4,8 +4,10 @@ import { validateServerEnv } from "@workspace/shared/env/server";
 import type { Request, Response } from "express";
 import { fromNodeHeaders } from "better-auth/node";
 
+// Carga la configuracion del backend.
 const env = validateServerEnv();
 
+// Configura Better Auth con Postgres y login por email/password.
 export const auth = betterAuth({
   baseURL: env.BETTER_AUTH_URL,
   secret: env.BETTER_AUTH_SECRET,
@@ -18,15 +20,14 @@ export const auth = betterAuth({
   },
 });
 
-//auth session
-//te dice quien esta haciendo la peticion
+// Intenta leer la sesion actual desde los headers de la request.
 export const getSessionFromRequest = async (req: Request) => {
   return auth.api.getSession({
     headers: fromNodeHeaders(req.headers),
   });
 };
 
-//quien esta logueado
+// Exige sesion y responde 401 si no hay usuario autenticado.
 export const requireSession = async (req: Request, res: Response) => {
   const session = await getSessionFromRequest(req);
 

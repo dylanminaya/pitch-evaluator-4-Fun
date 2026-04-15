@@ -1,3 +1,4 @@
+// Normaliza la entidad pitch para listados del dashboard.
 export const presentPitch = (pitch: {
   id: string;
   eventId: string;
@@ -16,6 +17,7 @@ export const presentPitch = (pitch: {
   createdAt: pitch.createdAt instanceof Date ? pitch.createdAt.toISOString() : (pitch.createdAt ?? null),
 });
 
+// Forma publica del pitch para la pantalla de voto.
 export const presentPublicPitch = (pitch: {
   id: string;
   name: string;
@@ -32,6 +34,7 @@ export const presentPublicPitch = (pitch: {
   eventStatus: pitch.eventStatus,
 });
 
+// Resumen detallado del pitch con promedios y conteos.
 export const presentPitchDetail = (pitch: {
   id: string;
   eventId: string;
@@ -58,16 +61,7 @@ export const presentPitchDetail = (pitch: {
   presentationAvg: pitch.presentationAvg,
 });
 
-// export const presentPitchQr = (pitch: {
-//   id: string;
-//   name: string;
-//   publicVoteUrl: string;
-// }) => ({
-//   id: pitch.id,
-//   name: pitch.name,
-//   publicVoteUrl: pitch.publicVoteUrl,
-// });
-
+// Normaliza un comentario individual.
 export const presentPitchComment = (comment: {
   id: string;
   comment: string;
@@ -78,6 +72,7 @@ export const presentPitchComment = (comment: {
   createdAt: comment.createdAt,
 });
 
+// Agrupa el payload del resumen con la lista de comentarios.
 export const presentPitchSummary = (payload: {
   pitchId: string;
   pitchName: string;

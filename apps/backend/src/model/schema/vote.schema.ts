@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+// Forma completa de un voto ya persistido.
 export const voteSchema = z.object({
   id: z.string().min(1, "Id is required"),
   pitchId: z.string().min(1, "Pitch id is required"),
@@ -13,4 +14,5 @@ export const voteSchema = z.object({
   createdAt: z.string().datetime(),
 });
 
+// Tipo inferido a partir del schema.
 export type Vote = z.infer<typeof voteSchema>;

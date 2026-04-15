@@ -16,6 +16,7 @@ import {
 
 export const pitchRouter: Router = Router();
 
+// Criterios por defecto para bases antiguas que todavia no guardan criteria en event.
 const defaultCriteria = [
   { id: "innovation", label: "Innovacion", weight: 25, isDefault: true },
   { id: "viability", label: "Viabilidad", weight: 25, isDefault: true },
@@ -23,12 +24,14 @@ const defaultCriteria = [
   { id: "presentation", label: "Presentacion", weight: 25, isDefault: true },
 ];
 
+// Detecta errores de Postgres por codigo para aplicar fallbacks de schema.
 const hasPgErrorCode = (error: unknown, code: string) =>
   typeof error === "object" &&
   error !== null &&
   "code" in error &&
   error.code === code;
 
+// Lista los pitches de un evento.
 pitchRouter.get("/", async (req, res) => {
   const session = await requireSession(req, res);
 
@@ -66,6 +69,7 @@ pitchRouter.get("/", async (req, res) => {
   }
 });
 
+// Crea un pitch nuevo dentro de un evento.
 pitchRouter.post("/", async (req, res) => {
   const session = await requireSession(req, res);
 
@@ -73,7 +77,8 @@ pitchRouter.post("/", async (req, res) => {
     return;
   }
 
-  const parsed = createPitchSchema.safeParse(req.body);//zod
+  // Valida el body con Zod antes de tocar la DB.
+  const parsed = createPitchSchema.safeParse(req.body);
 
   if (!parsed.success) {
     return res.status(400).json({
@@ -81,7 +86,7 @@ pitchRouter.post("/", async (req, res) => {
       errors: parsed.error.flatten(),
     });
   }
-  //extrae datos del body
+  // Datos ya validados.
   const { eventId, name, description, color, logoUrl } = parsed.data;
 
   try {
@@ -107,6 +112,7 @@ pitchRouter.post("/", async (req, res) => {
   }
 });
 
+// Actualiza un pitch existente.
 pitchRouter.patch("/:id", async (req, res) => {
   const session = await requireSession(req, res);
 
@@ -163,6 +169,7 @@ pitchRouter.patch("/:id", async (req, res) => {
   }
 });
 
+// Elimina un pitch.
 pitchRouter.delete("/:id", async (req, res) => {
   const session = await requireSession(req, res);
 
@@ -202,12 +209,13 @@ pitchRouter.delete("/:id", async (req, res) => {
   }
 });
 
-// Endpoint publico para la pantalla de voto
+// Endpoint publico para la pantalla de voto.
 pitchRouter.get("/public/:pitchId", async (req, res) => {
   try {
     let result;
 
     try {
+      // Intenta traer tambien los criterios del evento si la columna existe.
       result = await db.query(
         `
           SELECT
@@ -225,7 +233,7 @@ pitchRouter.get("/public/:pitchId", async (req, res) => {
         [req.params.pitchId],
       );
     } catch (error) {
-      // Fallback for databases that still use the old event table without `criteria`.
+      // Fallback para bases viejas sin `criteria`.
       if (!hasPgErrorCode(error, "42703")) {
         throw error;
       }
@@ -263,7 +271,7 @@ pitchRouter.get("/public/:pitchId", async (req, res) => {
   }
 });
 
-//detalles
+// Devuelve el resumen detallado de un pitch para dashboard.
 pitchRouter.get("/detail/:pitchId", async (req, res) => {
   const session = await requireSession(req, res)
 
@@ -328,7 +336,7 @@ pitchRouter.get("/detail/:pitchId", async (req, res) => {
   }
 });
 
-//comentario
+// Lista comentarios escritos en los votos del pitch.
 pitchRouter.get("/comments", async (req, res) => {
   const session = await requireSession(req, res)
 
@@ -376,8 +384,10 @@ pitchRouter.get("/comments", async (req, res) => {
   }
 })
 
-//qr
+// Variables usadas para construir URLs publicas.
 const env = validateServerEnv()
+
+// Devuelve la URL publica del pitch para generar QR.
 pitchRouter.get("/:pitchId/qr", async (req, res) => {
   const session = await requireSession(req, res)
 
@@ -414,7 +424,8 @@ pitchRouter.get("/:pitchId/qr", async (req, res) => {
 
     const pitch = result.rows[0]
 
-    const publicVoteUrl = `${env.FRONTEND_URL}/vote/${pitch.id}`;//se convierte en endpoint público
+    // Esta URL es la que luego se convierte en QR.
+    const publicVoteUrl = `${env.FRONTEND_URL}/vote/${pitch.id}`;
 
     return res.json({
       id: pitch.id,
@@ -427,7 +438,7 @@ pitchRouter.get("/:pitchId/qr", async (req, res) => {
   }
 })
 
-//endpoint resumen de ia
+// Prepara los comentarios que luego podria resumir una IA.
 pitchRouter.post("/:pitchId/summary", async (req, res) => {
   const session = await requireSession(req, res)
 
@@ -498,7 +509,7 @@ pitchRouter.post("/:pitchId/summary", async (req, res) => {
   }
 })
 
-//export por pitch
+// Exporta el reporte de un pitch en CSV.
 pitchRouter.get("/:pitchId/export", async (req, res) => {
   const session = await requireSession(req, res)
 
@@ -601,10 +612,11 @@ pitchRouter.get("/:pitchId/export", async (req, res) => {
       .replace(/\s+/g, "-")
       .replace(/[^a-z0-9-_]/g, "")
     
-    res.setHeader("Content-Type", "text/csv; charset=utf-8");//te enviare un csv
+    // Indica al navegador que la respuesta es un CSV descargable.
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
     res.setHeader(
       "Content-Disposition",
-      `attachment; filename="${pitchName || "pitch"}-report.csv"`,//muestralo en un archivo
+      `attachment; filename="${pitchName || "pitch"}-report.csv"`,
     );
 
     return res.status(200).send(csv)

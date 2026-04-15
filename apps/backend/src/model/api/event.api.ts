@@ -11,12 +11,14 @@ import { validateServerEnv } from "@workspace/shared/env/server";
 
 export const eventRouter: Router = Router();
 
+// Detecta errores de Postgres por codigo para aplicar fallbacks de schema.
 const hasPgErrorCode = (error: unknown, code: string) =>
   typeof error === "object" &&
   error !== null &&
   "code" in error &&
   error.code === code;
 
+// Devuelve la vista publica del evento usada por el link/QR de invitacion general.
 eventRouter.get("/public/:eventId", async (req, res) => {
   try {
     const eventResult = await db.query(
@@ -76,6 +78,7 @@ eventRouter.get("/public/:eventId", async (req, res) => {
   }
 });
 
+// Lista los eventos donde el usuario es owner o co-organizer.
 eventRouter.get("/", async (req, res) => {
   const session = await requireSession(req, res);
 
@@ -111,6 +114,7 @@ eventRouter.get("/", async (req, res) => {
   }
 });
 
+// Crea un evento nuevo para el organizer autenticado.
 eventRouter.post("/", async (req, res) => {
   const session = await requireSession(req, res);
 
@@ -134,6 +138,7 @@ eventRouter.post("/", async (req, res) => {
     let result;
 
     try {
+      // Intenta insertar tambien los criterios si la DB ya tiene esa columna.
       result = await db.query(
         `
           INSERT INTO event (id, name, description, status, criteria, "createdAt", "organizerId")
@@ -143,7 +148,7 @@ eventRouter.post("/", async (req, res) => {
         [eventId, name, description, "OPEN", JSON.stringify(criteria), session.user.id],
       );
     } catch (error) {
-      // Fallback for databases that still use the old event table without `criteria`.
+      // Fallback para bases viejas que todavia no tienen `criteria`.
       if (!hasPgErrorCode(error, "42703")) {
         throw error;
       }
@@ -165,6 +170,7 @@ eventRouter.post("/", async (req, res) => {
   }
 });
 
+// Abre o cierra un evento.
 eventRouter.patch("/:id/status", async (req, res) => {
   const session = await requireSession(req, res);
 
@@ -209,6 +215,7 @@ eventRouter.patch("/:id/status", async (req, res) => {
   }
 });
 
+// Elimina un evento si el usuario tiene acceso.
 eventRouter.delete("/:id", async (req, res) => {
   const session = await requireSession(req, res);
 
@@ -242,7 +249,7 @@ eventRouter.delete("/:id", async (req, res) => {
   }
 });
 
-//export total result
+// Exporta el ranking completo del evento en CSV.
 eventRouter.get("/:eventId/export", async (req, res) => {
   const session = await requireSession(req, res);
 
@@ -298,7 +305,7 @@ eventRouter.get("/:eventId/export", async (req, res) => {
       [req.params.eventId],
     );
 
-    //crea encabezado del csv
+    // Encabezado del CSV.
     const csvHeader = [
       "pitchId",
       "pitchName",
@@ -310,7 +317,7 @@ eventRouter.get("/:eventId/export", async (req, res) => {
       "scoreAvg",
     ].join(",");
 
-    //crea filas de csv
+    // Filas del CSV.
     const csvRows = result.rows.map((row) =>
       [
         row.pitchId,
@@ -324,16 +331,16 @@ eventRouter.get("/:eventId/export", async (req, res) => {
       ].join(","),
     );
 
-    //unir todo
+    // Une encabezado y filas en un solo archivo.
     const csv = [csvHeader, ...csvRows].join("\n");
 
-    //crear el nombre del archivo
+    // Genera un nombre de archivo seguro.
     const eventName = String(eventResult.rows[0].name)
       .toLowerCase()
       .replace(/\s+/g, "-")
       .replace(/[^a-z0-9-_]/g, "");
 
-    //forzar descarga
+    // Fuerza la descarga del archivo.
     res.setHeader("Content-Type", "text/csv; charset=utf-8");
     res.setHeader(
       "Content-Disposition",
@@ -347,8 +354,10 @@ eventRouter.get("/:eventId/export", async (req, res) => {
   }
 });
 
-//qr
+// Variables usadas para construir URLs publicas.
 const env = validateServerEnv()
+
+// Devuelve la URL publica del evento para generar QR.
 eventRouter.get("/:eventId/qr", async (req, res) => {
   const session = await requireSession(req, res)
 

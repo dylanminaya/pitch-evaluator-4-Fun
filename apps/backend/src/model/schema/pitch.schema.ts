@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+// Forma completa de un pitch ya persistido.
 export const pitchSchema = z.object({
   id: z.string().min(1, "Id is required"),
   eventId: z.string().min(1, "Event id is required"),
@@ -18,6 +19,7 @@ export const pitchSchema = z.object({
   createdAt: z.string().datetime(),
 });
 
+// Payload para crear un pitch.
 export const createPitchSchema = z.object({
   eventId: z.string().min(1, "Event id is required"),
   name: z
@@ -34,6 +36,7 @@ export const createPitchSchema = z.object({
   logoUrl: z.string().url().nullable().optional(),
 });
 
+// Payload para editar un pitch.
 export const updatePitchSchema = z.object({
   name: z
     .string()

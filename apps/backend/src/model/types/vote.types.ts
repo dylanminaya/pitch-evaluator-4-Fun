@@ -1,3 +1,4 @@
+// Entidad base de voto en backend.
 export type Vote = {
   id: string;
   pitchId: string;
@@ -11,7 +12,7 @@ export type Vote = {
   createdAt: Date;
 };
 
-
+// Fila agregada usada para construir el ranking de pitches.
 export type PitchRanking = {
   id: string;
   eventId: string;

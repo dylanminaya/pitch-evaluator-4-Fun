@@ -1,3 +1,4 @@
+// Normaliza la entidad vote para respuestas del dashboard.
 export const presentVote = (vote: {
   id: string;
   pitchId: string;
@@ -22,6 +23,7 @@ export const presentVote = (vote: {
   createdAt: vote.createdAt ?? null,
 });
 
+// Convierte valores agregados del ranking a numeros consistentes.
 export const presentPitchRanking = (pitch: {
   id: string;
   eventId: string;

@@ -23,9 +23,11 @@ import { validateServerEnv } from "@workspace/shared/env/server";
 import { sendOrganizerInvitationEmail } from "../../email.js";
 import { Router } from "express";
 
+// Variables de entorno usadas para construir links y mensajes de error.
 const env = validateServerEnv();
 export const organizerInvitationRouter: Router = Router();
 
+// Crea una invitacion para otro organizer dentro de un evento.
 eventRouter.post("/:eventId/organizer-invitations", async (req, res) => {
   const session = await requireSession(req, res);
 
@@ -51,6 +53,7 @@ eventRouter.post("/:eventId/organizer-invitations", async (req, res) => {
   const { email, role } = parsed.data;
 
   try {
+    // Verifica que el evento exista antes de crear la invitacion.
     const eventResult = await db.query(
       `
         SELECT id, name
@@ -77,6 +80,7 @@ eventRouter.post("/:eventId/organizer-invitations", async (req, res) => {
       [req.params.eventId, email],
     );
 
+    // Evita tener dos invitaciones pendientes para el mismo correo.
     if ((duplicatedPendingInvitation.rowCount ?? 0) > 0) {
       return res.status(409).json({
         message: "There is already a pending invitation for this email",
@@ -86,6 +90,7 @@ eventRouter.post("/:eventId/organizer-invitations", async (req, res) => {
     const invitationId = randomUUID();
     const token = randomUUID();
 
+    // Guarda la invitacion y el token que viajara en el correo.
     const result = await db.query(
       `
         INSERT INTO event_organizer_invitation (
@@ -121,10 +126,11 @@ eventRouter.post("/:eventId/organizer-invitations", async (req, res) => {
       ],
     );
 
-
+    // Link que abre la pagina publica de aceptacion en el frontend.
     const inviteUrl = `${env.FRONTEND_URL}/organizer-invitations/${token}`;
 
     try {
+      // El correo falla sin romper la creacion de la invitacion.
       await sendOrganizerInvitationEmail({
         to: email,
         eventName: eventResult.rows[0].name,
@@ -151,6 +157,7 @@ eventRouter.post("/:eventId/organizer-invitations", async (req, res) => {
   }
 });
 
+// Lista las invitaciones del evento para la vista de equipo.
 eventRouter.get("/:eventId/organizer-invitations", async (req, res) => {
   const session = await requireSession(req, res);
 
@@ -200,6 +207,7 @@ eventRouter.get("/:eventId/organizer-invitations", async (req, res) => {
   }
 });
 
+// Lista el owner y los co-organizers del evento.
 eventRouter.get("/:eventId/organizers", async (req, res) => {
   const session = await requireSession(req, res);
 
@@ -264,6 +272,7 @@ eventRouter.get("/:eventId/organizers", async (req, res) => {
   }
 });
 
+// Carga una invitacion publica a partir del token del correo.
 organizerInvitationRouter.get("/:token", async (req, res) => {
   try {
     const result = await db.query(
@@ -294,6 +303,7 @@ organizerInvitationRouter.get("/:token", async (req, res) => {
     const expiresAt =
       row.expiresAt instanceof Date ? row.expiresAt : new Date(row.expiresAt);
 
+    // Si ya vencio, actualiza el estado antes de responder.
     if (row.status === "PENDING" && expiresAt.getTime() < Date.now()) {
       await db.query(
         `
@@ -330,6 +340,7 @@ organizerInvitationRouter.get("/:token", async (req, res) => {
   }
 });
 
+// Convierte una invitacion pendiente en acceso real al evento.
 organizerInvitationRouter.post("/accept", async (req, res) => {
   const session = await requireSession(req, res);
 
@@ -346,11 +357,13 @@ organizerInvitationRouter.post("/accept", async (req, res) => {
     });
   }
 
+  // Se usa transaccion porque aqui se escriben varias tablas relacionadas.
   const client = await db.connect();
 
   try {
     await client.query("BEGIN");
 
+    // Busca la invitacion exacta usando el token.
     const invitationResult = await client.query(
       `
         SELECT
@@ -378,6 +391,7 @@ organizerInvitationRouter.post("/accept", async (req, res) => {
         ? invitation.expiresAt
         : new Date(invitation.expiresAt);
 
+    // Solo se puede aceptar una invitacion pendiente.
     if (invitation.status !== "PENDING") {
       await client.query("ROLLBACK");
       return res.status(409).json({ message: "Invitation is no longer pending" });
@@ -396,6 +410,7 @@ organizerInvitationRouter.post("/accept", async (req, res) => {
       return res.status(410).json({ message: "Invitation has expired" });
     }
 
+    // Protege el link: solo el correo invitado puede aceptarlo.
     if (invitation.email.toLowerCase() !== session.user.email.toLowerCase()) {
       await client.query("ROLLBACK");
       return res.status(403).json({
@@ -423,6 +438,7 @@ organizerInvitationRouter.post("/accept", async (req, res) => {
       [invitation.eventId, session.user.id],
     );
 
+    // Evita duplicar membresia si ya era owner o ya era organizer.
     if ((existingMembership.rowCount ?? 0) === 0 && (ownerMembership.rowCount ?? 0) === 0) {
       await client.query(
         `
@@ -440,6 +456,7 @@ organizerInvitationRouter.post("/accept", async (req, res) => {
       );
     }
 
+    // Marca la invitacion como aceptada y guarda quien la acepto.
     await client.query(
       `
         UPDATE event_organizer_invitation
