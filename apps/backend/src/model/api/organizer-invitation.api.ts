@@ -186,6 +186,7 @@ eventRouter.get("/:eventId/organizer-invitations", async (req, res) => {
           "createdAt"
         FROM event_organizer_invitation
         WHERE "eventId" = $1
+          AND status = 'PENDING'
         ORDER BY "createdAt" DESC
       `,
       [req.params.eventId],
@@ -206,6 +207,52 @@ eventRouter.get("/:eventId/organizer-invitations", async (req, res) => {
     });
   }
 });
+
+// Cancela una invitacion pendiente del evento.
+eventRouter.post(
+  "/:eventId/organizer-invitations/:invitationId/cancel",
+  async (req, res) => {
+    const session = await requireSession(req, res);
+
+    if (!session) {
+      return;
+    }
+
+    const canManage = await canManageEvent(session.user.id, req.params.eventId);
+
+    if (!canManage) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    try {
+      const result = await db.query(
+        `
+          UPDATE event_organizer_invitation
+          SET status = 'CANCELED'
+          WHERE id = $1
+            AND "eventId" = $2
+            AND status = 'PENDING'
+          RETURNING id
+        `,
+        [req.params.invitationId, req.params.eventId],
+      );
+
+      if ((result.rowCount ?? 0) === 0) {
+        return res.status(404).json({ message: "Pending invitation not found" });
+      }
+
+      return res.status(204).send();
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({
+        message:
+          env.NODE_ENV === "development" && error instanceof Error
+            ? `Failed to cancel organizer invitation: ${error.message}`
+            : "Failed to cancel organizer invitation",
+      });
+    }
+  },
+);
 
 // Lista el owner y los co-organizers del evento.
 eventRouter.get("/:eventId/organizers", async (req, res) => {
