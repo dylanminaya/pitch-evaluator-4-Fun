@@ -1,16 +1,21 @@
 import { apiFetch, apiFetchBlob, apiFetchVoid } from "./api/client";
-import type {
-  CreatePublicVote,
-  CreateDashboardEvent,
-  CreateDashboardPitch,
-  UpdateDashboardPitch,
-  DashboardEvent,
-  DashboardPitch,
-  DashboardRankingItem,
-  DashboardPitchDetail,
-  DashboardPitchComment,
-  DashboardPitchQr,
-  PublicPitch,
+
+import {
+  type CreatePublicVote,
+  type CreateDashboardEvent,
+  type CreateDashboardPitch,
+  type UpdateDashboardPitch,
+  type DashboardEvent,
+  type DashboardPitch,
+  type DashboardRankingItem,
+  type DashboardPitchDetail,
+  type DashboardPitchComment,
+  type DashboardPitchQr,
+  type PublicPitch,
+  type DashboardEventOrganizer,
+  type CreateEventOrganizerInvitation,
+  type DashboardEventOrganizerInvitation,
+  type OrganizerInvitationDetail,
 } from "@workspace/shared/api";
 
 export type {
@@ -25,6 +30,10 @@ export type {
   DashboardPitchComment,
   DashboardPitchQr,
   PublicPitch,
+  DashboardEventOrganizer,
+  CreateEventOrganizerInvitation,
+  DashboardEventOrganizerInvitation,
+  OrganizerInvitationDetail,
 };
 
 export function getEvents() {
@@ -108,5 +117,43 @@ export function submitPublicVote(data: CreatePublicVote) {
   return apiFetch("/api/vote", {
     method: "POST",
     body: JSON.stringify(data),
+  });
+}
+
+export function createOrganizerInvitation(
+  eventId: string,
+  data: CreateEventOrganizerInvitation,
+) {
+  return apiFetch<DashboardEventOrganizerInvitation>(
+    `/api/event/${eventId}/organizer-invitations`,
+    {
+      method: "POST",
+      body: JSON.stringify(data),
+    },
+  );
+}
+
+export function getOrganizerInvitations(eventId: string) {
+  return apiFetch<DashboardEventOrganizerInvitation[]>(
+    `/api/event/${eventId}/organizer-invitations`,
+  );
+}
+
+export function getEventOrganizers(eventId: string) {
+  return apiFetch<DashboardEventOrganizer[]>(
+    `/api/event/${eventId}/organizers`,
+  );
+}
+
+export function getOrganizerInvitationByToken(token: string) {
+  return apiFetch<OrganizerInvitationDetail>(
+    `/api/organizer-invitations/${token}`,
+  );
+}
+
+export function acceptOrganizerInvitation(token: string) {
+  return apiFetch<{ eventId: string }>(`/api/organizer-invitations/accept`, {
+    method: "POST",
+    body: JSON.stringify({ token }),
   });
 }

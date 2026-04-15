@@ -13,6 +13,7 @@ export async function middleware(request: NextRequest) {
 
   const isPublicRoute =
     publicRoutes.includes(pathname) ||
+    pathname.startsWith("/organizer-invitations/") ||
     pathname.startsWith("/invitation/") ||
     pathname.startsWith("/vote/");
   const isAuthRoute = authRoutes.includes(pathname);

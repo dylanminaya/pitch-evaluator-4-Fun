@@ -1,6 +1,5 @@
 "use client";
 
-
 import { Suspense, useMemo } from "react";
 import Image from "next/image";
 import Link from "next/link";
@@ -10,9 +9,7 @@ import {
   ArrowUpRight,
   CircleDot,
   Plus,
-  QrCode,
-  // Share2,
-  Sparkles,
+  Users,
 } from "lucide-react";
 import { Button } from "@workspace/ui/components/button";
 import { useSignOut } from "@/hooks/auth";
@@ -25,21 +22,6 @@ import {
 } from "@/hooks/dashboard";
 //helper
 import { exportEvent, exportPitch } from "@/lib/dashboard-api";
-
-const summaryBlocks = [
-  {
-    tone: "positive",
-    title: "Lo que destaca",
-    body: "El publico valoro mucho el enfoque practico de usar IA para procesos ambientales y tiempo real. Varios comentarios dicen que la solucion se siente lista para piloto.",
-  },
-  {
-    tone: "warning",
-    title: "A mejorar",
-    body: "Falto claridad en el modelo de negocio. Algunos evaluadores piden ejemplos mas concretos sobre escalabilidad y costos de implementacion.",
-  },
-] as const;
-
-
 
 function QrDisplay({ url }: { url?: string }) {
   if (!url) {
@@ -195,6 +177,17 @@ function DashboardPageContent() {
               >
                 <ArrowLeft className="size-4" />
                 Volver a eventos
+              </Button>
+            </Link>
+
+            <Link href={selectedEventId ? `/events/${selectedEventId}/team` : "#"}>
+              <Button
+                variant="outline"
+                disabled={!selectedEventId}
+                className="rounded-full border-[#263550] bg-[#0d1526] text-white hover:bg-[#1a2640] hover:text-white"
+              >
+                <Users className="size-4" />
+                Equipo
               </Button>
             </Link>
             <div

@@ -10,6 +10,7 @@ import {
   Trash2,
   Plus,
   Search,
+  Users,
 } from "lucide-react";
 import { Button } from "@workspace/ui/components/button";
 import { useSignOut } from "@/hooks/auth";
@@ -242,21 +243,34 @@ export default function EventsPage() {
                       </div>
                     </Link>
                     <div className="border-t border-[#263550] bg-[#0d1526] px-6 py-4">
-                      <div className="flex items-center justify-between gap-3">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
                         <p className="text-xs text-[#8899aa]">
                           Acciones del evento
                         </p>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="rounded-full border-[#5a2433] bg-[#23171b] text-[#ff8cab] hover:bg-[#2f1b21] hover:text-[#ff8cab]"
-                          disabled={isDeleting}
-                          onClick={() => handleDelete(event.id, event.name)}
-                        >
-                          <Trash2 className="size-4" />
-                          Eliminar
-                        </Button>
+                        <div className="flex flex-wrap items-center gap-3">
+                          <Link href={`/events/${event.id}/team`}>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="rounded-full border-[#263550] bg-[#121d30] text-white hover:bg-[#1a2640] hover:text-white"
+                            >
+                              <Users className="size-4" />
+                              Equipo
+                            </Button>
+                          </Link>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="rounded-full border-[#5a2433] bg-[#23171b] text-[#ff8cab] hover:bg-[#2f1b21] hover:text-[#ff8cab]"
+                            disabled={isDeleting}
+                            onClick={() => handleDelete(event.id, event.name)}
+                          >
+                            <Trash2 className="size-4" />
+                            Eliminar
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   </article>

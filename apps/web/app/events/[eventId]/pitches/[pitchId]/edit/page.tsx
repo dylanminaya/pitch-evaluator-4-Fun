@@ -1,38 +1,29 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Palette, QrCode, Sparkles } from "lucide-react";
 import { Button } from "@workspace/ui/components/button";
 import { Input } from "@workspace/ui/components/input";
 import { usePitches, useUpdatePitch } from "@/hooks/dashboard";
+import type { DashboardPitch } from "@workspace/shared/api";
 
-export default function EditPitchPage() {
-  // Read both ids from the dynamic route so we know what event and pitch are being edited.
-  const params = useParams<{ eventId: string; pitchId: string }>();
+function EditPitchForm({
+  eventId,
+  pitchId,
+  pitch,
+}: {
+  eventId: string;
+  pitchId: string;
+  pitch: DashboardPitch;
+}) {
   const router = useRouter();
-  const eventId = params.eventId;
-  const pitchId = params.pitchId;
-  // Reuse the event pitch list and extract the current pitch from there.
-  const { data: pitches = [], isLoading, error: loadError } = usePitches(eventId);
   const { mutateAsync, isPending, error } = useUpdatePitch();
-  const pitch = pitches.find((item) => item.id === pitchId);
-
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
-  const [color, setColor] = useState("#83CE00");
-  const [logoUrl, setLogoUrl] = useState("");
-
-  useEffect(() => {
-    // Populate the form once the selected pitch is loaded.
-    if (!pitch) return;
-
-    setName(pitch.name);
-    setDescription(pitch.description);
-    setColor(pitch.color);
-    setLogoUrl(pitch.logoUrl ?? "");
-  }, [pitch]);
+  const [name, setName] = useState(pitch.name);
+  const [description, setDescription] = useState(pitch.description);
+  const [color, setColor] = useState(pitch.color);
+  const [logoUrl, setLogoUrl] = useState(pitch.logoUrl ?? "");
 
   function handleColorTextChange(value: string) {
     // Normalize manual color input so the API always receives a proper hex value.
@@ -58,24 +49,6 @@ export default function EditPitchPage() {
 
     router.push(
       `/dashboard?eventId=${updatedPitch.eventId}&pitchId=${updatedPitch.id}`,
-    );
-  }
-
-  if (isLoading) {
-    // Loading state while we fetch the pitch list for the selected event.
-    return (
-      <main className="flex min-h-svh items-center justify-center bg-[#0d1526] text-[#a9b3c9]">
-        Cargando pitch...
-      </main>
-    );
-  }
-
-  if (loadError || !pitch) {
-    // Guard clause for invalid url, missing pitch, or failed request.
-    return (
-      <main className="flex min-h-svh items-center justify-center bg-[#0d1526] px-6 text-center text-[#a9b3c9]">
-        No pudimos cargar el pitch para editar.
-      </main>
     );
   }
 
@@ -128,9 +101,9 @@ export default function EditPitchPage() {
             </div>
 
             <div className="mt-6 flex flex-col gap-6">
-              {(error || loadError) && (
+              {error && (
                 <div className="rounded-2xl border border-[#5a2433] bg-[#2a1018] p-3 text-sm text-[#ff8cab]">
-                  {error?.message ?? "No pudimos actualizar el pitch."}
+                  {error.message ?? "No pudimos actualizar el pitch."}
                 </div>
               )}
 
@@ -243,4 +216,34 @@ export default function EditPitchPage() {
       </div>
     </main>
   );
+}
+
+export default function EditPitchPage() {
+  // Read both ids from the dynamic route so we know what event and pitch are being edited.
+  const params = useParams<{ eventId: string; pitchId: string }>();
+  const eventId = params.eventId;
+  const pitchId = params.pitchId;
+  // Reuse the event pitch list and extract the current pitch from there.
+  const { data: pitches = [], isLoading, error: loadError } = usePitches(eventId);
+  const pitch = pitches.find((item) => item.id === pitchId);
+
+  if (isLoading) {
+    // Loading state while we fetch the pitch list for the selected event.
+    return (
+      <main className="flex min-h-svh items-center justify-center bg-[#0d1526] text-[#a9b3c9]">
+        Cargando pitch...
+      </main>
+    );
+  }
+
+  if (loadError || !pitch) {
+    // Guard clause for invalid url, missing pitch, or failed request.
+    return (
+      <main className="flex min-h-svh items-center justify-center bg-[#0d1526] px-6 text-center text-[#a9b3c9]">
+        No pudimos cargar el pitch para editar.
+      </main>
+    );
+  }
+
+  return <EditPitchForm eventId={eventId} pitchId={pitchId} pitch={pitch} />;
 }
