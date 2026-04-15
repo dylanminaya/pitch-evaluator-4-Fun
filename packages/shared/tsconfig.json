@@ -3,6 +3,8 @@
   "compilerOptions": {
     "module": "ESNext",
     "moduleResolution": "bundler",
+    "types": ["node"],
+    "ignoreDeprecations": "5.0",
     "baseUrl": ".",
     "paths": {
       "@workspace/shared/*": ["./*"]

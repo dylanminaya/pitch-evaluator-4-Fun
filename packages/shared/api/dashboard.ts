@@ -145,6 +145,60 @@ export const createPublicVoteSchema = z.object({
   comment: z.string().max(500).optional().nullable(),
 });
 
+
+
+export const organizerRoleSchema = z.enum(["ORGANIZER"])
+
+export const organizerInvitationStatusSchema = z.enum([
+  "PENDING",
+  "ACCEPTED",
+  "CANCELED",
+  "EXPIRED",
+])
+
+export const dashboardEventOrganizerSchema = z.object({
+  id: z.string(),
+  eventId: z.string(),
+  userId: z.string(),
+  email: z.string().email(),
+  name: z.string().nullable(),
+  role: organizerRoleSchema,
+  invitedByUserId: z.string().nullable(),
+  createdAt: z.string().nullable(),
+})
+
+export const dashboardEventOrganizerInvitationSchema = z.object({
+  id: z.string(),
+  eventId: z.string(),
+  email: z.string().email(),
+  role: organizerRoleSchema,
+  status: organizerInvitationStatusSchema,
+  invitedByUserId: z.string().nullable(),
+  acceptedByUserId: z.string().nullable(),
+  expiresAt: z.string(),
+  createdAt: z.string().nullable(),
+});
+
+export const organizerInvitationDetailSchema = z.object({
+  id: z.string(),
+  eventId: z.string(),
+  eventName: z.string(),
+  email: z.string().email(),
+  role: organizerRoleSchema,
+  status: organizerInvitationStatusSchema,
+  invitedByEmail: z.string().email(),
+  expiresAt: z.string(),
+});
+
+export const createEventOrganizerInvitationSchema  = z.object({
+  email: z.string().email("Please enter a valid email address"),
+  role: organizerRoleSchema.default("ORGANIZER"),
+})
+
+export const acceptEventOrganizerInvitationSchema = z.object({
+  token: z.string().min(1, "Invitation token is required"),
+});
+
 // Inferred types
 export type DashboardEvent = z.infer<typeof dashboardEventSchema>;
 export type DashboardPitch = z.infer<typeof dashboardPitchSchema>;
@@ -160,3 +214,25 @@ export type EventCriterion = z.infer<typeof eventCriterionSchema>;
 export type VoteCriterionScore = z.infer<typeof voteCriterionScoreSchema>;
 export type PublicPitch = z.infer<typeof publicPitchSchema>;
 export type CreatePublicVote = z.infer<typeof createPublicVoteSchema>;
+
+export type OrganizerRole = z.infer<typeof organizerRoleSchema>;
+export type OrganizerInvitationStatus = z.infer<typeof organizerInvitationStatusSchema>;
+export type DashboardEventOrganizer = z.infer<typeof dashboardEventOrganizerSchema>;
+export type DashboardEventOrganizerInvitation = z.infer<
+  typeof dashboardEventOrganizerInvitationSchema
+>;
+export type OrganizerInvitationDetail = z.infer<
+  typeof organizerInvitationDetailSchema
+>;
+export type CreateEventOrganizerInvitation = z.infer<
+  typeof createEventOrganizerInvitationSchema
+>;
+export type AcceptEventOrganizerInvitation = z.infer<
+  typeof acceptEventOrganizerInvitationSchema
+>;
+
+// Backward-compatible aliases while the organizer invitation flow settles.
+export type dashboardEventOrganizer = DashboardEventOrganizer;
+export type dashboardEventOrganizerInvitation = DashboardEventOrganizerInvitation;
+export type createEventOrganizerInvitation = CreateEventOrganizerInvitation;
+export type acceptEventOrganizerInvitation = AcceptEventOrganizerInvitation;

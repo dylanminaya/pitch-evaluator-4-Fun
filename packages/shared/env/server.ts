@@ -17,6 +17,8 @@ const serverEnvSchema = z.object({
   BETTER_AUTH_SECRET: z.string().min(1, "BETTER_AUTH_SECRET is required"),
   BETTER_AUTH_URL: z.string().url("BETTER_AUTH_URL must be a valid URL"),
   FRONTEND_URL: z.string().url("FRONTEND_URL must be a valid URL"),
+  RESEND_API_KEY: z.string().min(1, "RESEND_API_KEY is required"),
+  EMAIL_FROM: z.string().email("EMAIL_FROM must be a valid email address"),
 
   // Server
   PORT: z.coerce.number().default(3001),

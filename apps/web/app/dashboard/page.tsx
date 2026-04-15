@@ -296,9 +296,18 @@ function DashboardPageContent() {
                                 index === 0 ? "bg-[#ccff00]" : "bg-[#53546a]"//resaltar ganador
                               }`} 
                             />
-                            <span className={index === 0 ? "font-semibold text-[#f8ffcf]" : "font-semibold"}>
-                              {item.name} {/*nombre del proyecto */}
-                            </span>
+                            {selectedEventId ? (
+                              <Link
+                                href={`/events/${selectedEventId}/pitches/${item.id}/edit`}
+                                className={`${index === 0 ? "font-semibold text-[#f8ffcf]" : "font-semibold"} transition hover:text-[#83ce00]`}
+                              >
+                                {item.name}
+                              </Link>
+                            ) : (
+                              <span className={index === 0 ? "font-semibold text-[#f8ffcf]" : "font-semibold"}>
+                                {item.name}
+                              </span>
+                            )}
                           </div>
                         </td>{/*muestra las puntuaciones en cada categoria */}
                         <td className="px-4 py-4 text-[#9da0bc]">{item.innovationAvg}</td>
@@ -376,6 +385,24 @@ function DashboardPageContent() {
                   >
                     Export pitch
                   </Button>
+                </div>
+
+                <div className="mt-4 flex justify-end">
+                  <Link
+                    href={
+                      selectedEventId && selectedPitchId
+                        ? `/events/${selectedEventId}/pitches/${selectedPitchId}/edit`
+                        : "#"
+                    }
+                  >
+                    <Button
+                      variant="outline"
+                      disabled={!selectedEventId || !selectedPitchId}
+                      className="rounded-full border-[#263550] bg-transparent text-white hover:bg-[#1a2640] hover:text-white"
+                    >
+                      Editar pitch
+                    </Button>
+                  </Link>
                 </div>
               </div>
 
