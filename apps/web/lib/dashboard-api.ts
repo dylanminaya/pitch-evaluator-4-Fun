@@ -139,6 +139,18 @@ export function getOrganizerInvitations(eventId: string) {
   );
 }
 
+export function cancelOrganizerInvitation(
+  eventId: string,
+  invitationId: string,
+) {
+  return apiFetchVoid(
+    `/api/event/${eventId}/organizer-invitations/${invitationId}/cancel`,
+    {
+      method: "POST",
+    },
+  );
+}
+
 export function getEventOrganizers(eventId: string) {
   return apiFetch<DashboardEventOrganizer[]>(
     `/api/event/${eventId}/organizers`,

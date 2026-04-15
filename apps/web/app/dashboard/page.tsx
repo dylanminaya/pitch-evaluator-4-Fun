@@ -392,39 +392,6 @@ function DashboardPageContent() {
                 </button>
               </div>
             </section>
-
-            {/* <section className={`${panelClass} flex flex-1 flex-col p-5`}>
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="size-4 text-[#d06bff]" />
-                  <p className="text-[11px] font-bold uppercase italic tracking-[0.24em] text-[#a88cc8]">
-                    Resumen IA
-                  </p>
-                </div>
-                <span className="rounded-full bg-[#2b1836] px-2.5 py-1 text-[10px] uppercase tracking-[0.22em] text-[#d06bff]">
-                  Beta
-                </span>
-              </div>
-
-              <div className="mt-4 flex flex-col gap-4">
-                {summaryBlocks.map((block) => (
-                  <article
-                    key={block.title}
-                    className="rounded-2xl border border-[#263550] bg-[#0d1526] p-4"
-                  >
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={`h-2 w-2 rounded-full ${
-                          block.tone === "positive" ? "bg-[#ccff00]" : "bg-[#ff4c83]"
-                        }`}
-                      />
-                      <h3 className={`text-sm font-semibold ${block.tone === "positive" ? "text-[#ccff00]" : "text-[#ff4c83]"}`}>{block.title}</h3>
-                    </div>
-                    <p className="mt-3 text-sm leading-6 text-[#aeb0c4]">{block.body}</p>
-                  </article>
-                ))}
-              </div>
-            </section> */}
           </aside>
         </section>
       </div>

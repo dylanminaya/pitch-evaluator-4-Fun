@@ -7,6 +7,7 @@ import { ArrowLeft, Mail, Users } from "lucide-react";
 import { Button } from "@workspace/ui/components/button";
 import { Input } from "@workspace/ui/components/input";
 import {
+  useCancelOrganizerInvitation,
   useCreateOrganizerInvitation,
   useEventOrganizers,
   useOrganizerInvitations,
@@ -17,6 +18,10 @@ export default function EventTeamPage() {
   const eventId = params.eventId;
   const [email, setEmail] = useState("");
   const { mutateAsync, isPending, error } = useCreateOrganizerInvitation();
+  const {
+    mutateAsync: cancelInvitation,
+    isPending: isCancelingInvitation,
+  } = useCancelOrganizerInvitation();
   const {
     data: invitations = [],
     isLoading,
@@ -38,6 +43,13 @@ export default function EventTeamPage() {
     });
 
     setEmail("");
+  }
+
+  async function handleCancelInvitation(invitationId: string) {
+    await cancelInvitation({
+      eventId,
+      invitationId,
+    });
   }
 
   return (
@@ -175,8 +187,20 @@ export default function EventTeamPage() {
                           </p>
                         </div>
 
-                        <div className="rounded-full border border-[#263550] bg-[#121d30] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-[#83ce00]">
-                          {invitation.role}
+                        <div className="flex items-center gap-2">
+                          <div className="rounded-full border border-[#263550] bg-[#121d30] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-[#83ce00]">
+                            {invitation.role}
+                          </div>
+
+                          <Button
+                            type="button"
+                            variant="outline"
+                            disabled={isCancelingInvitation}
+                            onClick={() => handleCancelInvitation(invitation.id)}
+                            className="rounded-full border-[#5a2433] bg-transparent px-3 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-[#ff8cab] hover:bg-[#2a1018] hover:text-[#ffb5c7]"
+                          >
+                            {isCancelingInvitation ? "Cancelando..." : "Cancelar"}
+                          </Button>
                         </div>
                       </div>
                     </article>
