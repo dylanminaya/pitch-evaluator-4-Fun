@@ -13,6 +13,7 @@ export type Pitch = {
 // Forma publica del pitch para la pantalla de voto.
 export type PublicPitch = {
   id: string;
+  eventId: string;
   name: string;
   description: string;
   pitchStatus: "OPEN" | "CLOSED";

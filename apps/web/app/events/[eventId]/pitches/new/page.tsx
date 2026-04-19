@@ -84,7 +84,7 @@ export default function NewPitchPage() {
               </p>
               <p className="text-sm text-[#a9b3c9]">
                 Este formulario crea el pitch real en la base de datos y luego el
-                dashboard podra generar su invitacion y QR publico.
+                dashboard podra generar el QR publico del evento para acceder a todos los pitches.
               </p>
             </div>
 
@@ -191,8 +191,8 @@ export default function NewPitchPage() {
               </div>
               {/* <div className="mt-5 flex flex-col gap-4 text-sm leading-6 text-[#a9b3c9]">
                 <p>1. El pitch se inserta realmente en la tabla `pitch`.</p>
-                <p>2. El dashboard lo toma como pitch activo para QR e invitacion.</p>
-                <p>3. La URL publica de invitacion ya podra abrir `/invitation/[pitchId]` sin 404.</p>
+                <p>2. El dashboard lo agrega al evento para que aparezca en el QR general.</p>
+                <p>3. La URL publica de invitacion abrira `/invitation/[eventId]` y desde ahi se podra entrar al pitch.</p>
               </div> */}
               <div className="mt-5 rounded-2xl border border-dashed border-[#263550] bg-[#0d1526] px-4 py-4 text-sm leading-6 text-[#a9b3c9]">
                 <div className="inline-flex items-center gap-2 font-semibold text-white">

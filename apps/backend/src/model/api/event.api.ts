@@ -44,32 +44,30 @@ eventRouter.get("/public/:eventId", async (req, res) => {
           p.name,
           p.description,
           p.color,
-          p."logoUrl"
+          p."logoUrl",
+          p.status
         FROM pitch p
         WHERE p."eventId" = $1
         ORDER BY p."createdAt" ASC
-        LIMIT 1
       `,
       [req.params.eventId],
     );
 
     const event = eventResult.rows[0];
-    const pitch = pitchResult.rows[0] ?? null;
 
     return res.json(
       publicEventInvitationSchema.parse({
         id: event.id,
         name: event.name,
         status: event.status,
-        targetPitch: pitch
-          ? {
-              id: pitch.id,
-              name: pitch.name,
-              description: pitch.description,
-              color: pitch.color,
-              logoUrl: pitch.logoUrl,
-            }
-          : null,
+        pitches: pitchResult.rows.map((pitch) => ({
+          id: pitch.id,
+          name: pitch.name,
+          description: pitch.description,
+          color: pitch.color,
+          logoUrl: pitch.logoUrl ?? null,
+          status: pitch.status,
+        })),
       }),
     );
   } catch (error) {

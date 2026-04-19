@@ -22,6 +22,7 @@ export const presentPitch = (pitch: {
 // Forma publica del pitch para la pantalla de voto.
 export const presentPublicPitch = (pitch: {
   id: string;
+  eventId: string;
   name: string;
   description: string;
   pitchStatus: "OPEN" | "CLOSED";
@@ -30,6 +31,7 @@ export const presentPublicPitch = (pitch: {
   eventStatus: "OPEN" | "CLOSED";
 }) => ({
   id: pitch.id,
+  eventId: pitch.eventId,
   name: pitch.name,
   description: pitch.description,
   pitchStatus: pitch.pitchStatus,

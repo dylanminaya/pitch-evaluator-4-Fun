@@ -17,7 +17,7 @@ import {
   useEvents,
   usePitches,
   useRanking,
-  usePitchQr,
+  useEventQr,
   useUpdatePitchStatus,
   useUpdateEventStatus,
 } from "@/hooks/dashboard";
@@ -71,7 +71,7 @@ function DashboardPageContent() {
   const selectedPitchId = selectedPitch?.id;
 
   const { data: rankingData = [] } = useRanking(selectedEventId);
-  const { data: qrData } = usePitchQr(selectedPitchId);
+  const { data: qrData } = useEventQr(selectedEventId);
 
   const selectedPitchVotes = rankingData.find(item => item.id === selectedPitchId)?.votesCount ?? 0;
   const eventIsOpen = selectedEvent?.status === "OPEN";
@@ -359,9 +359,9 @@ function DashboardPageContent() {
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <p className={eyebrowClass}>
-                    Codigo QR activo
+                    Codigo QR del evento
                   </p>
-                  <h2 className="mt-2 text-xl font-semibold tracking-tight">{qrData?.name ?? selectedPitch?.name ?? "Sin pitch seleccionado"}</h2>
+                  <h2 className="mt-2 text-xl font-semibold tracking-tight">{qrData?.name ?? selectedEvent?.name ?? "Sin evento seleccionado"}</h2>
                 </div>
                 <Link href={selectedEventId ? `/events/${selectedEventId}/pitches/new` : "#"}>
                   <Button
@@ -380,7 +380,7 @@ function DashboardPageContent() {
               </div>
 
               <p className="mt-4 text-center text-xs text-[#8899aa]">
-                escanea para abrir el formulario de voto
+                escanea para ver todos los pitches del evento
               </p>
 
               {qrData?.publicVoteUrl && (

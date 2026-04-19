@@ -1,7 +1,12 @@
 "use client";
 
-import { usePitchQr } from "./use-pitch-qr";
+import { useQuery } from "@tanstack/react-query";
+import { getEventQr } from "@/lib/dashboard-api";
 
-// Backward-compatible alias while the codebase finishes renaming
-// "event qr" references to the existing pitch QR flow.
-export const useEventQr = usePitchQr;
+export function useEventQr(eventId?: string) {
+  return useQuery({
+    queryKey: ["event-qr", eventId],
+    queryFn: () => getEventQr(eventId!),
+    enabled: Boolean(eventId),
+  });
+}

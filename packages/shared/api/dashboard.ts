@@ -77,13 +77,16 @@ export const publicEventInvitationSchema = z.object({
   id: z.string(),
   name: z.string(),
   status: z.enum(["OPEN", "CLOSED"]),
-  targetPitch: z.object({
-    id: z.string(),
-    name: z.string(),
-    description: z.string(),
-    color: z.string(),
-    logoUrl: z.string().nullable(),
-  }).nullable(),
+  pitches: z.array(
+    z.object({
+      id: z.string(),
+      name: z.string(),
+      description: z.string(),
+      color: z.string(),
+      logoUrl: z.string().nullable(),
+      status: z.enum(["OPEN", "CLOSED"]),
+    }),
+  ),
 });
 
 export const createDashboardEventSchema = z.object({
@@ -131,6 +134,7 @@ export const updateDashboardPitchSchema = z.object({
 
 export const publicPitchSchema = z.object({
   id: z.string(),
+  eventId: z.string(),
   name: z.string(),
   description: z.string(),
   pitchStatus: z.enum(["OPEN", "CLOSED"]),

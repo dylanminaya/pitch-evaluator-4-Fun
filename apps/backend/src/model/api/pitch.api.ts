@@ -275,6 +275,7 @@ pitchRouter.get("/public/:pitchId", async (req, res) => {
         `
           SELECT
             p.id,
+            p."eventId",
             p.name,
             p.description,
             p.status AS "pitchStatus",
@@ -298,6 +299,7 @@ pitchRouter.get("/public/:pitchId", async (req, res) => {
         `
           SELECT
             p.id,
+            p."eventId",
             p.name,
             p.description,
             p.status AS "pitchStatus",

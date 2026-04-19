@@ -12,6 +12,7 @@ import {
   type DashboardPitchComment,
   type DashboardPitchQr,
   type PublicPitch,
+  type PublicEventInvitation,
   type DashboardEventOrganizer,
   type CreateEventOrganizerInvitation,
   type DashboardEventOrganizerInvitation,
@@ -30,6 +31,7 @@ export type {
   DashboardPitchComment,
   DashboardPitchQr,
   PublicPitch,
+  PublicEventInvitation,
   DashboardEventOrganizer,
   CreateEventOrganizerInvitation,
   DashboardEventOrganizerInvitation,
@@ -95,8 +97,16 @@ export function getPitchQr(pitchId: string) {
   return apiFetch<DashboardPitchQr>(`/api/pitch/${pitchId}/qr`);
 }
 
+export function getEventQr(eventId: string) {
+  return apiFetch<DashboardPitchQr>(`/api/event/${eventId}/qr`);
+}
+
 export function getPublicPitch(pitchId: string) {
   return apiFetch<PublicPitch>(`/api/pitch/public/${pitchId}`);
+}
+
+export function getPublicEventInvitation(eventId: string) {
+  return apiFetch<PublicEventInvitation>(`/api/event/public/${eventId}`);
 }
 
 export function exportEvent(eventId: string) {

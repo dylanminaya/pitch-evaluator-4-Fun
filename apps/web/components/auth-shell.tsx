@@ -14,7 +14,7 @@ type AuthShellProps = {
 
 const featureItems = [
   "Ranking en vivo con visual listo para proyectar",
-  "QR por pitch para captar votos al instante",
+  "Un QR por evento para abrir todos los pitches al instante",
   "Resumen de IA y control del flujo del evento",
 ];
 
