@@ -18,6 +18,7 @@ import {
   usePitches,
   useRanking,
   useEventQr,
+  useEventStats,
   useUpdatePitchStatus,
   useUpdateEventStatus,
 } from "@/hooks/dashboard";
@@ -71,6 +72,7 @@ function DashboardPageContent() {
   const selectedPitchId = selectedPitch?.id;
 
   const { data: rankingData = [] } = useRanking(selectedEventId);
+  const { data: eventStats } = useEventStats(selectedEventId);
   const { data: qrData } = useEventQr(selectedEventId);
 
   const selectedPitchVotes = rankingData.find(item => item.id === selectedPitchId)?.votesCount ?? 0;
@@ -142,7 +144,10 @@ function DashboardPageContent() {
     },
     {
       label: "Evaluadores",
-      value: "N/D",//no disponible
+      value:
+        eventStats?.evaluatorsCount === null || eventStats?.evaluatorsCount === undefined
+          ? "N/D"
+          : String(eventStats.evaluatorsCount),
       accent: "text-fuchsia-400",
     },
   ];

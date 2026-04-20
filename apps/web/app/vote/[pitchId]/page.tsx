@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { CheckCircle2, Sparkles } from "lucide-react";
+import { CheckCircle2, Sparkles, Star } from "lucide-react";
 import { Button } from "@workspace/ui/components/button";
 import { usePublicPitch, useSubmitPublicVote } from "@/hooks/dashboard";
 import type { EventCriterion } from "@workspace/shared/api";
@@ -19,9 +19,18 @@ export default function VotingScreenPage() {
   const [scores, setScores] = useState<Record<string, number>>({});
 
   const criteria: EventCriterion[] = pitch?.criteria ?? [];
+  const hasAlreadyVoted = Boolean(pitch?.hasVoted) || isSuccess;
 
   function updateScore(key: string, value: number) {
     setScores((current) => ({ ...current, [key]: value }));
+  }
+
+  function getRatingLabel(value?: number) {
+    if (!value) {
+      return "Sin evaluar";
+    }
+
+    return `${value}/5`;
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -102,8 +111,9 @@ export default function VotingScreenPage() {
               {pitch.description}
             </p>
             <div className="mt-6 rounded-2xl border border-dashed border-[#263550] bg-[#0d1526] px-4 py-4 text-sm leading-6 text-[#8899aa]">
-              Tu voto cuenta una sola vez por dispositivo. Toma unos segundos para
-              evaluar de forma honesta cada criterio.
+              {hasAlreadyVoted
+                ? "Este dispositivo ya registro un voto para este pitch."
+                : "Tu voto cuenta una sola vez por dispositivo. Toma unos segundos para evaluar de forma honesta cada criterio."}
             </div>
           </aside>
 
@@ -114,29 +124,36 @@ export default function VotingScreenPage() {
                   key={criterion.id}
                   className="rounded-[24px] border border-[#263550] bg-[#1a2640] p-6 shadow-[0_18px_45px_rgba(2,8,23,0.35)]"
                 >
-                  <div className="inline-flex items-center gap-2 text-[11px] font-bold uppercase italic tracking-[0.24em] text-[#83ce00]">
-                    <Sparkles className="size-4 text-[#8899aa]" />
-                    {criterion.label}
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="inline-flex items-center gap-2 text-[11px] font-bold uppercase italic tracking-[0.24em] text-[#83ce00]">
+                      <Sparkles className="size-4 text-[#8899aa]" />
+                      {criterion.label}
+                    </div>
+                    <span className="text-sm text-[#a9b3c9]">
+                      {getRatingLabel(scores[criterion.id])}
+                    </span>
                   </div>
-                  <p className="mt-3 text-sm text-[#a9b3c9]">
-                    Peso configurado: {criterion.weight}%
-                  </p>
-                  <div className="mt-8 flex items-center justify-between gap-2">
+                  <div className="mt-6 flex items-center gap-2">
                     {[1, 2, 3, 4, 5].map((value) => {
-                      const selected = (scores[criterion.id] ?? 3) === value;
+                      const selectedScore = scores[criterion.id] ?? 0;
+                      const selected = selectedScore >= value;
 
                       return (
                         <button
                           key={value}
                           type="button"
                           onClick={() => updateScore(criterion.id, value)}
-                          className={`flex h-10 w-10 items-center justify-center rounded-xl border text-sm font-bold transition ${
-                            selected
-                              ? "border-[#83ce00] bg-[#83ce00] text-[#0d1526]"
-                              : "border-[#263550] bg-[#0d1526] text-[#8899aa]"
-                          }`}
+                          disabled={hasAlreadyVoted}
+                          aria-label={`Calificar ${criterion.label} con ${value} estrellas`}
+                          className="rounded-md p-1 transition disabled:cursor-not-allowed"
                         >
-                          {value}
+                          <Star
+                            className={`size-7 ${
+                              selected
+                                ? "fill-[#a7ea2e] text-[#a7ea2e]"
+                                : "fill-transparent text-[#66738f]"
+                            }`}
+                          />
                         </button>
                       );
                     })}
@@ -157,6 +174,7 @@ export default function VotingScreenPage() {
                 value={comment}
                 onChange={(event) => setComment(event.target.value)}
                 placeholder="Que te dirias del equipo o de la solucion?"
+                disabled={hasAlreadyVoted}
                 className="mt-4 min-h-28 w-full rounded-2xl border border-[#263550] bg-[#0d1526] px-4 py-3 text-sm text-white outline-none placeholder:text-[#66738f]"
               />
             </section>
@@ -171,27 +189,26 @@ export default function VotingScreenPage() {
               <div className="rounded-2xl border border-[#263550] bg-[#121d30] p-4 text-sm text-[#83ce00]">
                 <div className="inline-flex items-center gap-2">
                   <CheckCircle2 className="size-4" />
-                  Tu voto fue enviado correctamente.
-                </div>
-                <div className="mt-3">
-                  <Button
-                    type="button"
-                    onClick={() => router.push(`/invitation/${pitch.eventId}`)}
-                    className="rounded-full bg-[#83ce00] text-sm font-bold italic text-[#0d1526] hover:bg-[#a7ea2e]"
-                  >
-                    Volver al evento
-                  </Button>
+                  Ya votaste en este pitch.
                 </div>
               </div>
             )}
 
-            <div className="flex justify-end">
+            <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => router.push(`/invitation/${pitch.eventId}`)}
+                className="h-12 rounded-full border-[#263550] bg-transparent px-6 text-sm font-bold text-white hover:bg-[#1a2640] hover:text-white"
+              >
+                Ver pitches
+              </Button>
               <Button
                 type="submit"
-                disabled={isPending || isSuccess}
+                disabled={isPending || hasAlreadyVoted}
                 className="h-12 rounded-full bg-[#83ce00] px-6 text-sm font-bold italic text-[#0d1526] hover:bg-[#a7ea2e]"
               >
-                {isPending ? "Enviando..." : "Enviar voto"}
+                {isPending ? "Enviando..." : hasAlreadyVoted ? "Ya votaste" : "Enviar voto"}
               </Button>
             </div>
           </form>

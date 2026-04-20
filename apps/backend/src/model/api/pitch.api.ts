@@ -35,6 +35,18 @@ const hasPgErrorCode = (error: unknown, code: string) =>
   "code" in error &&
   error.code === code;
 
+const getClientIpAddress = (value: string | string[] | undefined) => {
+  if (Array.isArray(value)) {
+    return value[0] ?? null;
+  }
+
+  if (typeof value === "string" && value.length > 0) {
+    return value.split(",")[0]?.trim() ?? null;
+  }
+
+  return null;
+};
+
 // Lista los pitches de un evento.
 pitchRouter.get("/", async (req, res) => {
   const session = await requireSession(req, res);
@@ -153,11 +165,11 @@ pitchRouter.post("/", async (req, res) => {
 
     const result = await db.query(
       `
-        INSERT INTO pitch (id, "eventId", name, description, color, "logoUrl", "createdAt")
-        VALUES ($1, $2, $3, $4, $5, $6, NOW())
-        RETURNING id, "eventId", name, description, color, "logoUrl", "createdAt"
+        INSERT INTO pitch (id, "eventId", name, description, status, color, "logoUrl", "createdAt")
+        VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+        RETURNING id, "eventId", name, description, status, color, "logoUrl", "createdAt"
       `,
-      [randomUUID(), eventId, name, description, color, logoUrl ?? null],
+      [randomUUID(), eventId, name, description, "OPEN", color, logoUrl ?? null],
     );
 
     return res.status(201).json(dashboardPitchSchema.parse(presentPitch(result.rows[0])));
@@ -208,7 +220,7 @@ pitchRouter.patch("/:id", async (req, res) => {
           color = $3,
           "logoUrl" = $4
         WHERE id = $5
-        RETURNING id, "eventId", name, description, color, "logoUrl", "createdAt"
+        RETURNING id, "eventId", name, description, status, color, "logoUrl", "createdAt"
       `,
       [name, description, color, logoUrl ?? null, req.params.id],
     );
@@ -267,6 +279,8 @@ pitchRouter.delete("/:id", async (req, res) => {
 // Endpoint publico para la pantalla de voto.
 pitchRouter.get("/public/:pitchId", async (req, res) => {
   try {
+    const ipAddress =
+      getClientIpAddress(req.headers["x-forwarded-for"]) ?? req.ip ?? null;
     let result;
 
     try {
@@ -320,8 +334,28 @@ pitchRouter.get("/public/:pitchId", async (req, res) => {
       });
     }
 
+    let hasVoted = false;
+
+    if (ipAddress) {
+      const existingVoteResult = await db.query(
+        `
+          SELECT id
+          FROM vote
+          WHERE "pitchId" = $1
+            AND "ipAddress" = $2
+          LIMIT 1
+        `,
+        [req.params.pitchId, ipAddress],
+      );
+
+      hasVoted = (existingVoteResult.rowCount ?? 0) > 0;
+    }
+
     return res.status(200).json(publicPitchSchema.parse({
-      ...presentPublicPitch(result.rows[0]),
+      ...presentPublicPitch({
+        ...result.rows[0],
+        hasVoted,
+      }),
       criteria: Array.isArray(result.rows[0].criteria) ? result.rows[0].criteria : defaultCriteria,
     }));
   } catch (error) {

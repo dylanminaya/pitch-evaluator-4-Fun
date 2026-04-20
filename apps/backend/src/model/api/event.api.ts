@@ -6,7 +6,12 @@ import { db } from "../../db.js";
 import { createEventSchema, updateEventStatusSchema } from "../schema/event.schema.js";
 import { canManageEvent } from "../event.permissions.js";
 import { presentEvent, presentEventQr } from "../../presenter/event.presenter.js";
-import { dashboardEventSchema, dashboardEventQrSchema, publicEventInvitationSchema } from "@workspace/shared/api";
+import {
+  dashboardEventSchema,
+  dashboardEventQrSchema,
+  dashboardEventStatsSchema,
+  publicEventInvitationSchema,
+} from "@workspace/shared/api";
 import { validateServerEnv } from "@workspace/shared/env/server";
 
 export const eventRouter: Router = Router();
@@ -48,7 +53,7 @@ eventRouter.get("/public/:eventId", async (req, res) => {
           p.status
         FROM pitch p
         WHERE p."eventId" = $1
-        ORDER BY p."createdAt" ASC
+        ORDER BY p."createdAt" DESC
       `,
       [req.params.eventId],
     );
@@ -349,6 +354,48 @@ eventRouter.get("/:eventId/export", async (req, res) => {
   } catch (error) {
     console.error(error);
     return res.status(500).json({ message: "Failed to export event results" });
+  }
+});
+
+// Devuelve metricas agregadas del evento para el dashboard.
+eventRouter.get("/:eventId/stats", async (req, res) => {
+  const session = await requireSession(req, res);
+
+  if (!session) {
+    return;
+  }
+
+  try {
+    const canManage = await canManageEvent(session.user.id, req.params.eventId);
+
+    if (!canManage) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    const result = await db.query(
+      `
+        SELECT
+          NULLIF(
+            COUNT(
+              DISTINCT COALESCE(NULLIF(v."evaluatorId", ''), NULLIF(v."ipAddress", ''))
+            ),
+            0
+          )::int AS "evaluatorsCount"
+        FROM pitch p
+        LEFT JOIN vote v ON v."pitchId" = p.id
+        WHERE p."eventId" = $1
+      `,
+      [req.params.eventId],
+    );
+
+    return res.json(
+      dashboardEventStatsSchema.parse({
+        evaluatorsCount: result.rows[0]?.evaluatorsCount ?? null,
+      }),
+    );
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: "Failed to fetch event stats" });
   }
 });
 

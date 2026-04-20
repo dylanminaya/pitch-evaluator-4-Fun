@@ -6,6 +6,7 @@ import {
   type CreateDashboardPitch,
   type UpdateDashboardPitch,
   type DashboardEvent,
+  type DashboardEventStats,
   type DashboardPitch,
   type DashboardRankingItem,
   type DashboardPitchDetail,
@@ -25,6 +26,7 @@ export type {
   CreateDashboardPitch,
   UpdateDashboardPitch,
   DashboardEvent,
+  DashboardEventStats,
   DashboardPitch,
   DashboardRankingItem,
   DashboardPitchDetail,
@@ -47,6 +49,10 @@ export function createEvent(data: CreateDashboardEvent) {
     method: "POST",
     body: JSON.stringify(data),
   });
+}
+
+export function getEventStats(eventId: string) {
+  return apiFetch<DashboardEventStats>(`/api/event/${eventId}/stats`);
 }
 
 export function getPitches(eventId: string) {

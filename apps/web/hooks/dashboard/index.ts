@@ -1,4 +1,4 @@
-export { useEvents } from "./use-events";
+export { useEvents, useEventStats } from "./use-events";
 export { useCreateEvent } from "./use-create-event";
 export { useCreatePitch } from "./use-create-pitch";
 export { useDeleteEvent } from "./use-delete-event";

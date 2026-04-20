@@ -29,6 +29,7 @@ export const presentPublicPitch = (pitch: {
   color: string;
   logoUrl?: string | null;
   eventStatus: "OPEN" | "CLOSED";
+  hasVoted?: boolean;
 }) => ({
   id: pitch.id,
   eventId: pitch.eventId,
@@ -38,6 +39,7 @@ export const presentPublicPitch = (pitch: {
   color: pitch.color,
   logoUrl: pitch.logoUrl ?? null,
   eventStatus: pitch.eventStatus,
+  hasVoted: pitch.hasVoted ?? false,
 });
 
 // Resumen detallado del pitch con promedios y conteos.
