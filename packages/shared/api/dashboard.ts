@@ -21,7 +21,8 @@ export const criterionAverageSchema = z.object({
 
 const criteriaArraySchema = z
   .array(eventCriterionSchema)
-  .min(4, "At least 4 criteria are required")
+  .min(1, "At least 1 criterion is required")
+  .max(6, "No more than 6 criteria are allowed")
   .superRefine((criteria, ctx) => {
     const totalWeight = criteria.reduce((sum, criterion) => sum + criterion.weight, 0);
 
@@ -49,7 +50,8 @@ const criteriaArraySchema = z
 
 const voteCriteriaScoresSchema = z
   .array(voteCriterionScoreSchema)
-  .min(4, "At least 4 scores are required")
+  .min(1, "At least 1 score is required")
+  .max(6, "No more than 6 scores are allowed")
   .superRefine((criteriaScores, ctx) => {
     const criterionIds = new Set<string>();
 

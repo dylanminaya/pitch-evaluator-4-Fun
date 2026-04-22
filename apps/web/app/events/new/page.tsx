@@ -33,6 +33,8 @@ const setupItems = [
 ];
 
 export default function NewEventPage() {
+  const MIN_CRITERIA = 1;
+  const MAX_CRITERIA = 6;
   const router = useRouter();
   const { mutateAsync, isPending, error } = useCreateEvent();
   const [name, setName] = useState("");
@@ -49,9 +51,19 @@ export default function NewEventPage() {
     () => criteria.reduce((sum, criterion) => sum + criterion.weight, 0),
     [criteria],
   );
-  const canSubmit = totalWeight === 100 && name.trim().length >= 3 && description.trim().length >= 5;
+  const hasValidCriteriaCount =
+    criteria.length >= MIN_CRITERIA && criteria.length <= MAX_CRITERIA;
+  const canSubmit =
+    totalWeight === 100 &&
+    hasValidCriteriaCount &&
+    name.trim().length >= 3 &&
+    description.trim().length >= 5;
 
   function handleAddCriterion() {
+    if (criteria.length >= MAX_CRITERIA) {
+      return;
+    }
+
     setCriteria((current) => [
       ...current,
       {
@@ -86,6 +98,10 @@ export default function NewEventPage() {
   }
 
   function handleRemoveCriterion(id: string) {
+    if (criteria.length <= MIN_CRITERIA) {
+      return;
+    }
+
     setCriteria((current) => current.filter((criterion) => criterion.id !== id));
   }
   //
@@ -243,6 +259,9 @@ export default function NewEventPage() {
                     </p>
                   </div>
                   <div className="flex items-center gap-3">
+                    <span className="text-xs text-[#8899aa]">
+                      {criteria.length}/{MAX_CRITERIA} criterios
+                    </span>
                     <span className={`text-xs ${totalWeight === 100 ? "text-[#83ce00]" : "text-[#ff8cab]"}`}>
                       Total {totalWeight}%
                     </span>
@@ -250,7 +269,7 @@ export default function NewEventPage() {
                       type="button"
                       onClick={handleAddCriterion}
                       className="h-9 rounded-full bg-[#83ce00] px-4 text-xs font-bold italic text-[#0d1526] hover:bg-[#a7ea2e]"
-                      disabled={isPending}
+                      disabled={isPending || criteria.length >= MAX_CRITERIA}
                     >
                       <Plus className="size-4" />
                       Agregar
@@ -312,7 +331,7 @@ export default function NewEventPage() {
                           type="button"
                           variant="outline"
                           onClick={() => handleRemoveCriterion(criterion.id)}
-                          disabled={isPending || criterion.isDefault}
+                          disabled={isPending || criteria.length <= MIN_CRITERIA}
                           className="h-11 rounded-2xl border-[#263550] bg-transparent px-3 text-white hover:bg-[#1a2640] hover:text-white"
                         >
                           <Trash2 className="size-4" />
@@ -322,7 +341,7 @@ export default function NewEventPage() {
                   ))}
                 </div>
                 <p className="mt-4 text-xs leading-5 text-[#8899aa]">
-                  Estos porcentajes ya se guardan y afectan el resultado final. Para que la ponderacion funcione bien, el total debe sumar 100%.
+                  Debe haber entre {MIN_CRITERIA} y {MAX_CRITERIA} criterios. Estos porcentajes se guardan y afectan el resultado final, asi que el total debe sumar 100%.
                 </p>
               </section>
 
