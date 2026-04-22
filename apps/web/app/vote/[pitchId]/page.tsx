@@ -129,9 +129,14 @@ export default function VotingScreenPage() {
                       <Sparkles className="size-4 text-[#8899aa]" />
                       {criterion.label}
                     </div>
-                    <span className="text-sm text-[#a9b3c9]">
-                      {getRatingLabel(scores[criterion.id])}
-                    </span>
+                    <div className="flex items-center gap-3">
+                      <span className="rounded-full border border-[#263550] bg-[#0d1526] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#83ce00]">
+                        {criterion.weight}%
+                      </span>
+                      <span className="text-sm text-[#a9b3c9]">
+                        {getRatingLabel(scores[criterion.id])}
+                      </span>
+                    </div>
                   </div>
                   <div className="mt-6 flex items-center gap-2">
                     {[1, 2, 3, 4, 5].map((value) => {

@@ -13,6 +13,7 @@ import {
   publicEventInvitationSchema,
 } from "@workspace/shared/api";
 import { validateServerEnv } from "@workspace/shared/env/server";
+import { normalizeEventCriteria } from "../criteria.js";
 
 export const eventRouter: Router = Router();
 
@@ -98,7 +99,8 @@ eventRouter.get("/", async (req, res) => {
           e.description,
           e.status,
           e."createdAt",
-          e."organizerId"
+          e."organizerId",
+          e.criteria
         FROM event e
         LEFT JOIN event_organizer eo ON eo."eventId" = e.id
         WHERE e."organizerId" = $1
@@ -112,8 +114,44 @@ eventRouter.get("/", async (req, res) => {
       z.array(dashboardEventSchema).parse(result.rows.map(presentEvent)),
     );
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Failed to fetch events" });
+    if (!hasPgErrorCode(error, "42703")) {
+      console.error(error);
+      return res.status(500).json({ message: "Failed to fetch events" });
+    }
+
+    try {
+      const fallbackResult = await db.query(
+        `
+          SELECT DISTINCT
+            e.id,
+            e.name,
+            e.description,
+            e.status,
+            e."createdAt",
+            e."organizerId"
+          FROM event e
+          LEFT JOIN event_organizer eo ON eo."eventId" = e.id
+          WHERE e."organizerId" = $1
+            OR eo."userId" = $1
+          ORDER BY "createdAt" DESC
+        `,
+        [session.user.id],
+      );
+
+      res.json(
+        z.array(dashboardEventSchema).parse(
+          fallbackResult.rows.map((event) =>
+            presentEvent({
+              ...event,
+              criteria: normalizeEventCriteria(undefined),
+            }),
+          ),
+        ),
+      );
+    } catch (fallbackError) {
+      console.error(fallbackError);
+      res.status(500).json({ message: "Failed to fetch events" });
+    }
   }
 });
 
@@ -166,7 +204,14 @@ eventRouter.post("/", async (req, res) => {
       );
     }
 
-    res.status(201).json(dashboardEventSchema.parse(presentEvent(result.rows[0])));
+    res.status(201).json(
+      dashboardEventSchema.parse(
+        presentEvent({
+          ...result.rows[0],
+          criteria,
+        }),
+      ),
+    );
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Failed to create event" });
@@ -211,7 +256,14 @@ eventRouter.patch("/:id/status", async (req, res) => {
       return res.status(404).json({ message: "Event not found" });
     }
 
-    res.json(dashboardEventSchema.parse(presentEvent(result.rows[0])));
+    res.json(
+      dashboardEventSchema.parse(
+        presentEvent({
+          ...result.rows[0],
+          criteria: normalizeEventCriteria(undefined),
+        }),
+      ),
+    );
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Failed to update event status" });

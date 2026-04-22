@@ -16,6 +16,14 @@ CREATE TABLE IF NOT EXISTS event (
   "organizerId" TEXT        NOT NULL REFERENCES "user"(id) ON DELETE CASCADE
 );
 
+ALTER TABLE event
+ADD COLUMN IF NOT EXISTS criteria JSONB NOT NULL DEFAULT '[
+  {"id":"innovation","label":"Innovacion","weight":25,"isDefault":true},
+  {"id":"viability","label":"Viabilidad","weight":25,"isDefault":true},
+  {"id":"impact","label":"Impacto","weight":25,"isDefault":true},
+  {"id":"presentation","label":"Presentacion","weight":25,"isDefault":true}
+]'::jsonb;
+
 CREATE TABLE IF NOT EXISTS pitch (
   id            TEXT        PRIMARY KEY,
   "eventId"     TEXT        NOT NULL REFERENCES event(id) ON DELETE CASCADE,
@@ -44,6 +52,9 @@ CREATE TABLE IF NOT EXISTS vote (
   "createdAt"   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE ("pitchId", "ipAddress")
 );
+
+ALTER TABLE vote
+ADD COLUMN IF NOT EXISTS "criteriaScores" JSONB NOT NULL DEFAULT '[]'::jsonb;
 
 
 --tabla para el co-organizador

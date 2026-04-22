@@ -9,6 +9,7 @@ import {
   updatePitchStatusSchema,
 } from "../schema/pitch.schema.js";
 import { canManageEvent, getEventIdForPitch } from "../event.permissions.js";
+import { buildWeightedScoreSql, normalizeEventCriteria } from "../criteria.js";
 import { validateServerEnv } from "@workspace/shared/env/server";
 import { presentPitch, presentPitchComment, presentPitchDetail,presentPitchSummary, presentPublicPitch } from "../../presenter/pitch.presenter.js";
 import {
@@ -19,14 +20,6 @@ import {
 } from "@workspace/shared/api";
 
 export const pitchRouter: Router = Router();
-
-// Criterios por defecto para bases antiguas que todavia no guardan criteria en event.
-const defaultCriteria = [
-  { id: "innovation", label: "Innovacion", weight: 25, isDefault: true },
-  { id: "viability", label: "Viabilidad", weight: 25, isDefault: true },
-  { id: "impact", label: "Impacto", weight: 25, isDefault: true },
-  { id: "presentation", label: "Presentacion", weight: 25, isDefault: true },
-];
 
 // Detecta errores de Postgres por codigo para aplicar fallbacks de schema.
 const hasPgErrorCode = (error: unknown, code: string) =>
@@ -356,7 +349,7 @@ pitchRouter.get("/public/:pitchId", async (req, res) => {
         ...result.rows[0],
         hasVoted,
       }),
-      criteria: Array.isArray(result.rows[0].criteria) ? result.rows[0].criteria : defaultCriteria,
+      criteria: normalizeEventCriteria(result.rows[0].criteria),
     }));
   } catch (error) {
     console.error(error);
@@ -636,16 +629,9 @@ pitchRouter.get("/:pitchId/export", async (req, res) => {
           COALESCE(ROUND(AVG(v.viability)::numeric, 2), 0) AS "viabilityAvg",
           COALESCE(ROUND(AVG(v.impact)::numeric, 2), 0) AS "impactAvg",
           COALESCE(ROUND(AVG(v.presentation)::numeric, 2), 0) AS "presentationAvg",
-          COALESCE(
-            ROUND((
-              AVG(v.innovation) +
-              AVG(v.viability) +
-              AVG(v.impact) +
-              AVG(v.presentation)
-            ) / 4, 2),
-            0
-          ) AS "scoreAvg"
+          ${buildWeightedScoreSql("v", "e.criteria")} AS "scoreAvg"
         FROM pitch p
+        INNER JOIN event e ON e.id = p."eventId"
         LEFT JOIN vote v ON v."pitchId" = p.id
         WHERE p.id = $1
         GROUP BY
@@ -653,7 +639,8 @@ pitchRouter.get("/:pitchId/export", async (req, res) => {
           p.name,
           p.description,
           p.color,
-          p."logoUrl"
+          p."logoUrl",
+          e.criteria
       `,
     [req.params.pitchId]
     )

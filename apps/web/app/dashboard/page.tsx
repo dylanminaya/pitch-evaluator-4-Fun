@@ -22,8 +22,16 @@ import {
   useUpdatePitchStatus,
   useUpdateEventStatus,
 } from "@/hooks/dashboard";
+import type { CriterionAverage, EventCriterion } from "@workspace/shared/api";
 //helper
 import { exportEvent, exportPitch } from "@/lib/dashboard-api";
+
+const defaultCriteria: EventCriterion[] = [
+  { id: "innovation", label: "Innovacion", weight: 25, isDefault: true },
+  { id: "viability", label: "Viabilidad", weight: 25, isDefault: true },
+  { id: "impact", label: "Impacto", weight: 25, isDefault: true },
+  { id: "presentation", label: "Presentacion", weight: 25, isDefault: true },
+];
 
 function QrDisplay({ url }: { url?: string }) {
   if (!url) {
@@ -62,6 +70,7 @@ function DashboardPageContent() {
     return events.find((event) => event.id === requestedEventId) ?? events[0];
   }, [events, requestedEventId]);
   const selectedEventId = selectedEvent?.id;
+  const selectedCriteria = selectedEvent?.criteria ?? defaultCriteria;
 
   const {data: pitches = [] } = usePitches(selectedEventId);//trae pitches del eventos
   const selectedPitch = useMemo(() => {
@@ -158,6 +167,57 @@ function DashboardPageContent() {
     "rounded-2xl border border-[#263550] bg-[#1a2640] shadow-[0_18px_45px_rgba(2,8,23,0.35)]";
   const eyebrowClass =
     "text-[10px] font-bold uppercase italic tracking-[0.32em] text-[#83ce00]";
+
+  function getCriterionAverages(item: {
+    criteriaAverages?: CriterionAverage[];
+    innovationAvg: number;
+    viabilityAvg: number;
+    impactAvg: number;
+    presentationAvg: number;
+  }) {
+    if (item.criteriaAverages?.length) {
+      return item.criteriaAverages;
+    }
+
+    const legacyAverages = new Map([
+      ["innovation", item.innovationAvg],
+      ["viability", item.viabilityAvg],
+      ["impact", item.impactAvg],
+      ["presentation", item.presentationAvg],
+    ]);
+
+    return selectedCriteria.map((criterion) => ({
+      id: criterion.id,
+      label: criterion.label,
+      weight: criterion.weight,
+      avg: legacyAverages.get(criterion.id) ?? 0,
+    }));
+  }
+
+  function getCriterionShortLabel(label: string) {
+    //Limpia y divide el texto
+    const words = label
+      .trim()//quita espacios al inicio y final
+      .split(/\s+/)//separa palabras por espacios
+      .filter(Boolean);//elimina cosas vacías
+
+    //Si no hay palabras, Devuelve "---"
+    if (words.length === 0) {
+      return "---";
+    }
+
+    //Toma las primeras 4 letras. Capitaliza la primera
+    if (words.length === 1) {
+      const short = words[0]!.slice(0, 4);
+      return short.charAt(0).toUpperCase() + short.slice(1).toLowerCase();
+    }
+
+    //Toma la primera letra de cada palabra, Las une, Máximo 4 letras
+    return words
+      .map((word) => word.charAt(0).toUpperCase())
+      .join("")
+      .slice(0, 4);
+  }
   
   return (
     <main className="min-h-svh bg-[#0d1526] text-white">
@@ -279,10 +339,15 @@ function DashboardPageContent() {
                       <th className="px-4 py-3 font-medium">#</th>
                       <th className="px-4 py-3 font-medium">Proyecto</th>
                       <th className="px-4 py-3 font-medium">Estado</th>
-                      <th className="px-4 py-3 font-medium">Inn</th>
-                      <th className="px-4 py-3 font-medium">Via</th>
-                      <th className="px-4 py-3 font-medium">Imp</th>
-                      <th className="px-4 py-3 font-medium">Pres</th>
+                      {selectedCriteria.map((criterion) => (
+                        <th
+                          key={criterion.id}
+                          className="px-4 py-3 font-medium"
+                          title={criterion.label}
+                        >
+                          {getCriterionShortLabel(criterion.label)}
+                        </th>
+                      ))}
                       <th className="px-4 py-3 font-medium text-right">Total</th>
                     </tr>
                   </thead>
@@ -290,6 +355,7 @@ function DashboardPageContent() {
                     {rankingData.map((item, index) => {
                       const pitchStatus = pitchStatusById.get(item.id) ?? "OPEN";
                       const nextStatus = pitchStatus === "OPEN" ? "CLOSED" : "OPEN";
+                      const criterionAverages = getCriterionAverages(item);
 
                       return (
                       <tr
@@ -343,10 +409,11 @@ function DashboardPageContent() {
                             {pitchStatus === "OPEN" ? "Activado" : "Cerrado"}
                           </Button>
                         </td>
-                        <td className="px-4 py-4 text-[#9da0bc]">{item.innovationAvg}</td>
-                        <td className="px-4 py-4 text-[#9da0bc]">{item.viabilityAvg}</td>
-                        <td className="px-4 py-4 text-[#9da0bc]">{item.impactAvg}</td>
-                        <td className="px-4 py-4 text-[#9da0bc]">{item.presentationAvg}</td>
+                        {criterionAverages.map((criterion) => (
+                          <td key={`${item.id}-${criterion.id}`} className="px-4 py-4 text-[#9da0bc]">
+                            {criterion.avg}
+                          </td>
+                        ))}
                         <td className="px-4 py-4 text-right font-semibold text-[#ccff00]">
                           {item.scoreAvg} {/*puntaje final */}
                         </td>

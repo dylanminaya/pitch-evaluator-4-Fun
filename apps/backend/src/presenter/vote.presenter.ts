@@ -37,6 +37,12 @@ export const presentPitchRanking = (pitch: {
   impactAvg: number;
   presentationAvg: number;
   scoreAvg: number;
+  criteriaAverages?: Array<{
+    id: string;
+    label: string;
+    weight: number;
+    avg: number;
+  }> | null;
 }) => ({
   id: pitch.id,
   eventId: pitch.eventId,
@@ -50,4 +56,10 @@ export const presentPitchRanking = (pitch: {
   impactAvg: Number(pitch.impactAvg),
   presentationAvg: Number(pitch.presentationAvg),
   scoreAvg: Number(pitch.scoreAvg),
+  criteriaAverages: pitch.criteriaAverages?.map((criterion) => ({
+    id: criterion.id,
+    label: criterion.label,
+    weight: Number(criterion.weight),
+    avg: Number(criterion.avg),
+  })),
 });

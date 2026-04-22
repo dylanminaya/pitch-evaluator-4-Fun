@@ -12,6 +12,60 @@ export const voteCriterionScoreSchema = z.object({
   score: z.number().int().min(1).max(5),
 });
 
+export const criterionAverageSchema = z.object({
+  id: z.string(),
+  label: z.string().min(1),
+  weight: z.number().int().min(0).max(100),
+  avg: z.number(),
+});
+
+const criteriaArraySchema = z
+  .array(eventCriterionSchema)
+  .min(4, "At least 4 criteria are required")
+  .superRefine((criteria, ctx) => {
+    const totalWeight = criteria.reduce((sum, criterion) => sum + criterion.weight, 0);
+
+    if (totalWeight !== 100) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Criteria weights must add up to 100%",
+      });
+    }
+
+    const ids = new Set<string>();
+
+    for (const criterion of criteria) {
+      if (ids.has(criterion.id)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Criterion ids must be unique",
+        });
+        break;
+      }
+
+      ids.add(criterion.id);
+    }
+  });
+
+const voteCriteriaScoresSchema = z
+  .array(voteCriterionScoreSchema)
+  .min(4, "At least 4 scores are required")
+  .superRefine((criteriaScores, ctx) => {
+    const criterionIds = new Set<string>();
+
+    for (const criterion of criteriaScores) {
+      if (criterionIds.has(criterion.criterionId)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Each criterion can only be scored once",
+        });
+        break;
+      }
+
+      criterionIds.add(criterion.criterionId);
+    }
+  });
+
 export const dashboardEventSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -19,6 +73,7 @@ export const dashboardEventSchema = z.object({
   status: z.enum(["OPEN", "CLOSED"]),
   createdAt: z.string().nullable(),
   organizerId: z.string(),
+  criteria: z.array(eventCriterionSchema),
 });
 
 export const dashboardPitchSchema = z.object({
@@ -45,6 +100,7 @@ export const dashboardRankingItemSchema = z.object({
   impactAvg: z.number(),
   presentationAvg: z.number(),
   scoreAvg: z.number(),
+  criteriaAverages: z.array(criterionAverageSchema).optional(),
 });
 
 export const dashboardPitchDetailSchema = z.object({
@@ -102,7 +158,7 @@ export const createDashboardEventSchema = z.object({
     .string()
     .min(5, "Description must have at least 5 characters")
     .max(500, "Description cannot exceed 500 characters"),
-  criteria: z.array(eventCriterionSchema).min(4, "At least 4 criteria are required"),
+  criteria: criteriaArraySchema,
 });
 
 export const createDashboardPitchSchema = z.object({
@@ -152,7 +208,7 @@ export const publicPitchSchema = z.object({
 export const createPublicVoteSchema = z.object({
   pitchId: z.string().min(1, "Pitch id is required"),
   evaluatorId: z.string().nullable().optional(),
-  criteriaScores: z.array(voteCriterionScoreSchema).min(4, "At least 4 scores are required"),
+  criteriaScores: voteCriteriaScoresSchema,
   comment: z.string().max(500).optional().nullable(),
 });
 
@@ -214,6 +270,7 @@ export const acceptEventOrganizerInvitationSchema = z.object({
 export type DashboardEvent = z.infer<typeof dashboardEventSchema>;
 export type DashboardPitch = z.infer<typeof dashboardPitchSchema>;
 export type DashboardRankingItem = z.infer<typeof dashboardRankingItemSchema>;
+export type CriterionAverage = z.infer<typeof criterionAverageSchema>;
 export type DashboardPitchDetail = z.infer<typeof dashboardPitchDetailSchema>;
 export type DashboardPitchComment = z.infer<typeof dashboardPitchCommentSchema>;
 export type DashboardPitchQr = z.infer<typeof dashboardEventQrSchema>;

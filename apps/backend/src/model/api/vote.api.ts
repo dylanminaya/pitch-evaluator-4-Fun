@@ -7,6 +7,13 @@ import { createPublicVoteSchema } from "@workspace/shared/api";
 import { presentPitchRanking, presentVote } from "../../presenter/vote.presenter.js";
 import { dashboardRankingItemSchema } from "@workspace/shared/api";
 import { canManageEvent, getEventIdForPitch } from "../event.permissions.js";
+import {
+  buildCriteriaAveragesSql,
+  buildWeightedScoreSql,
+  getScoreByCriterionId,
+  normalizeEventCriteria,
+  validateCriteriaScores,
+} from "../criteria.js";
 
 export const voteRouter: Router = Router();
 
@@ -22,12 +29,6 @@ const getClientIpAddress = (value: string | string[] | undefined) => {
 
   return null;
 };
-
-// Busca el score de un criterio obligatorio dentro del payload.
-const getRequiredScore = (
-  criteriaScores: Array<{ criterionId: string; score: number }>,
-  criterionId: string,
-) => criteriaScores.find((item) => item.criterionId === criterionId)?.score ?? null;
 
 // Detecta errores de Postgres por codigo para aplicar fallbacks o respuestas claras.
 const hasPgErrorCode = (error: unknown, code: string) =>
@@ -108,40 +109,70 @@ voteRouter.post("/", async (req, res) => {
     comment,
   } = parsed.data;
 
-  const innovation = getRequiredScore(criteriaScores, "innovation");
-  const viability = getRequiredScore(criteriaScores, "viability");
-  const impact = getRequiredScore(criteriaScores, "impact");
-  const presentation = getRequiredScore(criteriaScores, "presentation");
-
-  if (
-    innovation === null ||
-    viability === null ||
-    impact === null ||
-    presentation === null
-  ) {
-    return res.status(400).json({
-      message: "Missing one or more required default criteria scores",
-    });
-  }
-
   try {
-    const pitchResult = await db.query(
-      `
-        SELECT p.id
-        FROM pitch p
-        INNER JOIN event e ON e.id = p."eventId"
-        WHERE p.id = $1
-          AND e.status = 'OPEN'
-          AND p.status = 'OPEN'
-      `,
-      [pitchId],
-    );
+    let pitchResult;
+
+    try {
+      pitchResult = await db.query(
+        `
+          SELECT
+            p.id,
+            e.criteria
+          FROM pitch p
+          INNER JOIN event e ON e.id = p."eventId"
+          WHERE p.id = $1
+            AND e.status = 'OPEN'
+            AND p.status = 'OPEN'
+        `,
+        [pitchId],
+      );
+    } catch (error) {
+      if (!hasPgErrorCode(error, "42703")) {
+        throw error;
+      }
+
+      pitchResult = await db.query(
+        `
+          SELECT p.id
+          FROM pitch p
+          INNER JOIN event e ON e.id = p."eventId"
+          WHERE p.id = $1
+            AND e.status = 'OPEN'
+            AND p.status = 'OPEN'
+        `,
+        [pitchId],
+      );
+    }
 
     if (pitchResult.rowCount === 0) {
       return res.status(404).json({
         message: "Pitch not found or voting is closed",
       });
     }
+
+    const eventCriteria = normalizeEventCriteria(pitchResult.rows[0].criteria);
+    const criteriaValidationError = validateCriteriaScores(criteriaScores, eventCriteria);
+
+    if (criteriaValidationError) {
+      return res.status(400).json({ message: criteriaValidationError });
+    }
+
+    const innovation = getScoreByCriterionId(criteriaScores, "innovation");
+    const viability = getScoreByCriterionId(criteriaScores, "viability");
+    const impact = getScoreByCriterionId(criteriaScores, "impact");
+    const presentation = getScoreByCriterionId(criteriaScores, "presentation");
+
+    if (
+      innovation === null ||
+      viability === null ||
+      impact === null ||
+      presentation === null
+    ) {
+      return res.status(400).json({
+        message: "Missing one or more required default criteria scores",
+      });
+    }
+
     // Evita voto duplicado por IP.
     const ipAddress =
       getClientIpAddress(req.headers["x-forwarded-for"]) ?? req.ip ?? null;
@@ -293,44 +324,86 @@ voteRouter.get("/ranking", async (req, res) => {
         return res.status(403).json({ message: "Forbidden" });
       }
 
-        const result = await db.query(
-      `
-        SELECT
-          p.id,
-          p."eventId",
-          p.name,
-          p.description,
-          p.color,
-          p."logoUrl",
-          COUNT(v.id)::int AS "votesCount",
-          COALESCE(ROUND(AVG(v.innovation)::numeric, 2), 0) AS "innovationAvg",
-          COALESCE(ROUND(AVG(v.viability)::numeric, 2), 0) AS "viabilityAvg",
-          COALESCE(ROUND(AVG(v.impact)::numeric, 2), 0) AS "impactAvg",
-          COALESCE(ROUND(AVG(v.presentation)::numeric, 2), 0) AS "presentationAvg",
-          COALESCE(
-            ROUND((
-              AVG(v.innovation) +
-              AVG(v.viability) +
-              AVG(v.impact) +
-              AVG(v.presentation)
-            ) / 4, 2),
-            0
-          ) AS "scoreAvg"
-        FROM pitch p
-        LEFT JOIN vote v ON v."pitchId" = p.id
-        WHERE p."eventId" = $1
-        GROUP BY
-          p.id,
-          p."eventId",
-          p.name,
-          p.description,
-          p.color,
-          p."logoUrl",
-          p."createdAt"
-        ORDER BY "scoreAvg" DESC, "votesCount" DESC, p."createdAt" ASC
-      `,
-      [eventId],
-      );
+        let result;
+
+        try {
+          result = await db.query(
+            `
+              SELECT
+                p.id,
+                p."eventId",
+                p.name,
+                p.description,
+                p.color,
+                p."logoUrl",
+                COUNT(v.id)::int AS "votesCount",
+                COALESCE(ROUND(AVG(v.innovation)::numeric, 2), 0) AS "innovationAvg",
+                COALESCE(ROUND(AVG(v.viability)::numeric, 2), 0) AS "viabilityAvg",
+                COALESCE(ROUND(AVG(v.impact)::numeric, 2), 0) AS "impactAvg",
+                COALESCE(ROUND(AVG(v.presentation)::numeric, 2), 0) AS "presentationAvg",
+                ${buildWeightedScoreSql("v", "e.criteria")} AS "scoreAvg",
+                ${buildCriteriaAveragesSql("p", "e.criteria")} AS "criteriaAverages"
+              FROM pitch p
+              INNER JOIN event e ON e.id = p."eventId"
+              LEFT JOIN vote v ON v."pitchId" = p.id
+              WHERE p."eventId" = $1
+              GROUP BY
+                p.id,
+                p."eventId",
+                p.name,
+                p.description,
+                p.color,
+                p."logoUrl",
+                e.criteria,
+                p."createdAt"
+              ORDER BY "scoreAvg" DESC, "votesCount" DESC, p."createdAt" ASC
+            `,
+            [eventId],
+          );
+        } catch (error) {
+          if (!hasPgErrorCode(error, "42703")) {
+            throw error;
+          }
+
+          result = await db.query(
+            `
+              SELECT
+                p.id,
+                p."eventId",
+                p.name,
+                p.description,
+                p.color,
+                p."logoUrl",
+                COUNT(v.id)::int AS "votesCount",
+                COALESCE(ROUND(AVG(v.innovation)::numeric, 2), 0) AS "innovationAvg",
+                COALESCE(ROUND(AVG(v.viability)::numeric, 2), 0) AS "viabilityAvg",
+                COALESCE(ROUND(AVG(v.impact)::numeric, 2), 0) AS "impactAvg",
+                COALESCE(ROUND(AVG(v.presentation)::numeric, 2), 0) AS "presentationAvg",
+                COALESCE(
+                  ROUND((
+                    AVG(v.innovation) +
+                    AVG(v.viability) +
+                    AVG(v.impact) +
+                    AVG(v.presentation)
+                  ) / 4, 2),
+                  0
+                ) AS "scoreAvg"
+              FROM pitch p
+              LEFT JOIN vote v ON v."pitchId" = p.id
+              WHERE p."eventId" = $1
+              GROUP BY
+                p.id,
+                p."eventId",
+                p.name,
+                p.description,
+                p.color,
+                p."logoUrl",
+                p."createdAt"
+              ORDER BY "scoreAvg" DESC, "votesCount" DESC, p."createdAt" ASC
+            `,
+            [eventId],
+          );
+        }
       return res.json(z.array(dashboardRankingItemSchema).parse(result.rows.map(presentPitchRanking)));
     } catch (error) {
       console.error(error)

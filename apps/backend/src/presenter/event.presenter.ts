@@ -1,3 +1,5 @@
+import { normalizeEventCriteria } from "../model/criteria.js";
+
 // Normaliza la entidad event para la respuesta del dashboard.
 export const presentEvent = (event: {
   id: string;
@@ -6,6 +8,7 @@ export const presentEvent = (event: {
   status: "OPEN" | "CLOSED";
   createdAt?: Date | string;
   organizerId: string;
+  criteria?: unknown;
 }) => ({
   id: event.id,
   name: event.name,
@@ -13,6 +16,7 @@ export const presentEvent = (event: {
   status: event.status,
   createdAt: event.createdAt instanceof Date ? event.createdAt.toISOString() : (event.createdAt ?? null),
   organizerId: event.organizerId,
+  criteria: normalizeEventCriteria(event.criteria),
 });
 
 // Da forma estable a la respuesta usada para generar el QR del evento.

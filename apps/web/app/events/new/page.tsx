@@ -49,6 +49,7 @@ export default function NewEventPage() {
     () => criteria.reduce((sum, criterion) => sum + criterion.weight, 0),
     [criteria],
   );
+  const canSubmit = totalWeight === 100 && name.trim().length >= 3 && description.trim().length >= 5;
 
   function handleAddCriterion() {
     setCriteria((current) => [
@@ -137,7 +138,7 @@ export default function NewEventPage() {
               form="new-event-form"
               type="submit"
               className="rounded-full bg-[#83ce00] text-sm font-bold italic text-[#0d1526] hover:bg-[#a7ea2e]"
-              disabled={isPending}
+              disabled={isPending || !canSubmit}
             >
               {isPending ? "Creando..." : "Guardar evento"}
             </Button>
@@ -321,7 +322,7 @@ export default function NewEventPage() {
                   ))}
                 </div>
                 <p className="mt-4 text-xs leading-5 text-[#8899aa]">
-                  Puedes preparar los criterios aqui. Por ahora esta configuracion es visual y no se guarda todavia en la base de datos.
+                  Estos porcentajes ya se guardan y afectan el resultado final. Para que la ponderacion funcione bien, el total debe sumar 100%.
                 </p>
               </section>
 
