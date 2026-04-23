@@ -3,7 +3,14 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ArrowLeft, Download, FileDown, Files, SquareStack } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowUpRight,
+  Download,
+  FileDown,
+  Files,
+  SquareStack,
+} from "lucide-react";
 import { Button } from "@workspace/ui/components/button";
 import { useEvents, usePitches, useRanking } from "@/hooks/dashboard";
 import { exportPitch } from "@/lib/dashboard-api";
@@ -373,15 +380,26 @@ export default function EventExportsPage() {
                             {formatPercentage(row.scoreAvg)}
                           </td>
                           <td className="px-4 py-4 text-right">
-                            <Button
-                              type="button"
-                              onClick={() => handleExportPitch(row.id, row.name)}
-                              disabled={isExportingPitchId === row.id}
-                              className="rounded-full bg-[#83ce00] px-4 text-xs font-bold italic text-[#0d1526] hover:bg-[#a7ea2e]"
-                            >
-                              <FileDown className="size-4" />
-                              {isExportingPitchId === row.id ? "Exportando..." : "Exportar"}
-                            </Button>
+                            <div className="flex justify-end gap-2">
+                              <Link
+                                href={`/projector/${row.id}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex h-9 items-center gap-2 rounded-full border border-[#263550] bg-[#0d1526] px-4 text-xs font-bold text-white transition hover:bg-[#121d30]"
+                              >
+                                <ArrowUpRight className="size-4" />
+                                Proyectar
+                              </Link>
+                              <Button
+                                type="button"
+                                onClick={() => handleExportPitch(row.id, row.name)}
+                                disabled={isExportingPitchId === row.id}
+                                className="rounded-full bg-[#83ce00] px-4 text-xs font-bold italic text-[#0d1526] hover:bg-[#a7ea2e]"
+                              >
+                                <FileDown className="size-4" />
+                                {isExportingPitchId === row.id ? "Exportando..." : "Exportar"}
+                              </Button>
+                            </div>
                           </td>
                         </tr>
                       );
