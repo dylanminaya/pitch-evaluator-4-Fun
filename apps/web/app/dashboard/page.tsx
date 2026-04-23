@@ -24,7 +24,7 @@ import {
 } from "@/hooks/dashboard";
 import type { CriterionAverage, EventCriterion } from "@workspace/shared/api";
 //helper
-import { exportEvent, exportPitch } from "@/lib/dashboard-api";
+import { exportEvent } from "@/lib/dashboard-api";
 
 const defaultCriteria: EventCriterion[] = [
   { id: "innovation", label: "Innovacion", weight: 25, isDefault: true },
@@ -107,18 +107,6 @@ function DashboardPageContent() {
     link.download = "event-results.csv";//nombre del archivo
     link.click();//simula un click, se descarga
     URL.revokeObjectURL(url)//limpiar memoria
-  }
-
-  async function handlerExportPitch() {
-    if (!selectedPitchId) return;
-
-    const blob = await exportPitch(selectedPitchId);
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "pitch-results.csv";
-    link.click();
-    URL.revokeObjectURL(url)
   }
 
   //arreglo de objetos, representa una tarjeta de estadística en pantalla
@@ -479,13 +467,18 @@ function DashboardPageContent() {
                     <p className="text-2xl font-semibold text-[#ccff00]">{selectedPitchVotes}</p>
                     <p className="text-xs text-[#97a093]">votos recibidos</p>
                   </div>
-                  {/*boton descarga los datos del pitch */}
-                  <Button className="rounded-full bg-[#83ce00] px-5 text-[#0d1526] hover:bg-[#a7ea2e]"
-                    onClick={handlerExportPitch}
-                    disabled={!selectedPitchId}//si desactiva si no hay pitch seleccionado
+                  <Link
+                    href={selectedEventId ? `/events/${selectedEventId}/exports` : "#"}
+                    aria-disabled={!selectedEventId}
+                    className={!selectedEventId ? "pointer-events-none opacity-40" : ""}
                   >
-                    Export pitch
-                  </Button>
+                    <Button
+                      className="rounded-full bg-[#83ce00] px-5 text-[#0d1526] hover:bg-[#a7ea2e]"
+                      disabled={!selectedEventId}
+                    >
+                      Exportar pitches
+                    </Button>
+                  </Link>
                 </div>
 
                 <div className="mt-4 flex justify-end">
@@ -515,9 +508,15 @@ function DashboardPageContent() {
                 >
                   <ArrowUpRight className="size-4" />
                 </button>
-                <button className="rounded-full border border-[#263550] p-2 transition hover:bg-[#0d1526]">
+                <Link
+                  href={selectedEventId ? `/events/${selectedEventId}/exports` : "#"}
+                  aria-disabled={!selectedEventId}
+                  className={`rounded-full border border-[#263550] p-2 transition hover:bg-[#0d1526] ${
+                    !selectedEventId ? "pointer-events-none opacity-40" : ""
+                  }`}
+                >
                   <ArrowUpRight className="size-4" />
-                </button>
+                </Link>
               </div>
             </section>
           </aside>
