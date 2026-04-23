@@ -622,8 +622,7 @@ pitchRouter.get("/:pitchId/export", async (req, res) => {
           p.id,
           p.name,
           p.description,
-          p.color,
-          p."logoUrl",
+          p.status,
           COUNT(v.id)::int AS "votesCount",
           COALESCE(ROUND(AVG(v.innovation)::numeric, 2), 0) AS "innovationAvg",
           COALESCE(ROUND(AVG(v.viability)::numeric, 2), 0) AS "viabilityAvg",
@@ -638,8 +637,7 @@ pitchRouter.get("/:pitchId/export", async (req, res) => {
           p.id,
           p.name,
           p.description,
-          p.color,
-          p."logoUrl",
+          p.status,
           e.criteria
       `,
     [req.params.pitchId]
@@ -651,38 +649,37 @@ pitchRouter.get("/:pitchId/export", async (req, res) => {
 
     const pitch = detailResult.rows[0];
 
-    const aiSummary =
-      "AI summary not generated yet. This field will contain the executive summary based on audience comments.";
+    const escapeCsvValue = (value: string | number | null | undefined) =>
+      `"${String(value ?? "").replace(/"/g, '""')}"`;
+
+    const formatPitchStatus = (status: string) =>
+      status === "OPEN" ? "Activo" : "Cerrado";
 
 
     const csvHeader = [
-      "pitchId",
-      "pitchName",
-      "description",
-      "color",
-      "logoUrl",
-      "votesCount",
-      "innovationAvg",
-      "viabilityAvg",
-      "impactAvg",
-      "presentationAvg",
-      "scoreAvg",
-      "aiSummary",
+      "pitch",
+      "estado",
+      "votos",
+      "porcentaje",
+      "promedio",
+      "innovacion",
+      "viabilidad",
+      "impacto",
+      "presentacion",
+      "descripcion",
     ].join(",")
 
     const csvRows = [
-      pitch.id,
-      `"${String(pitch.name).replace(/"/g, '""')}"`,
-      `"${String(pitch.description).replace(/"/g, '""')}"`,
-      pitch.color,
-      pitch.logoUrl ?? "",
+      escapeCsvValue(pitch.name),
+      escapeCsvValue(formatPitchStatus(pitch.status)),
       pitch.votesCount,
+      escapeCsvValue(`${(Number(pitch.scoreAvg) * 20).toFixed(1)}%`),
+      pitch.scoreAvg,
       pitch.innovationAvg,
       pitch.viabilityAvg,
       pitch.impactAvg,
       pitch.presentationAvg,
-      pitch.scoreAvg,
-      `"${aiSummary.replace(/"/g, '""')}"`,
+      escapeCsvValue(pitch.description),
     ].join(",")
 
     const csv = [csvHeader, csvRows].join("\n")

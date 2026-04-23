@@ -25,6 +25,10 @@ function escapeCsvValue(value: string | number | null | undefined) {
   return `"${normalized.replace(/"/g, '""')}"`;
 }
 
+function formatPitchStatus(status: string) {
+  return status === "OPEN" ? "Activo" : "Cerrado";
+}
+
 function createSlug(value: string) {
   return value
     .toLowerCase()
@@ -135,34 +139,28 @@ export default function EventExportsPage() {
 
   function buildCombinedCsv(rows: typeof rankingRows) {
     const header = [
-      "position",
-      "pitchId",
-      "pitchName",
-      "status",
-      "votesCount",
-      "percentage",
-      "scoreAvg",
-      ...selectedCriteria.map((criterion) => `${criterion.label}Avg`),
-      "description",
-      "color",
-      "logoUrl",
+      "posicion",
+      "pitch",
+      "estado",
+      "votos",
+      "porcentaje",
+      "promedio",
+      ...selectedCriteria.map((criterion) => `${criterion.label.toLowerCase()}Promedio`),
+      "descripcion",
     ];
 
     const dataRows = rows.map((row, index) => [
       index + 1,
-      row.id,
       row.name,
-      row.pitchStatus,
+      formatPitchStatus(row.pitchStatus),
       row.votesCount,
-      row.percentage,
+      `${row.percentage.toFixed(1)}%`,
       row.scoreAvg,
       ...selectedCriteria.map(
         (criterion) =>
           row.criterionAverages.find((item) => item.id === criterion.id)?.avg ?? 0,
       ),
       row.description,
-      row.color,
-      row.logoUrl ?? "",
     ]);
 
     return [header, ...dataRows]
@@ -365,7 +363,7 @@ export default function EventExportsPage() {
                                   : "bg-[#2a1018] text-[#ff8cab]"
                               }`}
                             >
-                              {row.pitchStatus === "OPEN" ? "Activo" : "Cerrado"}
+                              {formatPitchStatus(row.pitchStatus)}
                             </span>
                           </td>
                           <td className="px-4 py-4 text-right text-[#a9b3c9]">

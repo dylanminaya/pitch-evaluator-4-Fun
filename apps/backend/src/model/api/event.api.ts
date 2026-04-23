@@ -337,6 +337,8 @@ eventRouter.get("/:eventId/export", async (req, res) => {
       SELECT
         p.id AS pitchId,
         p.name AS pitchName,
+        p.description AS "pitchDescription",
+        p.status AS "pitchStatus",
         COUNT(v.id)::int AS "votesCount",
         COALESCE(ROUND(AVG(v.innovation)::numeric, 2), 0) AS "innovationAvg",
         COALESCE(ROUND(AVG(v.viability)::numeric, 2), 0) AS "viabilityAvg",
@@ -354,35 +356,47 @@ eventRouter.get("/:eventId/export", async (req, res) => {
         FROM pitch p
         LEFT JOIN vote v ON v."pitchId" = p.id
         WHERE p."eventId" = $1
-        GROUP by p.id, p.name, p."createdAt"
+        GROUP by p.id, p.name, p.description, p.status, p."createdAt"
         ORDER by "scoreAvg" DESC, "votesCount" DESC, p."createdAt" ASC
         `,
       [req.params.eventId],
     );
 
+    const escapeCsvValue = (value: string | number | null | undefined) =>
+      `"${String(value ?? "").replace(/"/g, '""')}"`;
+
+    const formatPitchStatus = (status: string) =>
+      status === "OPEN" ? "Activo" : "Cerrado";
+
     // Encabezado del CSV.
     const csvHeader = [
-      "pitchId",
-      "pitchName",
-      "votesCount",
-      "innovationAvg",
-      "viabilityAvg",
-      "impactAvg",
-      "presentationAvg",
-      "scoreAvg",
+      "posicion",
+      "pitch",
+      "estado",
+      "votos",
+      "porcentaje",
+      "promedio",
+      "innovacion",
+      "viabilidad",
+      "impacto",
+      "presentacion",
+      "descripcion",
     ].join(",");
 
     // Filas del CSV.
-    const csvRows = result.rows.map((row) =>
+    const csvRows = result.rows.map((row, index) =>
       [
-        row.pitchId,
-        `"${String(row.pitchName).replace(/"/g, '""')}"`,
+        index + 1,
+        escapeCsvValue(row.pitchName),
+        escapeCsvValue(formatPitchStatus(row.pitchStatus)),
         row.votesCount,
+        escapeCsvValue(`${(Number(row.scoreAvg) * 20).toFixed(1)}%`),
+        row.scoreAvg,
         row.innovationAvg,
         row.viabilityAvg,
         row.impactAvg,
         row.presentationAvg,
-        row.scoreAvg,
+        escapeCsvValue(row.pitchDescription),
       ].join(","),
     );
 
