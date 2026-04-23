@@ -357,7 +357,10 @@ export default function EventExportsPage() {
                           <td className="px-4 py-4">
                             <div className="flex flex-col gap-1">
                               <span className="font-semibold text-white">{row.name}</span>
-                              <span className="max-w-xl text-xs text-[#8899aa]">
+                              <span
+                                className="block max-w-xl truncate text-xs text-[#8899aa]"
+                                title={row.description ?? ""}
+                              >
                                 {row.description}
                               </span>
                             </div>

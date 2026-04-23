@@ -82,10 +82,10 @@ export default function NewPitchPage() {
               <p className="text-[11px] font-bold uppercase italic tracking-[0.3em] text-[#83ce00]">
                 Informacion del pitch
               </p>
-              <p className="text-sm text-[#a9b3c9]">
+              {/* <p className="text-sm text-[#a9b3c9]">
                 Este formulario crea el pitch real en la base de datos y luego el
                 dashboard podra generar el QR publico del evento para acceder a todos los pitches.
-              </p>
+              </p> */}
             </div>
 
             <div className="mt-6 flex flex-col gap-6">
@@ -179,7 +179,7 @@ export default function NewPitchPage() {
                   {name || "Nombre del pitch"}
                 </h2>
                 <p className="mt-3 text-sm leading-6 text-[#a9b3c9]">
-                  {description || "La descripcion del pitch aparecera aqui para validar el tono antes de guardarlo."}
+                  {description || "Descripcion del pitch."}
                 </p>
               </div>
             </section>
@@ -189,19 +189,16 @@ export default function NewPitchPage() {
                 <QrCode className="size-4 text-[#8899aa]" />
                 Despues de guardar
               </div>
-              {/* <div className="mt-5 flex flex-col gap-4 text-sm leading-6 text-[#a9b3c9]">
-                <p>1. El pitch se inserta realmente en la tabla `pitch`.</p>
-                <p>2. El dashboard lo agrega al evento para que aparezca en el QR general.</p>
-                <p>3. La URL publica de invitacion abrira `/invitation/[eventId]` y desde ahi se podra entrar al pitch.</p>
-              </div> */}
               <div className="mt-5 rounded-2xl border border-dashed border-[#263550] bg-[#0d1526] px-4 py-4 text-sm leading-6 text-[#a9b3c9]">
                 <div className="inline-flex items-center gap-2 font-semibold text-white">
                   <Sparkles className="size-4 text-[#83ce00]" />
                   Tip
                 </div>
                 <p className="mt-2">
-                  Usa un color hex valido como `#83CE00` o `#0595F0` para que el
-                  pitch se guarde correctamente.
+                  Usa un nombre corto y una descripcion clara: explica el problema,
+                  la solucion y el beneficio principal en una o dos frases. Asi sera
+                  mas facil identificar el pitch en el dashboard y para quienes votan
+                  por primera vez.
                 </p>
               </div>
             </section>

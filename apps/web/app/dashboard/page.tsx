@@ -23,7 +23,7 @@ import {
   useUpdateEventStatus,
 } from "@/hooks/dashboard";
 import type { CriterionAverage, EventCriterion } from "@workspace/shared/api";
-//helper
+// Utilidad para exportar resultados del evento.
 import { exportEvent } from "@/lib/dashboard-api";
 
 const defaultCriteria: EventCriterion[] = [
@@ -60,7 +60,7 @@ function DashboardPageContent() {
   const { mutateAsync: mutatePitchStatus, isPending: isUpdatingPitchStatus } =
     useUpdatePitchStatus();
 
-  //query
+  // Carga los datos principales del dashboard.
   const {data: events = [] } = useEvents();
   const requestedEventId = searchParams.get("eventId");
   const requestedPitchId = searchParams.get("pitchId");
@@ -72,7 +72,7 @@ function DashboardPageContent() {
   const selectedEventId = selectedEvent?.id;
   const selectedCriteria = selectedEvent?.criteria ?? defaultCriteria;
 
-  const {data: pitches = [] } = usePitches(selectedEventId);//trae pitches del eventos
+  const {data: pitches = [] } = usePitches(selectedEventId); // Lista de pitches del evento seleccionado.
   const latestPitchId = useMemo(() => {
     if (!pitches.length) return undefined;
 
@@ -131,16 +131,16 @@ function DashboardPageContent() {
   async function handlerExportEvent() {
     if(!selectedEventId) return;
 
-    const blob = await exportEvent(selectedEventId);//pide el archivo
-    const url = URL.createObjectURL(blob);//convierte el archivo en una url
-    const link = document.createElement("a");//crear el link
-    link.href = url;//apunta al archivo
-    link.download = "event-results.csv";//nombre del archivo
-    link.click();//simula un click, se descarga
-    URL.revokeObjectURL(url)//limpiar memoria
+    const blob = await exportEvent(selectedEventId); // Solicita el archivo exportado.
+    const url = URL.createObjectURL(blob); // Crea una URL temporal para descargarlo.
+    const link = document.createElement("a"); // Prepara el enlace de descarga.
+    link.href = url; // Asigna el archivo generado.
+    link.download = "event-results.csv"; // Define el nombre del archivo.
+    link.click(); // Inicia la descarga automáticamente.
+    URL.revokeObjectURL(url); // Libera la memoria usada por la URL temporal.
   }
 
-  //arreglo de objetos, representa una tarjeta de estadística en pantalla
+  // Tarjetas resumen que muestran las métricas principales.
   const stats = [
     {
       label: "Pitches activos",
@@ -151,7 +151,7 @@ function DashboardPageContent() {
       label: "Votos recibidos",
       value: String(
         rankingData.reduce(
-          (sum: number, item: { votesCount: number }) => sum + item.votesCount,//suma todos los votos
+          (sum: number, item: { votesCount: number }) => sum + item.votesCount, // Acumula todos los votos registrados.
           0,
         ),
       ),
@@ -166,7 +166,7 @@ function DashboardPageContent() {
                 (sum: number, item: { scoreAvg: number }) => sum + item.scoreAvg,
                 0,
               ) / rankingData.length
-            ).toFixed(1)//deja un decimal
+            ).toFixed(1) // Muestra la media con un decimal.
           : "0.0",
       accent: "text-cyan-400",
     },
@@ -214,24 +214,24 @@ function DashboardPageContent() {
   }
 
   function getCriterionShortLabel(label: string) {
-    //Limpia y divide el texto
+    // Normaliza el texto para generar una abreviatura corta.
     const words = label
-      .trim()//quita espacios al inicio y final
-      .split(/\s+/)//separa palabras por espacios
-      .filter(Boolean);//elimina cosas vacías
+      .trim() // Elimina espacios sobrantes.
+      .split(/\s+/) // Separa el texto en palabras.
+      .filter(Boolean); // Descarta valores vacios.
 
-    //Si no hay palabras, Devuelve "---"
+    // Usa un valor neutro cuando no hay texto disponible.
     if (words.length === 0) {
       return "---";
     }
 
-    //Toma las primeras 4 letras. Capitaliza la primera
+    // Si solo hay una palabra, muestra sus primeras 4 letras.
     if (words.length === 1) {
       const short = words[0]!.slice(0, 4);
       return short.charAt(0).toUpperCase() + short.slice(1).toLowerCase();
     }
 
-    //Toma la primera letra de cada palabra, Las une, Máximo 4 letras
+    // Si hay varias palabras, usa sus iniciales.
     return words
       .map((word) => word.charAt(0).toUpperCase())
       .join("")
@@ -320,17 +320,17 @@ function DashboardPageContent() {
         <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
           <div className="flex min-w-0 flex-col gap-4">
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-              {/*recorre cada elemento de cada arreglo */}
+              {/* Renderiza una tarjeta por cada metrica. */}
               {stats.map((stat) => ( 
                 <article
                   key={stat.label}
                   className={`${panelClass} px-5 py-5`}
                 >
                   <p className="text-[10px] font-bold uppercase italic tracking-[0.3em] text-[#8899aa]">
-                    {stat.label} {/*mostrar nombre*/}
+                    {stat.label} {/* Nombre de la metrica. */}
                   </p>
                   <p className={`mt-3 text-4xl font-extrabold tracking-tight ${stat.accent}`}>
-                    {stat.value}{/*mostrar valor*/}
+                    {stat.value}{/* Valor principal de la metrica. */}
                   </p>
                 </article>
               ))}
@@ -390,13 +390,13 @@ function DashboardPageContent() {
                         <td className={`px-4 py-4 text-xs font-bold ${
                           index === 0 ? "text-[#83ce00]" : isLatestPitch ? "text-[#00f0ff]" : "text-[#8c8da4]"
                         }`}>
-                          {String(index + 1).padStart(2, "0")} {/*muestra el numero de posicion */}
+                          {String(index + 1).padStart(2, "0")} {/* Posicion actual en el ranking. */}
                         </td>
                         <td className="px-4 py-4">
                           <div className="flex items-center gap-3">
                             <span
                               className={`h-2 w-2 rounded-full ${
-                                index === 0 ? "bg-[#ccff00]" : isLatestPitch ? "bg-[#0595f0]" : "bg-[#53546a]"//resaltar ganador
+                                index === 0 ? "bg-[#ccff00]" : isLatestPitch ? "bg-[#0595f0]" : "bg-[#53546a]" // Destaca al lider y al pitch mas reciente.
                               }`} 
                             />
                             {selectedEventId ? (
@@ -427,7 +427,7 @@ function DashboardPageContent() {
                               </span>
                             ) : null} */}
                           </div>
-                        </td>{/*muestra las puntuaciones en cada categoria */}
+                        </td>{/* Muestra el estado actual del pitch. */}
                         <td className="px-4 py-4">
                           <Button
                             type="button"
@@ -453,7 +453,7 @@ function DashboardPageContent() {
                           </td>
                         ))}
                         <td className="px-4 py-4 text-right font-semibold text-[#ccff00]">
-                          {item.scoreAvg} {/*puntaje final */}
+                          {item.scoreAvg} {/* Puntaje total del pitch. */}
                         </td>
                       </tr>
                       );
@@ -492,6 +492,17 @@ function DashboardPageContent() {
               <p className="mt-4 text-center text-xs text-[#8899aa]">
                 escanea para ver todos los pitches del evento
               </p>
+
+              <div className="mt-4 flex flex-col gap-2 text-sm text-[#8899aa]">
+                <p className="flex items-center gap-2">
+                  <span className="h-2.5 w-2.5 rounded-full bg-[#83ce00]" />
+                  Mas votos.
+                </p>
+                <p className="flex items-center gap-2">
+                  <span className="h-2.5 w-2.5 rounded-full bg-[#0595f0]" />
+                  Pitch reciente.
+                </p>
+              </div>
 
               {qrData?.publicVoteUrl && (
                 <div className="mt-4 rounded-2xl border border-[#263550] bg-[#0d1526] p-4">
@@ -539,13 +550,13 @@ function DashboardPageContent() {
                         : "#"
                     }
                   >
-                    <Button
+                    {/* <Button
                       variant="outline"
                       disabled={!selectedEventId || !selectedPitchId}
                       className="rounded-full border-[#263550] bg-transparent text-white hover:bg-[#1a2640] hover:text-white"
                     >
                       Editar pitch
-                    </Button>
+                    </Button> */}
                   </Link>
                 </div>
               </div>
@@ -558,7 +569,7 @@ function DashboardPageContent() {
                 >
                   <ArrowUpRight className="size-4" />
                 </button>
-                <Link
+                {/* <Link
                   href={selectedEventId ? `/events/${selectedEventId}/exports` : "#"}
                   aria-disabled={!selectedEventId}
                   className={`rounded-full border border-[#263550] p-2 transition hover:bg-[#0d1526] ${
@@ -566,7 +577,7 @@ function DashboardPageContent() {
                   }`}
                 >
                   <ArrowUpRight className="size-4" />
-                </Link>
+                </Link> */}
               </div>
             </section>
           </aside>
