@@ -73,6 +73,37 @@ function DashboardPageContent() {
   const selectedCriteria = selectedEvent?.criteria ?? defaultCriteria;
 
   const {data: pitches = [] } = usePitches(selectedEventId);//trae pitches del eventos
+  const latestPitchId = useMemo(() => {
+    if (!pitches.length) return undefined;
+
+    const pitchesWithIndex = pitches.map((pitch, index) => ({
+      id: pitch.id,
+      index,
+      createdAtMs: pitch.createdAt ? Date.parse(pitch.createdAt) : Number.NaN,
+    }));
+
+    const latestPitch = pitchesWithIndex.reduce((latest, current) => {
+      const latestTimestamp = Number.isFinite(latest.createdAtMs) ? latest.createdAtMs : -Infinity;
+      const currentTimestamp = Number.isFinite(current.createdAtMs) ? current.createdAtMs : -Infinity;
+
+      if (currentTimestamp > latestTimestamp) {
+        return current;
+      }
+
+      if (currentTimestamp === latestTimestamp && current.index > latest.index) {
+        return current;
+      }
+
+      if (!Number.isFinite(latest.createdAtMs) && !Number.isFinite(current.createdAtMs) && current.index > latest.index) {
+        return current;
+      }
+
+      return latest;
+    });
+
+    return latestPitch.id;
+  }, [pitches]);
+
   const selectedPitch = useMemo(() => {
     if (!pitches.length) return undefined;
 
@@ -344,38 +375,57 @@ function DashboardPageContent() {
                       const pitchStatus = pitchStatusById.get(item.id) ?? "OPEN";
                       const nextStatus = pitchStatus === "OPEN" ? "CLOSED" : "OPEN";
                       const criterionAverages = getCriterionAverages(item);
+                      const isLatestPitch = item.id === latestPitchId;
+                      const rowClassName = index === 0
+                        ? "bg-[linear-gradient(90deg,rgba(131,206,0,0.1),rgba(13,21,38,0.08))]"
+                        : isLatestPitch
+                          ? "border-b border-[#1c5f8d] bg-[linear-gradient(90deg,rgba(5,149,240,0.16),rgba(13,21,38,0.04))]"
+                          : "border-b border-[#263550]";
 
                       return (
                       <tr
                         key={item.id}
-                        className={`text-sm text-[#d7d8e5] last:border-b-0 ${
-                          index === 0
-                            ? "bg-[linear-gradient(90deg,rgba(131,206,0,0.1),rgba(13,21,38,0.08))]"
-                            : "border-b border-[#263550]"
-                        }`}
+                        className={`text-sm text-[#d7d8e5] last:border-b-0 ${rowClassName}`}
                       >
-                        <td className={`px-4 py-4 text-xs font-bold ${index === 0 ? "text-[#83ce00]" : "text-[#8c8da4]"}`}>
+                        <td className={`px-4 py-4 text-xs font-bold ${
+                          index === 0 ? "text-[#83ce00]" : isLatestPitch ? "text-[#00f0ff]" : "text-[#8c8da4]"
+                        }`}>
                           {String(index + 1).padStart(2, "0")} {/*muestra el numero de posicion */}
                         </td>
                         <td className="px-4 py-4">
                           <div className="flex items-center gap-3">
                             <span
                               className={`h-2 w-2 rounded-full ${
-                                index === 0 ? "bg-[#ccff00]" : "bg-[#53546a]"//resaltar ganador
+                                index === 0 ? "bg-[#ccff00]" : isLatestPitch ? "bg-[#0595f0]" : "bg-[#53546a]"//resaltar ganador
                               }`} 
                             />
                             {selectedEventId ? (
                               <Link
                                 href={`/events/${selectedEventId}/pitches/${item.id}/edit`}
-                                className={`${index === 0 ? "font-semibold text-[#f8ffcf]" : "font-semibold"} transition hover:text-[#83ce00]`}
+                                className={`font-semibold transition ${
+                                  index === 0
+                                    ? "text-[#f8ffcf] hover:text-[#83ce00]"
+                                    : isLatestPitch
+                                      ? "text-[#7fd4ff] hover:text-[#00f0ff]"
+                                      : "hover:text-[#83ce00]"
+                                }`}
                               >
                                 {item.name}
                               </Link>
                             ) : (
-                              <span className={index === 0 ? "font-semibold text-[#f8ffcf]" : "font-semibold"}>
+                              <span
+                                className={`font-semibold ${
+                                  index === 0 ? "text-[#f8ffcf]" : isLatestPitch ? "text-[#7fd4ff]" : ""
+                                }`}
+                              >
                                 {item.name}
                               </span>
                             )}
+                            {/* {isLatestPitch ? (
+                              <span className="rounded-full border border-[#0595f0] bg-[#0595f0]/10 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-[#7fd4ff]">
+                                Ultimo
+                              </span>
+                            ) : null} */}
                           </div>
                         </td>{/*muestra las puntuaciones en cada categoria */}
                         <td className="px-4 py-4">
