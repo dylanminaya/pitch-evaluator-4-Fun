@@ -1,12 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Palette, QrCode, Sparkles } from "lucide-react";
 import { Button } from "@workspace/ui/components/button";
 import { Input } from "@workspace/ui/components/input";
+import { FeedbackPanel } from "@/components/feedback-panel";
 import { useCreatePitch } from "@/hooks/dashboard";
+import { getFriendlyErrorItems, getPitchFormIssues } from "@/lib/user-feedback";
 
 export default function NewPitchPage() {
   const params = useParams<{ eventId: string }>();
@@ -17,6 +19,12 @@ export default function NewPitchPage() {
   const [description, setDescription] = useState("");
   const [color, setColor] = useState("#83CE00");
   const [logoUrl, setLogoUrl] = useState("");
+  const [hasTriedSubmit, setHasTriedSubmit] = useState(false);
+  const formIssues = useMemo(
+    () => getPitchFormIssues({ name, description, color, logoUrl }),
+    [color, description, logoUrl, name],
+  );
+  const errorItems = error ? getFriendlyErrorItems(error) : [];
 
   function handleColorTextChange(value: string) {
     const normalized = value.startsWith("#") ? value.toUpperCase() : `#${value.toUpperCase()}`;
@@ -25,6 +33,11 @@ export default function NewPitchPage() {
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    setHasTriedSubmit(true);
+
+    if (formIssues.length > 0) {
+      return;
+    }
 
     const createdPitch = await mutateAsync({
       eventId,
@@ -89,11 +102,17 @@ export default function NewPitchPage() {
             </div>
 
             <div className="mt-6 flex flex-col gap-6">
-              {error && (
-                <div className="rounded-2xl border border-[#5a2433] bg-[#2a1018] p-3 text-sm text-[#ff8cab]">
-                  {error.message}
-                </div>
-              )}
+              <FeedbackPanel
+                title="Revisa esto antes de guardar"
+                items={hasTriedSubmit ? formIssues : []}
+                tone="warning"
+              />
+
+              <FeedbackPanel
+                title="No pudimos guardar el pitch"
+                items={errorItems}
+                tone="error"
+              />
 
               <div className="flex flex-col gap-3">
                 <label className="text-xs font-bold uppercase italic tracking-[0.24em] text-[#8899aa]">
@@ -106,6 +125,9 @@ export default function NewPitchPage() {
                   disabled={isPending}
                   className="h-12 rounded-2xl border-[#263550] bg-[#0d1526] px-4 text-white placeholder:text-[#66738f]"
                 />
+                <p className="text-xs text-[#8899aa]">
+                  El nombre del pitch debe tener entre 3 y 25 caracteres.
+                </p>
               </div>
 
               <div className="flex flex-col gap-3">

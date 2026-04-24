@@ -1,12 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Palette, QrCode, Sparkles } from "lucide-react";
 import { Button } from "@workspace/ui/components/button";
 import { Input } from "@workspace/ui/components/input";
+import { FeedbackPanel } from "@/components/feedback-panel";
 import { usePitches, useUpdatePitch } from "@/hooks/dashboard";
+import { getFriendlyErrorItems, getPitchFormIssues } from "@/lib/user-feedback";
 import type { DashboardPitch } from "@workspace/shared/api";
 
 function EditPitchForm({
@@ -24,6 +26,12 @@ function EditPitchForm({
   const [description, setDescription] = useState(pitch.description);
   const [color, setColor] = useState(pitch.color);
   const [logoUrl, setLogoUrl] = useState(pitch.logoUrl ?? "");
+  const [hasTriedSubmit, setHasTriedSubmit] = useState(false);
+  const formIssues = useMemo(
+    () => getPitchFormIssues({ name, description, color, logoUrl }),
+    [color, description, logoUrl, name],
+  );
+  const errorItems = error ? getFriendlyErrorItems(error) : [];
 
   function handleColorTextChange(value: string) {
     // Normalize manual color input so the API always receives a proper hex value.
@@ -35,6 +43,11 @@ function EditPitchForm({
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    setHasTriedSubmit(true);
+
+    if (formIssues.length > 0) {
+      return;
+    }
 
     // Send only editable fields, then return to dashboard focused on the updated pitch.
     const updatedPitch = await mutateAsync({
@@ -101,11 +114,17 @@ function EditPitchForm({
             </div>
 
             <div className="mt-6 flex flex-col gap-6">
-              {error && (
-                <div className="rounded-2xl border border-[#5a2433] bg-[#2a1018] p-3 text-sm text-[#ff8cab]">
-                  {error.message ?? "No pudimos actualizar el pitch."}
-                </div>
-              )}
+              <FeedbackPanel
+                title="Revisa esto antes de guardar"
+                items={hasTriedSubmit ? formIssues : []}
+                tone="warning"
+              />
+
+              <FeedbackPanel
+                title="No pudimos actualizar el pitch"
+                items={errorItems}
+                tone="error"
+              />
 
               <div className="flex flex-col gap-3">
                 <label className="text-xs font-bold uppercase italic tracking-[0.24em] text-[#8899aa]">
@@ -118,6 +137,9 @@ function EditPitchForm({
                   disabled={isPending}
                   className="h-12 rounded-2xl border-[#263550] bg-[#0d1526] px-4 text-white placeholder:text-[#66738f]"
                 />
+                <p className="text-xs text-[#8899aa]">
+                  El nombre del pitch debe tener entre 3 y 25 caracteres.
+                </p>
               </div>
 
               <div className="flex flex-col gap-3">

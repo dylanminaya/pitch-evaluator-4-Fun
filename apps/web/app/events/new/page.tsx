@@ -14,7 +14,9 @@ import {
 } from "lucide-react";
 import { Button } from "@workspace/ui/components/button";
 import { Input } from "@workspace/ui/components/input";
+import { FeedbackPanel } from "@/components/feedback-panel";
 import { useCreateEvent } from "@/hooks/dashboard";
+import { getEventFormIssues, getFriendlyErrorItems } from "@/lib/user-feedback";
 import type { EventCriterion } from "@workspace/shared/api";
 
 const setupItems = [
@@ -39,6 +41,7 @@ export default function NewEventPage() {
   const { mutateAsync, isPending, error } = useCreateEvent();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [hasTriedSubmit, setHasTriedSubmit] = useState(false);
   //
   const [criteria, setCriteria] = useState<EventCriterion[]>([
     { id: "innovation", label: "Innovacion", weight: 25, isDefault: true },
@@ -51,13 +54,13 @@ export default function NewEventPage() {
     () => criteria.reduce((sum, criterion) => sum + criterion.weight, 0),
     [criteria],
   );
+  const formIssues = useMemo(
+    () => getEventFormIssues({ name, description, criteria }),
+    [criteria, description, name],
+  );
+  const errorItems = error ? getFriendlyErrorItems(error) : [];
   const hasValidCriteriaCount =
     criteria.length >= MIN_CRITERIA && criteria.length <= MAX_CRITERIA;
-  const canSubmit =
-    totalWeight === 100 &&
-    hasValidCriteriaCount &&
-    name.trim().length >= 3 &&
-    description.trim().length >= 5;
 
   function handleAddCriterion() {
     if (criteria.length >= MAX_CRITERIA) {
@@ -108,6 +111,17 @@ export default function NewEventPage() {
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    setHasTriedSubmit(true);
+
+    if (
+      totalWeight !== 100 ||
+      !hasValidCriteriaCount ||
+      name.trim().length < 3 ||
+      description.trim().length < 5 ||
+      formIssues.length > 0
+    ) {
+      return;
+    }
 
     const createdEvent = await mutateAsync({
       name,
@@ -154,7 +168,7 @@ export default function NewEventPage() {
               form="new-event-form"
               type="submit"
               className="rounded-full bg-[#83ce00] text-sm font-bold italic text-[#0d1526] hover:bg-[#a7ea2e]"
-              disabled={isPending || !canSubmit}
+              disabled={isPending}
             >
               {isPending ? "Creando..." : "Guardar evento"}
             </Button>
@@ -191,11 +205,17 @@ export default function NewEventPage() {
               </div>
 
               <div className="mt-6 flex flex-col gap-6">
-                {error && (
-                  <div className="rounded-2xl border border-[#5a2433] bg-[#2a1018] p-3 text-sm text-[#ff8cab]">
-                    {error.message}
-                  </div>
-                )}
+                <FeedbackPanel
+                  title="Revisa esto antes de crear el evento"
+                  items={hasTriedSubmit ? formIssues : []}
+                  tone="warning"
+                />
+
+                <FeedbackPanel
+                  title="No pudimos crear el evento"
+                  items={errorItems}
+                  tone="error"
+                />
 
                 <div className="flex flex-col gap-3">
                   <label

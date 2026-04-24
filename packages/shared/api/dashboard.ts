@@ -168,7 +168,7 @@ export const createDashboardPitchSchema = z.object({
   name: z
     .string()
     .min(3, "Project name must have at least 3 characters")
-    .max(150, "Project name cannot exceed 150 characters"),
+    .max(25, "Project name cannot exceed 25 characters"),
   description: z
     .string()
     .min(5, "Project description must have at least 5 characters")
@@ -183,7 +183,7 @@ export const updateDashboardPitchSchema = z.object({
   name: z
     .string()
     .min(3, "Project name must have at least 3 characters")
-    .max(150, "Project name cannot exceed 150 characters"),
+    .max(25, "Project name cannot exceed 25 characters"),
   description: z
     .string()
     .min(5, "Project description must have at least 5 characters")

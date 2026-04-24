@@ -12,8 +12,10 @@ import {
   SquareStack,
 } from "lucide-react";
 import { Button } from "@workspace/ui/components/button";
+import { FeedbackPanel } from "@/components/feedback-panel";
 import { useEvents, usePitches, useRanking } from "@/hooks/dashboard";
 import { exportPitch } from "@/lib/dashboard-api";
+import { getFriendlyErrorItems } from "@/lib/user-feedback";
 import type { CriterionAverage, EventCriterion } from "@workspace/shared/api";
 
 const defaultCriteria: EventCriterion[] = [
@@ -62,6 +64,7 @@ export default function EventExportsPage() {
   const [selectedPitchIds, setSelectedPitchIds] = useState<string[]>([]);
   const [isExportingPitchId, setIsExportingPitchId] = useState<string | null>(null);
   const [isExportingSelection, setIsExportingSelection] = useState(false);
+  const [exportError, setExportError] = useState<Error | null>(null);
 
   const selectedEvent = useMemo(
     () => events.find((event) => event.id === eventId),
@@ -177,9 +180,14 @@ export default function EventExportsPage() {
 
   async function handleExportPitch(pitchId: string, pitchName: string) {
     try {
+      setExportError(null);
       setIsExportingPitchId(pitchId);
       const blob = await exportPitch(pitchId);
       triggerBlobDownload(blob, `${createSlug(pitchName) || "pitch"}-report.csv`);
+    } catch (error) {
+      setExportError(
+        error instanceof Error ? error : new Error("Failed to export pitch"),
+      );
     } finally {
       setIsExportingPitchId(null);
     }
@@ -189,12 +197,17 @@ export default function EventExportsPage() {
     if (rows.length === 0) return;
 
     try {
+      setExportError(null);
       setIsExportingSelection(true);
       const csv = buildCombinedCsv(rows);
       const fileNameBase = createSlug(selectedEvent?.name ?? "event");
       const suffix = mode === "all" ? "all-pitches" : "selected-pitches";
       const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
       triggerBlobDownload(blob, `${fileNameBase}-${suffix}.csv`);
+    } catch (error) {
+      setExportError(
+        error instanceof Error ? error : new Error("Failed to export event data"),
+      );
     } finally {
       setIsExportingSelection(false);
     }
@@ -259,6 +272,12 @@ export default function EventExportsPage() {
               <p className="text-[11px] font-bold uppercase italic tracking-[0.3em] text-[#83ce00]">
                 Exportaciones
               </p>
+              <FeedbackPanel
+                title="No pudimos generar el archivo"
+                items={exportError ? getFriendlyErrorItems(exportError) : []}
+                tone="error"
+                className="mt-4"
+              />
               <div className="mt-5 flex flex-col gap-3">
                 <Button
                   type="button"
