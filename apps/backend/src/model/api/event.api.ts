@@ -15,6 +15,7 @@ import {
 import { validateServerEnv } from "@workspace/shared/env/server";
 import { normalizeEventCriteria } from "../criteria.js";
 
+
 export const eventRouter: Router = Router();
 
 // Detecta errores de Postgres por codigo para aplicar fallbacks de schema.
