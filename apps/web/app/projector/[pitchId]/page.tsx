@@ -138,6 +138,18 @@ export default function ProjectorPitchPage() {
     setIsRunning(false);
   }
 
+  async function handleBackToExports() {
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+      }
+    } catch {
+      // If the browser refuses to exit fullscreen here, still return to exports.
+    }
+
+    router.push(`/events/${pitch?.eventId}/exports`);
+  }
+
   if (isLoading) {
     return (
       <main className="flex min-h-svh items-center justify-center bg-[#050816] text-lg text-[#90a3bf]">
@@ -160,14 +172,7 @@ export default function ProjectorPitchPage() {
         <Button
           type="button"
           variant="outline"
-          onClick={() => {
-            if (window.history.length > 1) {
-              router.back();
-              return;
-            }
-
-            router.push(`/invitation/${pitch.eventId}`);
-          }}
+          onClick={handleBackToExports}
           className="h-11 rounded-full border-white/15 bg-black/35 px-4 text-sm font-semibold text-white backdrop-blur hover:bg-black/50 hover:text-white"
         >
           <ArrowLeft className="size-4" />

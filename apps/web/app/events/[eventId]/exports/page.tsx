@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft,
   ArrowUpRight,
@@ -57,6 +57,7 @@ function triggerBlobDownload(blob: Blob, fileName: string) {
 
 export default function EventExportsPage() {
   const params = useParams<{ eventId: string }>();
+  const router = useRouter();
   const eventId = params.eventId;
   const { data: events = [], isLoading: isLoadingEvents } = useEvents();
   const { data: pitches = [], isLoading: isLoadingPitches } = usePitches(eventId);
@@ -191,6 +192,18 @@ export default function EventExportsPage() {
     } finally {
       setIsExportingPitchId(null);
     }
+  }
+
+  async function handleProjectPitch(pitchId: string) {
+    try {
+      if (!document.fullscreenElement) {
+        await document.documentElement.requestFullscreen();
+      }
+    } catch {
+      // Some browsers can reject fullscreen; projection should still open.
+    }
+
+    router.push(`/projector/${pitchId}`);
   }
 
   function handleExportCombined(rows: typeof rankingRows, mode: "selected" | "all") {
@@ -403,15 +416,14 @@ export default function EventExportsPage() {
                           </td>
                           <td className="px-4 py-4 text-right">
                             <div className="flex justify-end gap-2">
-                              <Link
-                                href={`/projector/${row.id}`}
-                                target="_blank"
-                                rel="noreferrer"
+                              <Button
+                                type="button"
+                                onClick={() => handleProjectPitch(row.id)}
                                 className="inline-flex h-9 items-center gap-2 rounded-full border border-[#263550] bg-[#0d1526] px-4 text-xs font-bold text-white transition hover:bg-[#121d30]"
                               >
                                 <ArrowUpRight className="size-4" />
                                 Proyectar
-                              </Link>
+                              </Button>
                               <Button
                                 type="button"
                                 onClick={() => handleExportPitch(row.id, row.name)}

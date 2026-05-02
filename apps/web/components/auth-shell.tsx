@@ -29,7 +29,7 @@ export function AuthShell({
 }: AuthShellProps) {
   return (
     <main className="min-h-svh overflow-hidden bg-[#0d1526] text-white">
-      <div className="relative mx-auto flex min-h-svh w-full max-w-[1440px] flex-col lg:flex-row">
+      <div className="relative flex min-h-svh w-full flex-col lg:flex-row">
         <section className="relative flex flex-1 items-center overflow-hidden border-b border-[#263550] bg-[linear-gradient(160deg,#0d0d18_0%,#111120_52%,#0a1a0a_100%)] px-6 py-14 lg:border-b-0 lg:border-r lg:px-16">
           <div className="absolute left-[-120px] top-16 h-[360px] w-[360px] rounded-full bg-[radial-gradient(circle,rgba(131,206,0,0.18)_0%,rgba(131,206,0,0)_72%)]" />
           <div className="absolute bottom-[-120px] right-[-80px] h-[320px] w-[320px] rounded-full bg-[radial-gradient(circle,rgba(5,149,240,0.16)_0%,rgba(5,149,240,0)_72%)]" />
@@ -78,7 +78,7 @@ export function AuthShell({
           </div>
         </section>
 
-        <section className="flex w-full items-center justify-center bg-[#121d30] px-6 py-10 lg:w-[540px] lg:px-[60px]">
+        <section className="flex w-full items-center justify-center bg-[#121d30] px-6 py-10 lg:w-[40vw] lg:min-w-[540px] lg:px-[60px]">
           <div className="w-full max-w-[420px]">
             {children}
 

@@ -60,7 +60,7 @@ ADD COLUMN IF NOT EXISTS "criteriaScores" JSONB NOT NULL DEFAULT '[]'::jsonb;
 --tabla para el co-organizador
 CREATE TABLE IF NOT EXISTS event_organizer (
   id                TEXT        PRIMARY KEY,
-  "eventId"         UUID        NOT NULL REFERENCES event(id) ON DELETE CASCADE,
+  "eventId"         TEXT        NOT NULL REFERENCES event(id) ON DELETE CASCADE,
   "userId"          TEXT        NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
   role              TEXT        NOT NULL DEFAULT 'ORGANIZER' CHECK (role IN ('ORGANIZER')),
   "invitedByUserId" TEXT        REFERENCES "user"(id) ON DELETE SET NULL,
@@ -71,7 +71,7 @@ CREATE TABLE IF NOT EXISTS event_organizer (
 --tabla para cuando envien el link de invitacion 
 CREATE TABLE IF NOT EXISTS event_organizer_invitation (
   id                TEXT        PRIMARY KEY,
-  "eventId"         UUID        NOT NULL REFERENCES event(id) ON DELETE CASCADE,
+  "eventId"         TEXT        NOT NULL REFERENCES event(id) ON DELETE CASCADE,
   email             TEXT        NOT NULL,
   role              TEXT        NOT NULL DEFAULT 'ORGANIZER' CHECK (role IN ('ORGANIZER')),
   token             TEXT        NOT NULL UNIQUE,
