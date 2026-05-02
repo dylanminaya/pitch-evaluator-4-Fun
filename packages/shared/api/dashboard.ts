@@ -209,6 +209,11 @@ export const publicPitchSchema = z.object({
 
 export const createPublicVoteSchema = z.object({
   pitchId: z.string().min(1, "Pitch id is required"),
+  evaluatorEmail: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .email("Please enter a valid email address"),
   evaluatorId: z.string().nullable().optional(),
   criteriaScores: voteCriteriaScoresSchema,
   comment: z.string().max(500).optional().nullable(),

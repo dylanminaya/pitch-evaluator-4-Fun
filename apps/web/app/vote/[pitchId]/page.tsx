@@ -1,18 +1,32 @@
 "use client";
 
 import Image from "next/image";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { CheckCircle2, Sparkles, Star } from "lucide-react";
 import { Button } from "@workspace/ui/components/button";
 import { usePublicPitch, useSubmitPublicVote } from "@/hooks/dashboard";
+import { useSession } from "@/lib/better-auth/auth-client";
 import type { EventCriterion } from "@workspace/shared/api";
+
+const evaluatorEmailStorageKey = "pitch-evaluator-email";
 
 export default function VotingScreenPage() {
   const params = useParams<{ pitchId: string }>();
   const router = useRouter();
   const pitchId = params.pitchId;
-  const { data: pitch, isLoading, error } = usePublicPitch(pitchId);
+  const [emailInput, setEmailInput] = useState("");
+  const [evaluatorEmail, setEvaluatorEmail] = useState<string | null>(null);
+  const [isChangingEmail, setIsChangingEmail] = useState(false);
+  const { data: sessionData, isPending: isLoadingSession } = useSession();
+  const sessionUserEmail =
+    sessionData?.user && typeof sessionData.user === "object" && "email" in sessionData.user
+      ? String(sessionData.user.email ?? "").trim().toLowerCase()
+      : null;
+  const effectiveEvaluatorEmail = isChangingEmail
+    ? null
+    : evaluatorEmail || sessionUserEmail;
+  const { data: pitch, isLoading, error } = usePublicPitch(pitchId, effectiveEvaluatorEmail);
   const { mutateAsync: submitVote, isPending, isSuccess, error: voteError } =
     useSubmitPublicVote();
   const [comment, setComment] = useState("");
@@ -20,6 +34,48 @@ export default function VotingScreenPage() {
 
   const criteria: EventCriterion[] = pitch?.criteria ?? [];
   const hasAlreadyVoted = Boolean(pitch?.hasVoted) || isSuccess;
+
+  useEffect(() => {
+    if (isLoadingSession) {
+      return;
+    }
+
+    if (sessionUserEmail) {
+      setEmailInput(sessionUserEmail);
+      setEvaluatorEmail(null);
+      setIsChangingEmail(false);
+      return;
+    }
+
+    const savedEmail = window.localStorage.getItem(evaluatorEmailStorageKey);
+
+    if (savedEmail) {
+      setEmailInput(savedEmail);
+      setEvaluatorEmail(savedEmail);
+    }
+  }, [isLoadingSession, sessionUserEmail]);
+
+  function handleEmailSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const normalizedEmail = emailInput.trim().toLowerCase();
+
+    if (!sessionUserEmail) {
+      window.localStorage.setItem(evaluatorEmailStorageKey, normalizedEmail);
+    }
+
+    setEvaluatorEmail(normalizedEmail);
+    setIsChangingEmail(false);
+  }
+
+  function clearEvaluatorEmail() {
+    if (!sessionUserEmail) {
+      window.localStorage.removeItem(evaluatorEmailStorageKey);
+    }
+
+    setEvaluatorEmail(null);
+    setEmailInput("");
+    setIsChangingEmail(true);
+  }
 
   function updateScore(key: string, value: number) {
     setScores((current) => ({ ...current, [key]: value }));
@@ -38,12 +94,57 @@ export default function VotingScreenPage() {
 
     await submitVote({
       pitchId,
+      evaluatorEmail: effectiveEvaluatorEmail ?? "",
       criteriaScores: criteria.map((criterion) => ({
         criterionId: criterion.id,
         score: scores[criterion.id] ?? 3,
       })),
       comment: comment.trim() || null,
     });
+  }
+
+  if (isLoadingSession) {
+    return (
+      <main className="flex min-h-svh items-center justify-center bg-[#0d1526] text-[#8899aa]">
+        Cargando votacion...
+      </main>
+    );
+  }
+
+  if (!effectiveEvaluatorEmail) {
+    return (
+      <main className="flex min-h-svh items-center justify-center bg-[#0d1526] px-4 text-white">
+        <form
+          onSubmit={handleEmailSubmit}
+          className="w-full max-w-md rounded-[24px] border border-[#263550] bg-[#121d30] p-6 shadow-[0_22px_60px_rgba(2,8,23,0.42)]"
+        >
+          <Image src="/logo.svg" alt="Pitch 4 Fun" width={110} height={46} className="h-11 w-auto" />
+          <div className="mt-8">
+            <label
+              htmlFor="evaluator-email"
+              className="text-[11px] font-bold uppercase italic tracking-[0.24em] text-[#83ce00]"
+            >
+              Correo electronico
+            </label>
+            <input
+              id="evaluator-email"
+              type="email"
+              required
+              value={emailInput}
+              onChange={(event) => setEmailInput(event.target.value)}
+              placeholder="tu@email.com"
+              className="mt-3 h-12 w-full rounded-2xl border border-[#263550] bg-[#0d1526] px-4 text-sm text-white outline-none placeholder:text-[#66738f] focus:border-[#83ce00]"
+            />
+          </div>
+          <Button
+            type="submit"
+            className="mt-5 h-12 w-full rounded-full bg-[#83ce00] px-6 text-sm font-bold italic text-[#0d1526] hover:bg-[#a7ea2e]"
+          >
+            Continuar
+          </Button>
+        </form>
+      </main>
+    );
   }
 
   if (isLoading) {
@@ -112,9 +213,16 @@ export default function VotingScreenPage() {
             </p>
             <div className="mt-6 rounded-2xl border border-dashed border-[#263550] bg-[#0d1526] px-4 py-4 text-sm leading-6 text-[#8899aa]">
               {hasAlreadyVoted
-                ? "Este dispositivo ya registro un voto para este pitch."
-                : "Tu voto cuenta una sola vez por dispositivo. Toma unos segundos para evaluar de forma honesta cada criterio."}
+                ? "Este correo ya registro un voto para este pitch."
+                : "Tu voto cuenta una sola vez por correo electronico. Toma unos segundos para evaluar de forma honesta cada criterio."}
             </div>
+            <button
+              type="button"
+              onClick={clearEvaluatorEmail}
+              className="mt-4 text-xs font-semibold text-[#83ce00] underline-offset-4 hover:underline"
+            >
+              {effectiveEvaluatorEmail}
+            </button>
           </aside>
 
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">

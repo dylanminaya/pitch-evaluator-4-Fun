@@ -28,18 +28,6 @@ const hasPgErrorCode = (error: unknown, code: string) =>
   "code" in error &&
   error.code === code;
 
-const getClientIpAddress = (value: string | string[] | undefined) => {
-  if (Array.isArray(value)) {
-    return value[0] ?? null;
-  }
-
-  if (typeof value === "string" && value.length > 0) {
-    return value.split(",")[0]?.trim() ?? null;
-  }
-
-  return null;
-};
-
 // Lista los pitches de un evento.
 pitchRouter.get("/", async (req, res) => {
   const session = await requireSession(req, res);
@@ -272,8 +260,19 @@ pitchRouter.delete("/:id", async (req, res) => {
 // Endpoint publico para la pantalla de voto.
 pitchRouter.get("/public/:pitchId", async (req, res) => {
   try {
-    const ipAddress =
-      getClientIpAddress(req.headers["x-forwarded-for"]) ?? req.ip ?? null;
+    const evaluatorEmailParam = req.query.evaluatorEmail;
+    let evaluatorEmail: string | null = null;
+
+    if (typeof evaluatorEmailParam === "string" && evaluatorEmailParam.length > 0) {
+      const parsedEmail = z.string().trim().toLowerCase().email().safeParse(evaluatorEmailParam);
+
+      if (!parsedEmail.success) {
+        return res.status(400).json({ message: "Invalid evaluator email" });
+      }
+
+      evaluatorEmail = parsedEmail.data;
+    }
+
     let result;
 
     try {
@@ -329,19 +328,38 @@ pitchRouter.get("/public/:pitchId", async (req, res) => {
 
     let hasVoted = false;
 
-    if (ipAddress) {
-      const existingVoteResult = await db.query(
-        `
-          SELECT id
-          FROM vote
-          WHERE "pitchId" = $1
-            AND "ipAddress" = $2
-          LIMIT 1
-        `,
-        [req.params.pitchId, ipAddress],
-      );
+    if (evaluatorEmail) {
+      try {
+        const existingVoteResult = await db.query(
+          `
+            SELECT id
+            FROM vote
+            WHERE "pitchId" = $1
+              AND "evaluatorEmail" = $2
+            LIMIT 1
+          `,
+          [req.params.pitchId, evaluatorEmail],
+        );
 
-      hasVoted = (existingVoteResult.rowCount ?? 0) > 0;
+        hasVoted = (existingVoteResult.rowCount ?? 0) > 0;
+      } catch (error) {
+        if (!hasPgErrorCode(error, "42703")) {
+          throw error;
+        }
+
+        const existingVoteResult = await db.query(
+          `
+            SELECT id
+            FROM vote
+            WHERE "pitchId" = $1
+              AND "evaluatorId" = $2
+            LIMIT 1
+          `,
+          [req.params.pitchId, evaluatorEmail],
+        );
+
+        hasVoted = (existingVoteResult.rowCount ?? 0) > 0;
+      }
     }
 
     return res.status(200).json(publicPitchSchema.parse({

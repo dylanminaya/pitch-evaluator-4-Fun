@@ -1,20 +1,78 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
+import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { CalendarDays, Clock3, MapPin, Users } from "lucide-react";
 import { Button } from "@workspace/ui/components/button";
 import { usePublicEventInvitation } from "@/hooks/dashboard";
+import { useSession } from "@/lib/better-auth/auth-client";
 import {
   ArrowLeft,
 } from "lucide-react";
+
+const evaluatorEmailStorageKey = "pitch-evaluator-email";
 
 export default function EventInvitationPage() {
   const params = useParams<{ eventId: string }>();
   const eventId = params.eventId;
   const { data: invitation, isLoading, error } = usePublicEventInvitation(eventId);
+  const { data: sessionData, isPending: isLoadingSession } = useSession();
+  const [emailInput, setEmailInput] = useState("");
+  const [evaluatorEmail, setEvaluatorEmail] = useState<string | null>(null);
+  const [isChangingEmail, setIsChangingEmail] = useState(false);
+  const sessionUserEmail =
+    sessionData?.user && typeof sessionData.user === "object" && "email" in sessionData.user
+      ? String(sessionData.user.email ?? "").trim().toLowerCase()
+      : null;
+  const effectiveEvaluatorEmail = isChangingEmail
+    ? null
+    : evaluatorEmail || sessionUserEmail;
 
-  if (isLoading) {
+  useEffect(() => {
+    if (isLoadingSession) {
+      return;
+    }
+
+    if (sessionUserEmail) {
+      setEmailInput(sessionUserEmail);
+      setEvaluatorEmail(null);
+      setIsChangingEmail(false);
+      return;
+    }
+
+    const savedEmail = window.localStorage.getItem(evaluatorEmailStorageKey);
+
+    if (savedEmail) {
+      setEmailInput(savedEmail);
+      setEvaluatorEmail(savedEmail);
+    }
+  }, [isLoadingSession, sessionUserEmail]);
+
+  function handleEmailSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const normalizedEmail = emailInput.trim().toLowerCase();
+
+    if (!sessionUserEmail) {
+      window.localStorage.setItem(evaluatorEmailStorageKey, normalizedEmail);
+    }
+
+    setEvaluatorEmail(normalizedEmail);
+    setIsChangingEmail(false);
+  }
+
+  function clearEvaluatorEmail() {
+    if (!sessionUserEmail) {
+      window.localStorage.removeItem(evaluatorEmailStorageKey);
+    }
+
+    setEmailInput("");
+    setEvaluatorEmail(null);
+    setIsChangingEmail(true);
+  }
+
+  if (isLoading || isLoadingSession) {
     return (
       <main className="flex min-h-svh items-center justify-center bg-[#0d1526] text-[#8899aa]">
         Cargando invitacion...
@@ -37,6 +95,42 @@ export default function EventInvitationPage() {
     year: "numeric",
   }).format(new Date());
 
+  if (!effectiveEvaluatorEmail) {
+    return (
+      <main className="flex min-h-svh items-center justify-center bg-[#0d1526] px-4 text-white">
+        <form
+          onSubmit={handleEmailSubmit}
+          className="w-full max-w-md rounded-[24px] border border-[#263550] bg-[#121d30] p-6 shadow-[0_22px_60px_rgba(2,8,23,0.42)]"
+        >
+          <Image src="/logo.svg" alt="Pitch 4 Fun" width={110} height={46} className="h-11 w-auto" />
+          <div className="mt-8">
+            <label
+              htmlFor="evaluator-email"
+              className="text-[11px] font-bold uppercase italic tracking-[0.24em] text-[#83ce00]"
+            >
+              Correo electronico
+            </label>
+            <input
+              id="evaluator-email"
+              type="email"
+              required
+              value={emailInput}
+              onChange={(event) => setEmailInput(event.target.value)}
+              placeholder="tu@email.com"
+              className="mt-3 h-12 w-full rounded-2xl border border-[#263550] bg-[#0d1526] px-4 text-sm text-white outline-none placeholder:text-[#66738f] focus:border-[#83ce00]"
+            />
+          </div>
+          <Button
+            type="submit"
+            className="mt-5 h-12 w-full rounded-full bg-[#83ce00] px-6 text-sm font-bold italic text-[#0d1526] hover:bg-[#a7ea2e]"
+          >
+            Continuar
+          </Button>
+        </form>
+      </main>
+    );
+  }
+
   return (
     <main className="min-h-svh bg-[#0d1526] px-4 py-10 text-white">
       <div className="mx-auto flex min-h-[calc(100svh-5rem)] max-w-[1440px] items-center justify-center">
@@ -46,15 +140,25 @@ export default function EventInvitationPage() {
               <div className="inline-flex items-center gap-2 text-[11px] font-bold uppercase italic tracking-[0.28em] text-[#83ce00]">
                 <span>PITCH 4 FUN</span>
               </div>
-              <Link href="/">
+              <div className="flex flex-wrap items-center justify-end gap-2">
                 <Button
+                  type="button"
                   variant="outline"
+                  onClick={clearEvaluatorEmail}
                   className="rounded-full border-[#263550] bg-[#0d1526] text-white hover:bg-[#1a2640] hover:text-white"
                 >
-                  <ArrowLeft className="size-4" />
-                  Salir
+                  {effectiveEvaluatorEmail}
                 </Button>
-              </Link>
+                <Link href="/">
+                  <Button
+                    variant="outline"
+                    className="rounded-full border-[#263550] bg-[#0d1526] text-white hover:bg-[#1a2640] hover:text-white"
+                  >
+                    <ArrowLeft className="size-4" />
+                    Salir
+                  </Button>
+                </Link>
+              </div>
             </div>
             <h1 className="mt-6 text-3xl font-black tracking-tight text-white">
               {invitation.name}

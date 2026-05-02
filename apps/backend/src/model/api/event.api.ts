@@ -444,7 +444,7 @@ eventRouter.get("/:eventId/stats", async (req, res) => {
         SELECT
           NULLIF(
             COUNT(
-              DISTINCT COALESCE(NULLIF(v."evaluatorId", ''), NULLIF(v."ipAddress", ''))
+              DISTINCT COALESCE(NULLIF(v."evaluatorEmail", ''), NULLIF(v."evaluatorId", ''))
             ),
             0
           )::int AS "evaluatorsCount"

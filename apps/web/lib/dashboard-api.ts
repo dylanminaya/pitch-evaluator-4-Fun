@@ -107,8 +107,12 @@ export function getEventQr(eventId: string) {
   return apiFetch<DashboardPitchQr>(`/api/event/${eventId}/qr`);
 }
 
-export function getPublicPitch(pitchId: string) {
-  return apiFetch<PublicPitch>(`/api/pitch/public/${pitchId}`);
+export function getPublicPitch(pitchId: string, evaluatorEmail?: string) {
+  const query = evaluatorEmail
+    ? `?evaluatorEmail=${encodeURIComponent(evaluatorEmail)}`
+    : "";
+
+  return apiFetch<PublicPitch>(`/api/pitch/public/${pitchId}${query}`);
 }
 
 export function getPublicEventInvitation(eventId: string) {

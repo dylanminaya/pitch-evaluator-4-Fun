@@ -3,7 +3,7 @@ export const presentVote = (vote: {
   id: string;
   pitchId: string;
   evaluatorId?: string | null;
-  ipAddress?: string | null;
+  evaluatorEmail?: string | null;
   innovation: number;
   viability: number;
   impact: number;
@@ -14,7 +14,7 @@ export const presentVote = (vote: {
   id: vote.id,
   pitchId: vote.pitchId,
   evaluatorId: vote.evaluatorId ?? null,
-  ipAddress: vote.ipAddress ?? null,
+  evaluatorEmail: vote.evaluatorEmail ?? null,
   innovation: vote.innovation,
   viability: vote.viability,
   impact: vote.impact,

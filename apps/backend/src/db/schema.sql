@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS vote (
   id            TEXT        PRIMARY KEY,
   "pitchId"     TEXT        NOT NULL REFERENCES pitch(id) ON DELETE CASCADE,
   "evaluatorId" TEXT,
-  "ipAddress"   TEXT,
+  "evaluatorEmail" TEXT,
   "criteriaScores" JSONB    NOT NULL DEFAULT '[]'::jsonb,
   innovation    INTEGER     NOT NULL CHECK (innovation BETWEEN 1 AND 5),
   viability     INTEGER     NOT NULL CHECK (viability BETWEEN 1 AND 5),
@@ -50,11 +50,18 @@ CREATE TABLE IF NOT EXISTS vote (
   presentation  INTEGER     NOT NULL CHECK (presentation BETWEEN 1 AND 5),
   comment       TEXT,
   "createdAt"   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  UNIQUE ("pitchId", "ipAddress")
+  UNIQUE ("pitchId", "evaluatorEmail")
 );
 
 ALTER TABLE vote
 ADD COLUMN IF NOT EXISTS "criteriaScores" JSONB NOT NULL DEFAULT '[]'::jsonb;
+
+ALTER TABLE vote
+ADD COLUMN IF NOT EXISTS "evaluatorEmail" TEXT;
+
+CREATE UNIQUE INDEX IF NOT EXISTS vote_pitch_evaluator_email_unique
+ON vote ("pitchId", "evaluatorEmail")
+WHERE "evaluatorEmail" IS NOT NULL;
 
 
 --tabla para el co-organizador
