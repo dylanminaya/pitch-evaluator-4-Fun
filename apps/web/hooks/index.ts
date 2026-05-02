@@ -1,1 +1,2 @@
-export { useSignIn, useSignUp } from "./auth";
+export * from "./auth";
+export * from "./dashboard";

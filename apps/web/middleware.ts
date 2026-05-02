@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 const publicRoutes = ["/", "/signup"];
-const authRoutes = ["/", "/signup"]; // Routes that should redirect to dashboard if logged in
+const authRoutes = ["/", "/signup"]; // Routes that should redirect to events if logged in
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -11,7 +11,11 @@ export async function middleware(request: NextRequest) {
     request.cookies.get("better-auth.session_token")?.value ??
     request.cookies.get("__Secure-better-auth.session_token")?.value;
 
-  const isPublicRoute = publicRoutes.includes(pathname);
+  const isPublicRoute =
+    publicRoutes.includes(pathname) ||
+    pathname.startsWith("/organizer-invitations/") ||
+    pathname.startsWith("/invitation/") ||
+    pathname.startsWith("/vote/");
   const isAuthRoute = authRoutes.includes(pathname);
 
   if (!sessionToken && !isPublicRoute) {
@@ -21,7 +25,7 @@ export async function middleware(request: NextRequest) {
   }
 
   if (sessionToken && isAuthRoute) {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
+    return NextResponse.redirect(new URL("/events", request.url));
   }
 
   return NextResponse.next();

@@ -1,15 +1,6 @@
-import { Geist_Mono, Inter } from "next/font/google";
-
 import "@workspace/ui/globals.css";
 import { cn } from "@workspace/ui/lib/utils";
 import { QueryProvider } from "@/components/query-provider";
-
-const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
-
-const fontMono = Geist_Mono({
-  subsets: ["latin"],
-  variable: "--font-mono",
-});
 
 export default function RootLayout({
   children,
@@ -20,12 +11,7 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={cn(
-        "antialiased",
-        fontMono.variable,
-        "font-sans",
-        inter.variable
-      )}
+      className={cn("antialiased font-sans")}
     >
       <body>
         <QueryProvider>{children}</QueryProvider>

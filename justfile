@@ -63,3 +63,7 @@ backend-build:
 # Run better-auth database migrations
 db-migrate:
 	cd apps/backend && pnpm dotenv -e ../../.env -- pnpm dlx @better-auth/cli migrate
+
+# Create app tables (event, pitch, vote) — run once after db-migrate
+db-schema:
+	export $(grep -v '^#' .env | xargs) && docker exec -i pitch-evaluator-db psql "postgresql://$POSTGRES_USER:$POSTGRES_PASSWORD@localhost/$POSTGRES_DB" < apps/backend/src/db/schema.sql
