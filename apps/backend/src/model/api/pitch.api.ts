@@ -818,3 +818,12 @@ pitchRouter.get("/:pitchId/export", async (req, res) => {
     return res.status(500).json({ message: "Failed to export pitch report"})
   }
 })
+
+
+
+
+
+
+
+
+
