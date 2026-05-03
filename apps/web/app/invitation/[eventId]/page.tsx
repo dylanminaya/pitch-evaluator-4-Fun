@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { CalendarDays, Clock3, MapPin, Users } from "lucide-react";
 import { Button } from "@workspace/ui/components/button";
 import { usePublicEventInvitation } from "@/hooks/dashboard";
@@ -16,6 +16,7 @@ const evaluatorEmailStorageKey = "pitch-evaluator-email";
 
 export default function EventInvitationPage() {
   const params = useParams<{ eventId: string }>();
+  const router = useRouter();
   const eventId = params.eventId;
   const { data: invitation, isLoading, error } = usePublicEventInvitation(eventId);
   const { data: sessionData, isPending: isLoadingSession } = useSession();
@@ -29,9 +30,24 @@ export default function EventInvitationPage() {
   const effectiveEvaluatorEmail = isChangingEmail
     ? null
     : evaluatorEmail || sessionUserEmail;
+  const evaluatorEmailQuery = effectiveEvaluatorEmail
+    ? `?evaluatorEmail=${encodeURIComponent(effectiveEvaluatorEmail)}`
+    : "";
 
   useEffect(() => {
     if (isLoadingSession) {
+      return;
+    }
+
+    const emailFromUrl = new URLSearchParams(window.location.search)
+      .get("evaluatorEmail")
+      ?.trim()
+      .toLowerCase();
+
+    if (emailFromUrl) {
+      setEmailInput(emailFromUrl);
+      setEvaluatorEmail(emailFromUrl);
+      setIsChangingEmail(false);
       return;
     }
 
@@ -60,6 +76,7 @@ export default function EventInvitationPage() {
 
     setEvaluatorEmail(normalizedEmail);
     setIsChangingEmail(false);
+    router.replace(`/invitation/${eventId}?evaluatorEmail=${encodeURIComponent(normalizedEmail)}`);
   }
 
   function clearEvaluatorEmail() {
@@ -70,6 +87,7 @@ export default function EventInvitationPage() {
     setEmailInput("");
     setEvaluatorEmail(null);
     setIsChangingEmail(true);
+    router.replace(`/invitation/${eventId}`);
   }
 
   if (isLoading || isLoadingSession) {
@@ -229,7 +247,7 @@ export default function EventInvitationPage() {
                       <h2 className="mt-4 text-xl font-bold text-white">{pitch.name}</h2>
                       <p className="mt-3 text-sm leading-6 text-[#a9b3c9]">{pitch.description}</p>
                       <div className="mt-5">
-                        <Link href={canOpenPitch ? `/vote/${pitch.id}` : "#"} aria-disabled={!canOpenPitch}>
+                        <Link href={canOpenPitch ? `/vote/${pitch.id}${evaluatorEmailQuery}` : "#"} aria-disabled={!canOpenPitch}>
                           <Button
                             className="h-11 w-full rounded-full bg-[#83ce00] text-sm font-bold italic text-[#0d1526] hover:bg-[#a7ea2e]"
                             disabled={!canOpenPitch}

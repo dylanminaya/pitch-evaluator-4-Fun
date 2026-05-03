@@ -40,6 +40,18 @@ export default function VotingScreenPage() {
       return;
     }
 
+    const emailFromUrl = new URLSearchParams(window.location.search)
+      .get("evaluatorEmail")
+      ?.trim()
+      .toLowerCase();
+
+    if (emailFromUrl) {
+      setEmailInput(emailFromUrl);
+      setEvaluatorEmail(emailFromUrl);
+      setIsChangingEmail(false);
+      return;
+    }
+
     if (sessionUserEmail) {
       setEmailInput(sessionUserEmail);
       setEvaluatorEmail(null);
@@ -65,6 +77,7 @@ export default function VotingScreenPage() {
 
     setEvaluatorEmail(normalizedEmail);
     setIsChangingEmail(false);
+    router.replace(`/vote/${pitchId}?evaluatorEmail=${encodeURIComponent(normalizedEmail)}`);
   }
 
   function clearEvaluatorEmail() {
@@ -75,6 +88,7 @@ export default function VotingScreenPage() {
     setEvaluatorEmail(null);
     setEmailInput("");
     setIsChangingEmail(true);
+    router.replace(`/vote/${pitchId}`);
   }
 
   function updateScore(key: string, value: number) {
@@ -311,7 +325,13 @@ export default function VotingScreenPage() {
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => router.push(`/invitation/${pitch.eventId}`)}
+                onClick={() => {
+                  const query = effectiveEvaluatorEmail
+                    ? `?evaluatorEmail=${encodeURIComponent(effectiveEvaluatorEmail)}`
+                    : "";
+
+                  router.push(`/invitation/${pitch.eventId}${query}`);
+                }}
                 className="h-12 rounded-full border-[#263550] bg-transparent px-6 text-sm font-bold text-white hover:bg-[#1a2640] hover:text-white"
               >
                 Ver pitches
