@@ -15,6 +15,7 @@ import {
   normalizeEventCriteria,
 } from "../criteria.js";
 import { validateServerEnv } from "@workspace/shared/env/server";
+import { presentVote } from "../../presenter/vote.presenter.js";
 import { presentPitch, presentPitchComment, presentPitchDetail,presentPitchSummary, presentPublicPitch } from "../../presenter/pitch.presenter.js";
 import {
   dashboardPitchSchema,
@@ -330,13 +331,24 @@ pitchRouter.get("/public/:pitchId", async (req, res) => {
       });
     }
 
-    let hasVoted = false;
+    let currentVote = null;
 
     if (evaluatorEmail) {
       try {
         const existingVoteResult = await db.query(
           `
-            SELECT id
+            SELECT
+              id,
+              "pitchId",
+              "evaluatorId",
+              "evaluatorEmail",
+              "criteriaScores",
+              innovation,
+              viability,
+              impact,
+              presentation,
+              comment,
+              "createdAt"
             FROM vote
             WHERE "pitchId" = $1
               AND "evaluatorEmail" = $2
@@ -345,7 +357,10 @@ pitchRouter.get("/public/:pitchId", async (req, res) => {
           [req.params.pitchId, evaluatorEmail],
         );
 
-        hasVoted = (existingVoteResult.rowCount ?? 0) > 0;
+        currentVote =
+          (existingVoteResult.rowCount ?? 0) > 0
+            ? presentVote(existingVoteResult.rows[0])
+            : null;
       } catch (error) {
         if (!hasPgErrorCode(error, "42703")) {
           throw error;
@@ -353,7 +368,17 @@ pitchRouter.get("/public/:pitchId", async (req, res) => {
 
         const existingVoteResult = await db.query(
           `
-            SELECT id
+            SELECT
+              id,
+              "pitchId",
+              "evaluatorId",
+              "evaluatorId" AS "evaluatorEmail",
+              innovation,
+              viability,
+              impact,
+              presentation,
+              comment,
+              "createdAt"
             FROM vote
             WHERE "pitchId" = $1
               AND "evaluatorId" = $2
@@ -362,14 +387,18 @@ pitchRouter.get("/public/:pitchId", async (req, res) => {
           [req.params.pitchId, evaluatorEmail],
         );
 
-        hasVoted = (existingVoteResult.rowCount ?? 0) > 0;
+        currentVote =
+          (existingVoteResult.rowCount ?? 0) > 0
+            ? presentVote(existingVoteResult.rows[0])
+            : null;
       }
     }
 
     return res.status(200).json(publicPitchSchema.parse({
       ...presentPublicPitch({
         ...result.rows[0],
-        hasVoted,
+        hasVoted: Boolean(currentVote),
+        currentVote,
       }),
       criteria: normalizeEventCriteria(result.rows[0].criteria),
     }));
@@ -818,7 +847,6 @@ pitchRouter.get("/:pitchId/export", async (req, res) => {
     return res.status(500).json({ message: "Failed to export pitch report"})
   }
 })
-
 
 
 

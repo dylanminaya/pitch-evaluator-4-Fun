@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { CheckCircle2, Sparkles, Star } from "lucide-react";
 import { Button } from "@workspace/ui/components/button";
@@ -29,11 +29,13 @@ export default function VotingScreenPage() {
   const { data: pitch, isLoading, error } = usePublicPitch(pitchId, effectiveEvaluatorEmail);
   const { mutateAsync: submitVote, isPending, isSuccess, error: voteError } =
     useSubmitPublicVote();
-  const [comment, setComment] = useState("");
-  const [scores, setScores] = useState<Record<string, number>>({});
+  const [commentDraft, setCommentDraft] = useState<string | null>(null);
+  const [scoreDrafts, setScoreDrafts] = useState<Record<string, number>>({});
 
-  const criteria: EventCriterion[] = pitch?.criteria ?? [];
-  const hasAlreadyVoted = Boolean(pitch?.hasVoted) || isSuccess;
+  const criteria: EventCriterion[] = useMemo(() => pitch?.criteria ?? [], [pitch?.criteria]);
+  const hasAlreadyVoted = Boolean(pitch?.hasVoted);
+  const hasSavedVote = hasAlreadyVoted || isSuccess;
+  const isVotingClosed = pitch?.eventStatus !== "OPEN" || pitch?.pitchStatus !== "OPEN";
 
   useEffect(() => {
     if (isLoadingSession) {
@@ -77,6 +79,8 @@ export default function VotingScreenPage() {
 
     setEvaluatorEmail(normalizedEmail);
     setIsChangingEmail(false);
+    setCommentDraft(null);
+    setScoreDrafts({});
     router.replace(`/vote/${pitchId}?evaluatorEmail=${encodeURIComponent(normalizedEmail)}`);
   }
 
@@ -88,11 +92,38 @@ export default function VotingScreenPage() {
     setEvaluatorEmail(null);
     setEmailInput("");
     setIsChangingEmail(true);
+    setCommentDraft(null);
+    setScoreDrafts({});
     router.replace(`/vote/${pitchId}`);
   }
 
   function updateScore(key: string, value: number) {
-    setScores((current) => ({ ...current, [key]: value }));
+    setScoreDrafts((current) => ({ ...current, [key]: value }));
+  }
+
+  function getSavedScore(criterionId: string) {
+    if (!pitch?.currentVote) {
+      return undefined;
+    }
+
+    const dynamicScore = pitch.currentVote.criteriaScores?.find(
+      (score) => score.criterionId === criterionId,
+    )?.score;
+
+    if (dynamicScore) {
+      return dynamicScore;
+    }
+
+    if (criterionId === "innovation") return pitch.currentVote.innovation;
+    if (criterionId === "viability") return pitch.currentVote.viability;
+    if (criterionId === "impact") return pitch.currentVote.impact;
+    if (criterionId === "presentation") return pitch.currentVote.presentation;
+
+    return undefined;
+  }
+
+  function getSelectedScore(criterionId: string) {
+    return scoreDrafts[criterionId] ?? getSavedScore(criterionId);
   }
 
   function getRatingLabel(value?: number) {
@@ -106,21 +137,52 @@ export default function VotingScreenPage() {
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
+    if (isVotingClosed) {
+      return;
+    }
+
+    const normalizedEmail = effectiveEvaluatorEmail?.trim().toLowerCase() ?? "";
+
+    if (!normalizedEmail) {
+      return;
+    }
+
     await submitVote({
       pitchId,
-      evaluatorEmail: effectiveEvaluatorEmail ?? "",
+      evaluatorEmail: normalizedEmail,
       criteriaScores: criteria.map((criterion) => ({
         criterionId: criterion.id,
-        score: scores[criterion.id] ?? 3,
+        score: getSelectedScore(criterion.id) ?? 3,
       })),
-      comment: comment.trim() || null,
+      comment: (commentDraft ?? pitch?.currentVote?.comment ?? "").trim() || null,
     });
+
+    window.localStorage.setItem(evaluatorEmailStorageKey, normalizedEmail);
+    setEvaluatorEmail(normalizedEmail);
+    setIsChangingEmail(false);
+    router.replace(`/vote/${pitchId}?evaluatorEmail=${encodeURIComponent(normalizedEmail)}`);
   }
 
-  if (isLoadingSession) {
+  if (isLoadingSession && isLoading) {
     return (
       <main className="flex min-h-svh items-center justify-center bg-[#0d1526] text-[#8899aa]">
         Cargando votacion...
+      </main>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <main className="flex min-h-svh items-center justify-center bg-[#0d1526] text-[#8899aa]">
+        Cargando votacion...
+      </main>
+    );
+  }
+
+  if (error || !pitch) {
+    return (
+      <main className="flex min-h-svh items-center justify-center bg-[#0d1526] px-6 text-center text-[#8899aa]">
+        No pudimos cargar este pitch.
       </main>
     );
   }
@@ -133,7 +195,17 @@ export default function VotingScreenPage() {
           className="w-full max-w-md rounded-[24px] border border-[#263550] bg-[#121d30] p-6 shadow-[0_22px_60px_rgba(2,8,23,0.42)]"
         >
           <Image src="/logo.svg" alt="Pitch 4 Fun" width={110} height={46} className="h-11 w-auto" />
-          <div className="mt-8">
+          <div className="mt-7 rounded-2xl border border-[#263550] bg-[#0d1526] p-4">
+            <div className="text-xs font-bold uppercase italic tracking-[0.24em] text-[#83ce00]">
+              {pitch.name}
+            </div>
+            <p className="mt-2 text-sm leading-6 text-[#a9b3c9]">
+              {pitch.pitchStatus === "OPEN" && pitch.eventStatus === "OPEN"
+                ? "Escribe tu correo para votar o cargar tu voto anterior."
+                : "Este pitch esta cerrado. Escribe tu correo para ver tu voto guardado."}
+            </p>
+          </div>
+          <div className="mt-6">
             <label
               htmlFor="evaluator-email"
               className="text-[11px] font-bold uppercase italic tracking-[0.24em] text-[#83ce00]"
@@ -161,32 +233,6 @@ export default function VotingScreenPage() {
     );
   }
 
-  if (isLoading) {
-    return (
-      <main className="flex min-h-svh items-center justify-center bg-[#0d1526] text-[#8899aa]">
-        Cargando votacion...
-      </main>
-    );
-  }
-
-  if (error || !pitch) {
-    return (
-      <main className="flex min-h-svh items-center justify-center bg-[#0d1526] px-6 text-center text-[#8899aa]">
-        No pudimos cargar este pitch.
-      </main>
-    );
-  }
-
-  if (pitch.eventStatus !== "OPEN" || pitch.pitchStatus !== "OPEN") {
-    return (
-      <main className="flex min-h-svh items-center justify-center bg-[#0d1526] px-6 text-center text-white">
-        <div className="rounded-[24px] border border-[#263550] bg-[#1a2640] px-8 py-10">
-          La votacion para este pitch ya esta cerrada.
-        </div>
-      </main>
-    );
-  }
-
   return (
     <main className="min-h-svh bg-[#0d1526] px-4 py-4 text-white md:px-8 md:py-6">
       <div className="mx-auto flex min-h-svh w-full max-w-[1440px] flex-col gap-4">
@@ -201,7 +247,9 @@ export default function VotingScreenPage() {
                 </span>
               </div>
               <span className="text-sm text-[#8899aa]">
-                Evalua el pitch y envia tu voto.
+                {isVotingClosed
+                  ? "La votacion esta cerrada. Tu voto queda en modo lectura."
+                  : "Evalua el pitch y envia tu voto."}
               </span>
             </div>
           </div>
@@ -226,9 +274,11 @@ export default function VotingScreenPage() {
               {pitch.description}
             </p>
             <div className="mt-6 rounded-2xl border border-dashed border-[#263550] bg-[#0d1526] px-4 py-4 text-sm leading-6 text-[#8899aa]">
-              {hasAlreadyVoted
-                ? "Este correo ya registro un voto para este pitch."
-                : "Tu voto cuenta una sola vez por correo electronico. Toma unos segundos para evaluar de forma honesta cada criterio."}
+              {isVotingClosed
+                ? "La votacion para este pitch ya esta cerrada. Puedes ver las estrellas y el comentario guardados, pero no modificarlos."
+                : hasSavedVote
+                  ? "Este correo ya registro un voto para este pitch. Puedes editarlo mientras el pitch siga abierto."
+                  : "Tu voto cuenta una sola vez por correo electronico. Toma unos segundos para evaluar de forma honesta cada criterio."}
             </div>
             <button
               type="button"
@@ -256,13 +306,13 @@ export default function VotingScreenPage() {
                         {criterion.weight}%
                       </span>
                       <span className="text-sm text-[#a9b3c9]">
-                        {getRatingLabel(scores[criterion.id])}
+                        {getRatingLabel(getSelectedScore(criterion.id))}
                       </span>
                     </div>
                   </div>
                   <div className="mt-6 flex items-center gap-2">
                     {[1, 2, 3, 4, 5].map((value) => {
-                      const selectedScore = scores[criterion.id] ?? 0;
+                      const selectedScore = getSelectedScore(criterion.id) ?? 0;
                       const selected = selectedScore >= value;
 
                       return (
@@ -270,9 +320,9 @@ export default function VotingScreenPage() {
                           key={value}
                           type="button"
                           onClick={() => updateScore(criterion.id, value)}
-                          disabled={hasAlreadyVoted}
+                          disabled={isVotingClosed}
                           aria-label={`Calificar ${criterion.label} con ${value} estrellas`}
-                          className="rounded-md p-1 transition disabled:cursor-not-allowed"
+                          className="rounded-md p-1 transition hover:bg-[#263550] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-transparent"
                         >
                           <Star
                             className={`size-7 ${
@@ -298,10 +348,10 @@ export default function VotingScreenPage() {
               </label>
               <textarea
                 id="comment"
-                value={comment}
-                onChange={(event) => setComment(event.target.value)}
+                value={commentDraft ?? pitch.currentVote?.comment ?? ""}
+                onChange={(event) => setCommentDraft(event.target.value)}
                 placeholder="Que te dirias del equipo o de la solucion?"
-                disabled={hasAlreadyVoted}
+                disabled={isVotingClosed}
                 className="mt-4 min-h-28 w-full rounded-2xl border border-[#263550] bg-[#0d1526] px-4 py-3 text-sm text-white outline-none placeholder:text-[#66738f]"
               />
             </section>
@@ -316,7 +366,7 @@ export default function VotingScreenPage() {
               <div className="rounded-2xl border border-[#263550] bg-[#121d30] p-4 text-sm text-[#83ce00]">
                 <div className="inline-flex items-center gap-2">
                   <CheckCircle2 className="size-4" />
-                  Ya votaste en este pitch.
+                  Voto guardado. Puedes seguir editandolo mientras el pitch este abierto.
                 </div>
               </div>
             )}
@@ -338,10 +388,16 @@ export default function VotingScreenPage() {
               </Button>
               <Button
                 type="submit"
-                disabled={isPending || hasAlreadyVoted}
+                disabled={isPending || isVotingClosed}
                 className="h-12 rounded-full bg-[#83ce00] px-6 text-sm font-bold italic text-[#0d1526] hover:bg-[#a7ea2e]"
               >
-                {isPending ? "Enviando..." : hasAlreadyVoted ? "Ya votaste" : "Enviar voto"}
+                {isVotingClosed
+                  ? "Pitch cerrado"
+                  : isPending
+                  ? "Guardando..."
+                  : hasSavedVote
+                    ? "Guardar cambios"
+                    : "Enviar voto"}
               </Button>
             </div>
           </form>

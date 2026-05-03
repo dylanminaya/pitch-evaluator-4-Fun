@@ -8,6 +8,6 @@ export function usePublicPitch(pitchId?: string, evaluatorEmail?: string | null)
   return useQuery<PublicPitch>({
     queryKey: ["public-pitch", pitchId, evaluatorEmail],
     queryFn: () => getPublicPitch(pitchId!, evaluatorEmail ?? undefined),
-    enabled: Boolean(pitchId) && evaluatorEmail !== null,
+    enabled: Boolean(pitchId),
   });
 }

@@ -25,7 +25,7 @@ export const presentVote = (vote: {
   impact: vote.impact,
   presentation: vote.presentation,
   comment: vote.comment ?? null,
-  createdAt: vote.createdAt ?? null,
+  createdAt: vote.createdAt instanceof Date ? vote.createdAt.toISOString() : (vote.createdAt ?? null),
 });
 
 // Convierte valores agregados del ranking a numeros consistentes.

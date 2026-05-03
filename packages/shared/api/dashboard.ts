@@ -218,6 +218,7 @@ export const publicPitchSchema = z.object({
   logoUrl: z.string().nullable(),
   eventStatus: z.enum(["OPEN", "CLOSED"]),
   hasVoted: z.boolean(),
+  currentVote: dashboardVoteSchema.nullable().optional(),
   criteria: z.array(eventCriterionSchema),
 });
 

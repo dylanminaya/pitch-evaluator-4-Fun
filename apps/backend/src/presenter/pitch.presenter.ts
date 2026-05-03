@@ -30,6 +30,7 @@ export const presentPublicPitch = (pitch: {
   logoUrl?: string | null;
   eventStatus: "OPEN" | "CLOSED";
   hasVoted?: boolean;
+  currentVote?: unknown;
 }) => ({
   id: pitch.id,
   eventId: pitch.eventId,
@@ -40,6 +41,7 @@ export const presentPublicPitch = (pitch: {
   logoUrl: pitch.logoUrl ?? null,
   eventStatus: pitch.eventStatus,
   hasVoted: pitch.hasVoted ?? false,
+  currentVote: pitch.currentVote ?? null,
 });
 
 // Resumen detallado del pitch con promedios y conteos.
@@ -77,7 +79,7 @@ export const presentPitchComment = (comment: {
 }) => ({
   id: comment.id,
   comment: comment.comment,
-  createdAt: comment.createdAt,
+  createdAt: comment.createdAt instanceof Date ? comment.createdAt.toISOString() : comment.createdAt,
 });
 
 // Agrupa el payload del resumen con la lista de comentarios.
