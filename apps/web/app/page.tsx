@@ -4,9 +4,9 @@ import { LoginForm } from "@/components/login-form";
 export default async function Page({
   searchParams,
 }: {
-  searchParams: Promise<{ redirect?: string }>;
+  searchParams: Promise<{ redirect?: string; switchAccount?: string }>;
 }) {
-  const { redirect } = await searchParams;
+  const { redirect, switchAccount } = await searchParams;
 
   return (
     <AuthShell
@@ -17,7 +17,7 @@ export default async function Page({
       ctaLabel="Crear cuenta organizer"
       accent="Accede con tu cuenta para administrar el evento, activar el QR del pitch actual y seguir el ranking en tiempo real."
     >
-        <LoginForm redirectTo={redirect} />
+        <LoginForm redirectTo={redirect} forceSignOut={switchAccount === "1"} />
     </AuthShell>
   );
 }

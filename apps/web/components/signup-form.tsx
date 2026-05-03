@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Button } from "@workspace/ui/components/button";
 import {
@@ -18,15 +18,23 @@ import {
 } from "@workspace/ui/components/field";
 import { Input } from "@workspace/ui/components/input";
 import { useSignUp } from "@/hooks/auth";
+import { signOut } from "@/lib/better-auth/auth-client";
 
 export function SignupForm({
   redirectTo,
+  forceSignOut = false,
   ...props
-}: React.ComponentProps<typeof Card> & { redirectTo?: string }) {
+}: React.ComponentProps<typeof Card> & { redirectTo?: string; forceSignOut?: boolean }) {
   const { mutate, isPending, error: mutationError } = useSignUp(redirectTo);
   const [confirmError, setConfirmError] = useState<string | null>(null);
 
   const error = confirmError ?? mutationError?.message ?? null;
+
+  useEffect(() => {
+    if (!forceSignOut) return;
+
+    void signOut();
+  }, [forceSignOut]);
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();

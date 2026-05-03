@@ -1,7 +1,7 @@
 "use client";
 
-import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useEffect, useRef } from "react";
+import { useParams } from "next/navigation";
 import { CheckCircle2, Clock3, Mail, ShieldCheck } from "lucide-react";
 import { Button } from "@workspace/ui/components/button";
 import { useSession } from "@/lib/better-auth/auth-client";
@@ -12,8 +12,8 @@ import {
 
 export default function OrganizerInvitationPage() {
   const params = useParams<{ token: string }>();
-  const router = useRouter();
   const token = params.token;
+  const autoAcceptStartedRef = useRef(false);
   const { data: sessionData, isPending: isLoadingSession } = useSession();
   const {
     data: invitation,
@@ -30,8 +30,63 @@ export default function OrganizerInvitationPage() {
     if (!token) return;
 
     const result = await acceptInvitation(token);
-    router.push(`/dashboard?eventId=${result.eventId}`);
+    window.location.assign(`/dashboard?eventId=${result.eventId}`);
   }
+
+  const sessionUserEmail =
+    sessionData?.user && typeof sessionData.user === "object" && "email" in sessionData.user
+      ? String(sessionData.user.email ?? "")
+      : null;
+  const emailMatchesSession =
+    invitation !== undefined &&
+    sessionUserEmail !== null &&
+    sessionUserEmail.toLowerCase() === invitation.email.toLowerCase();
+  const invitationPath = `/organizer-invitations/${token}`;
+  const authRedirect = `/?redirect=${encodeURIComponent(invitationPath)}`;
+  const signupRedirect = `/signup?redirect=${encodeURIComponent(invitationPath)}`;
+  const switchAuthRedirect = `${authRedirect}&switchAccount=1`;
+  const switchSignupRedirect = `${signupRedirect}&switchAccount=1`;
+
+  function goToLogin() {
+    window.location.assign(switchAuthRedirect);
+  }
+
+  function goToSignup() {
+    window.location.assign(switchSignupRedirect);
+  }
+
+  function goToDashboard(eventId: string) {
+    window.location.assign(`/dashboard?eventId=${eventId}`);
+  }
+
+  useEffect(() => {
+    if (
+      !token ||
+      !invitation ||
+      invitation.status !== "PENDING" ||
+      !sessionData ||
+      !emailMatchesSession ||
+      autoAcceptStartedRef.current
+    ) {
+      return;
+    }
+
+    autoAcceptStartedRef.current = true;
+
+    acceptInvitation(token)
+      .then((result) => {
+        goToDashboard(result.eventId);
+      })
+      .catch(() => {
+        autoAcceptStartedRef.current = false;
+      });
+  }, [
+    acceptInvitation,
+    emailMatchesSession,
+    invitation,
+    sessionData,
+    token,
+  ]);
 
   if (isLoading) {
     return (
@@ -51,15 +106,6 @@ export default function OrganizerInvitationPage() {
 
   const isPending = invitation.status === "PENDING";
   const isAccepted = invitation.status === "ACCEPTED";
-  const sessionUserEmail =
-    sessionData?.user && typeof sessionData.user === "object" && "email" in sessionData.user
-      ? String(sessionData.user.email ?? "")
-      : null;
-  const emailMatchesSession =
-    sessionUserEmail !== null &&
-    sessionUserEmail.toLowerCase() === invitation.email.toLowerCase();
-  const authRedirect = `/?redirect=/organizer-invitations/${token}`;
-  const signupRedirect = `/signup?redirect=/organizer-invitations/${token}`;
 
   return (
     <main className="min-h-svh bg-[#0d1526] px-4 py-10 text-white">
@@ -123,19 +169,21 @@ export default function OrganizerInvitationPage() {
             {isAccepted ? (
               !sessionData ? (
                 <div className="mt-6 flex gap-3">
-                  <Link href={authRedirect} className="flex-1">
-                    <Button className="h-12 w-full rounded-full bg-[#83ce00] text-sm font-bold italic text-[#0d1526] hover:bg-[#a7ea2e]">
-                      Iniciar sesion
-                    </Button>
-                  </Link>
-                  <Link href={signupRedirect} className="flex-1">
-                    <Button
-                      variant="outline"
-                      className="h-12 w-full rounded-full border-[#263550] bg-[#0d1526] text-white hover:bg-[#121d30] hover:text-white"
-                    >
-                      Crear cuenta
-                    </Button>
-                  </Link>
+                  <Button
+                    type="button"
+                    onClick={goToLogin}
+                    className="h-12 flex-1 rounded-full bg-[#83ce00] text-sm font-bold italic text-[#0d1526] hover:bg-[#a7ea2e]"
+                  >
+                    Aceptar invitacion
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={goToSignup}
+                    className="h-12 flex-1 rounded-full border-[#263550] bg-[#0d1526] text-white hover:bg-[#121d30] hover:text-white"
+                  >
+                    Crear cuenta
+                  </Button>
                 </div>
               ) : !emailMatchesSession ? (
                 <div className="mt-6 rounded-2xl border border-[#5a2433] bg-[#2a1018] px-4 py-4 text-sm text-[#ff8cab]">
@@ -144,19 +192,21 @@ export default function OrganizerInvitationPage() {
                 </div>
               ) : (
                 <div className="mt-6 flex gap-3">
-                  <Link href={`/dashboard?eventId=${invitation.eventId}`} className="flex-1">
-                    <Button className="h-12 w-full rounded-full bg-[#83ce00] text-sm font-bold italic text-[#0d1526] hover:bg-[#a7ea2e]">
-                      Ir al dashboard
-                    </Button>
-                  </Link>
-                  <Link href="/events" className="flex-1">
-                    <Button
-                      variant="outline"
-                      className="h-12 w-full rounded-full border-[#263550] bg-[#0d1526] text-white hover:bg-[#121d30] hover:text-white"
-                    >
-                      Ver eventos
-                    </Button>
-                  </Link>
+                  <Button
+                    type="button"
+                    onClick={() => goToDashboard(invitation.eventId)}
+                    className="h-12 flex-1 rounded-full bg-[#83ce00] text-sm font-bold italic text-[#0d1526] hover:bg-[#a7ea2e]"
+                  >
+                    Ir al dashboard
+                  </Button>
+                  {/* <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => window.location.assign("/events")}
+                    className="h-12 flex-1 rounded-full border-[#263550] bg-[#0d1526] text-white hover:bg-[#121d30] hover:text-white"
+                  >
+                    Ver eventos
+                  </Button> */}
                 </div>
               )
             ) : !isPending ? (
@@ -169,24 +219,45 @@ export default function OrganizerInvitationPage() {
               </div>
             ) : !sessionData ? (
               <div className="mt-6 flex gap-3">
-                <Link href={authRedirect} className="flex-1">
-                  <Button className="h-12 w-full rounded-full bg-[#83ce00] text-sm font-bold italic text-[#0d1526] hover:bg-[#a7ea2e]">
-                    Iniciar sesion
-                  </Button>
-                </Link>
-                <Link href={signupRedirect} className="flex-1">
+                <Button
+                  type="button"
+                  onClick={goToLogin}
+                  className="h-12 flex-1 rounded-full bg-[#83ce00] text-sm font-bold italic text-[#0d1526] hover:bg-[#a7ea2e]"
+                >
+                  Aceptar invitacion
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={goToSignup}
+                  className="h-12 flex-1 rounded-full border-[#263550] bg-[#0d1526] text-white hover:bg-[#121d30] hover:text-white"
+                >
+                  Crear cuenta
+                </Button>
+              </div>
+            ) : !emailMatchesSession ? (
+              <div className="mt-6 space-y-4">
+                <div className="rounded-2xl border border-[#5a2433] bg-[#2a1018] px-4 py-4 text-sm text-[#ff8cab]">
+                  Tu sesion actual no coincide con el email invitado. Debes entrar con{" "}
+                  <span className="font-semibold">{invitation.email}</span>.
+                </div>
+                <div className="flex gap-3">
                   <Button
+                    type="button"
+                    onClick={goToLogin}
+                    className="h-12 flex-1 rounded-full bg-[#ff8cab] text-sm font-bold italic text-[#0d1526] transition-colors hover:bg-[#ffb5c7]"
+                  >
+                    Cambiar sesion
+                  </Button>
+                  <Button
+                    type="button"
                     variant="outline"
-                    className="h-12 w-full rounded-full border-[#263550] bg-[#0d1526] text-white hover:bg-[#121d30] hover:text-white"
+                    onClick={goToSignup}
+                    className="h-12 flex-1 rounded-full border-[#00f0ff] bg-[#071a2c] text-[#dffcff] transition-colors hover:bg-[#00f0ff] hover:text-[#0d1526]"
                   >
                     Crear cuenta
                   </Button>
-                </Link>
-              </div>
-            ) : !emailMatchesSession ? (
-              <div className="mt-6 rounded-2xl border border-[#5a2433] bg-[#2a1018] px-4 py-4 text-sm text-[#ff8cab]">
-                Tu sesion actual no coincide con el email invitado. Debes entrar con{" "}
-                <span className="font-semibold">{invitation.email}</span>.
+                </div>
               </div>
             ) : (
               <div className="mt-6 flex gap-3">
@@ -198,14 +269,14 @@ export default function OrganizerInvitationPage() {
                 >
                   {isAccepting ? "Aceptando..." : "Aceptar invitacion"}
                 </Button>
-                <Link href="/events" className="flex-1">
-                  <Button
-                    variant="outline"
-                    className="h-12 w-full rounded-full border-[#263550] bg-[#0d1526] text-white hover:bg-[#121d30] hover:text-white"
-                  >
-                    Volver
-                  </Button>
-                </Link>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => window.location.assign("/events")}
+                  className="h-12 flex-1 rounded-full border-[#263550] bg-[#0d1526] text-white hover:bg-[#121d30] hover:text-white"
+                >
+                  Volver
+                </Button>
               </div>
             )}
           </div>

@@ -18,7 +18,7 @@ export async function sendOrganizerInvitationEmail(params: {
   const { to, eventName, inviterEmail, inviteUrl } = params;
 
   // Resend envia el correo usando el remitente configurado en .env.
-  await resend.emails.send({
+  const { data, error } = await resend.emails.send({
     from: env.EMAIL_FROM,
     to,
     subject: `Invitacion para organizar ${eventName}`,
@@ -39,4 +39,12 @@ export async function sendOrganizerInvitationEmail(params: {
         </div>
         `,
   });
+
+  if (error) {
+    throw new Error(
+      `Resend failed to send organizer invitation: ${error.name} ${error.statusCode ?? ""} ${error.message}`.trim(),
+    );
+  }
+
+  return data;
 }
