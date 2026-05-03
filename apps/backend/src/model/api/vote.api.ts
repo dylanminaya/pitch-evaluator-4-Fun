@@ -146,21 +146,17 @@ voteRouter.post("/", async (req, res) => {
       return res.status(400).json({ message: criteriaValidationError });
     }
 
-    const innovation = getScoreByCriterionId(criteriaScores, "innovation");
-    const viability = getScoreByCriterionId(criteriaScores, "viability");
-    const impact = getScoreByCriterionId(criteriaScores, "impact");
-    const presentation = getScoreByCriterionId(criteriaScores, "presentation");
-
-    if (
-      innovation === null ||
-      viability === null ||
-      impact === null ||
-      presentation === null
-    ) {
-      return res.status(400).json({
-        message: "Missing one or more required default criteria scores",
-      });
-    }
+    const legacyScoreFallback =
+      criteriaScores.length > 0
+        ? Math.round(
+            criteriaScores.reduce((sum, criterion) => sum + criterion.score, 0) /
+              criteriaScores.length,
+          )
+        : 3;
+    const innovation = getScoreByCriterionId(criteriaScores, "innovation") ?? legacyScoreFallback;
+    const viability = getScoreByCriterionId(criteriaScores, "viability") ?? legacyScoreFallback;
+    const impact = getScoreByCriterionId(criteriaScores, "impact") ?? legacyScoreFallback;
+    const presentation = getScoreByCriterionId(criteriaScores, "presentation") ?? legacyScoreFallback;
 
     // Evita voto duplicado por correo electronico.
     let existingVoteResult;

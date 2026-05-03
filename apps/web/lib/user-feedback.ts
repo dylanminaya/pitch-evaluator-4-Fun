@@ -144,12 +144,12 @@ export function getEventFormIssues(input: {
     );
   }
 
-  if (input.criteria.length < 1) {
+  if (input.criteria.length < 2) {
     issues.push(
       createItem(
         "event-criteria-min",
         "No hay criterios suficientes para evaluar.",
-        "Deja por lo menos 1 criterio activo.",
+        "Deja por lo menos 2 criterios activos.",
       ),
     );
   }

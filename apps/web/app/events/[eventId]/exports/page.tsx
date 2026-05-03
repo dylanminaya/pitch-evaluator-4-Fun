@@ -360,7 +360,7 @@ export default function EventExportsPage() {
           </div>
         </header>
 
-        <section className="mt-6 grid gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
+        <section className="mt-6 grid items-start gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
           <aside className="space-y-4">
             <div className="rounded-[24px] border border-[#263550] bg-[#1a2640] p-6 shadow-[0_18px_45px_rgba(2,8,23,0.35)]">
               <p className="text-[11px] font-bold uppercase italic tracking-[0.3em] text-[#83ce00]">
@@ -423,7 +423,7 @@ export default function EventExportsPage() {
             </div>
           </aside>
 
-          <section className="overflow-hidden rounded-[24px] border border-[#263550] bg-[#1a2640] shadow-[0_18px_45px_rgba(2,8,23,0.35)]">
+          <section className="self-start overflow-hidden rounded-[24px] border border-[#263550] bg-[#1a2640] shadow-[0_18px_45px_rgba(2,8,23,0.35)]">
             <div className="flex flex-col gap-4 border-b border-[#263550] bg-[#121d30] px-5 py-4 md:flex-row md:items-center md:justify-between">
               <div>
                 <p className="text-[11px] font-bold uppercase italic tracking-[0.3em] text-[#83ce00]">

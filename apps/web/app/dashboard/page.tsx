@@ -143,7 +143,7 @@ function DashboardPageContent() {
   // Tarjetas resumen que muestran las métricas principales.
   const stats = [
     {
-      label: "Pitches activos",
+      label: "Pitches",
       value: String(pitches.length),
       accent: "text-white",
     },
