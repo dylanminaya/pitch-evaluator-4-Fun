@@ -10,18 +10,20 @@ import {
   Trash2,
   Plus,
   Search,
+  UserRoundCheck,
   Users,
 } from "lucide-react";
 import { Button } from "@workspace/ui/components/button";
 import { useSignOut } from "@/hooks/auth";
 import { useDeleteEvent, useEvents } from "@/hooks/dashboard";
 
-type FilterKey = "all" | "open" | "closed";
+type FilterKey = "all" | "open" | "closed" | "groups";
 
 const filterLabels: Record<FilterKey, string> = {
   all: "Todo",
   open: "Activos",
   closed: "Cerrados",
+  groups: "Grupos",
 };
 
 const accentTones = [
@@ -58,7 +60,13 @@ export default function EventsPage() {
 
     return events.filter((event) => {
       const matchesFilter =
-        filter === "all" ? true : filter === "open" ? event.status === "OPEN" : event.status === "CLOSED";
+        filter === "all"
+          ? true
+          : filter === "open"
+            ? event.status === "OPEN"
+            : filter === "closed"
+              ? event.status === "CLOSED"
+              : event.accessRole === "CO_ORGANIZER";
 
       const matchesSearch =
         normalizedSearch.length === 0 ||
@@ -229,11 +237,17 @@ export default function EventsPage() {
                             <CircleDot className="size-4" />
                             <span>{isOpen ? "Recepcionando votos" : "Sesion cerrada"}</span>
                           </div>
+                          {event.accessRole === "CO_ORGANIZER" ? (
+                            <div className="inline-flex items-center gap-2">
+                              <UserRoundCheck className="size-4" />
+                              <span>Invitado a coordinar</span>
+                            </div>
+                          ) : null}
                         </div>
 
                         <div className="flex items-center justify-between">
                           <span className="text-[11px] font-bold uppercase italic tracking-[0.28em] text-[#83ce00]">
-                            Abrir dashboard
+                            {event.accessRole === "CO_ORGANIZER" ? "Eres co-organizer" : "Abrir dashboard"}
                           </span>
                           <div className="inline-flex items-center gap-2 rounded-full border border-[#263550] bg-[#0d1526] px-4 py-2 text-sm font-semibold text-white">
                             Entrar

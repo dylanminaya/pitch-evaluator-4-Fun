@@ -8,6 +8,7 @@ export const presentEvent = (event: {
   status: "OPEN" | "CLOSED";
   createdAt?: Date | string;
   organizerId: string;
+  accessRole?: "OWNER" | "CO_ORGANIZER";
   criteria?: unknown;
 }) => ({
   id: event.id,
@@ -16,6 +17,7 @@ export const presentEvent = (event: {
   status: event.status,
   createdAt: event.createdAt instanceof Date ? event.createdAt.toISOString() : (event.createdAt ?? null),
   organizerId: event.organizerId,
+  accessRole: event.accessRole ?? "OWNER",
   criteria: normalizeEventCriteria(event.criteria),
 });
 

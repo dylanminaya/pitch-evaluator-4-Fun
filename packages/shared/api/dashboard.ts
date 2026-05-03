@@ -75,6 +75,7 @@ export const dashboardEventSchema = z.object({
   status: z.enum(["OPEN", "CLOSED"]),
   createdAt: z.string().nullable(),
   organizerId: z.string(),
+  accessRole: z.enum(["OWNER", "CO_ORGANIZER"]).default("OWNER"),
   criteria: z.array(eventCriterionSchema),
 });
 

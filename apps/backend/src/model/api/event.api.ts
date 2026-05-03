@@ -105,6 +105,10 @@ eventRouter.get("/", async (req, res) => {
           e.status,
           e."createdAt",
           e."organizerId",
+          CASE
+            WHEN e."organizerId" = $1 THEN 'OWNER'
+            ELSE 'CO_ORGANIZER'
+          END AS "accessRole",
           e.criteria
         FROM event e
         LEFT JOIN event_organizer eo ON eo."eventId" = e.id
@@ -133,7 +137,11 @@ eventRouter.get("/", async (req, res) => {
             e.description,
             e.status,
             e."createdAt",
-            e."organizerId"
+            e."organizerId",
+            CASE
+              WHEN e."organizerId" = $1 THEN 'OWNER'
+              ELSE 'CO_ORGANIZER'
+            END AS "accessRole"
           FROM event e
           LEFT JOIN event_organizer eo ON eo."eventId" = e.id
           WHERE e."organizerId" = $1
