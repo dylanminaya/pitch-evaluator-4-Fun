@@ -506,6 +506,8 @@ voteRouter.get("/ranking", async (req, res) => {
                 p.description,
                 p.color,
                 p."logoUrl",
+                p."presentationUrl",
+                p."presentationFileName",
                 COUNT(v.id)::int AS "votesCount",
                 COALESCE(ROUND(AVG(v.innovation)::numeric, 2), 0) AS "innovationAvg",
                 COALESCE(ROUND(AVG(v.viability)::numeric, 2), 0) AS "viabilityAvg",
@@ -524,6 +526,8 @@ voteRouter.get("/ranking", async (req, res) => {
                 p.description,
                 p.color,
                 p."logoUrl",
+                p."presentationUrl",
+                p."presentationFileName",
                 e.criteria,
                 p."createdAt"
               ORDER BY "scoreAvg" DESC, "votesCount" DESC, p."createdAt" ASC
@@ -544,6 +548,8 @@ voteRouter.get("/ranking", async (req, res) => {
                 p.description,
                 p.color,
                 p."logoUrl",
+                NULL AS "presentationUrl",
+                NULL AS "presentationFileName",
                 COUNT(v.id)::int AS "votesCount",
                 COALESCE(ROUND(AVG(v.innovation)::numeric, 2), 0) AS "innovationAvg",
                 COALESCE(ROUND(AVG(v.viability)::numeric, 2), 0) AS "viabilityAvg",

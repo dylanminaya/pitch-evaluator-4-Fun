@@ -32,11 +32,31 @@ CREATE TABLE IF NOT EXISTS pitch (
   status        TEXT        NOT NULL DEFAULT 'OPEN' CHECK (status IN ('OPEN', 'CLOSED')),
   color         TEXT        NOT NULL,
   "logoUrl"     TEXT,
+  "presentationUrl" TEXT,
+  "presentationFileName" TEXT,
+  "presentationContentType" TEXT,
+  "presentationFile" BYTEA,
+  "presentationPdf" BYTEA,
   "createdAt"   TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 ALTER TABLE pitch
 ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'OPEN';
+
+ALTER TABLE pitch
+ADD COLUMN IF NOT EXISTS "presentationUrl" TEXT;
+
+ALTER TABLE pitch
+ADD COLUMN IF NOT EXISTS "presentationFileName" TEXT;
+
+ALTER TABLE pitch
+ADD COLUMN IF NOT EXISTS "presentationContentType" TEXT;
+
+ALTER TABLE pitch
+ADD COLUMN IF NOT EXISTS "presentationFile" BYTEA;
+
+ALTER TABLE pitch
+ADD COLUMN IF NOT EXISTS "presentationPdf" BYTEA;
 
 CREATE TABLE IF NOT EXISTS vote (
   id            TEXT        PRIMARY KEY,

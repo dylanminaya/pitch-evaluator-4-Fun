@@ -8,6 +8,7 @@ import { Button } from "@workspace/ui/components/button";
 import { Input } from "@workspace/ui/components/input";
 import { FeedbackPanel } from "@/components/feedback-panel";
 import { useCreatePitch } from "@/hooks/dashboard";
+import { uploadPitchPresentation } from "@/lib/dashboard-api";
 import { getFriendlyErrorItems, getPitchFormIssues } from "@/lib/user-feedback";
 
 export default function NewPitchPage() {
@@ -19,6 +20,7 @@ export default function NewPitchPage() {
   const [description, setDescription] = useState("");
   const [color, setColor] = useState("#83CE00");
   const [logoUrl, setLogoUrl] = useState("");
+  const [presentationFile, setPresentationFile] = useState<File | null>(null);
   const [hasTriedSubmit, setHasTriedSubmit] = useState(false);
   const formIssues = useMemo(
     () => getPitchFormIssues({ name, description, color, logoUrl }),
@@ -46,6 +48,10 @@ export default function NewPitchPage() {
       color,
       logoUrl: logoUrl.trim() || null,
     });
+
+    if (presentationFile) {
+      await uploadPitchPresentation(createdPitch.id, presentationFile);
+    }
 
     router.push(
       `/dashboard?eventId=${createdPitch.eventId}&pitchId=${createdPitch.id}`,
@@ -180,6 +186,22 @@ export default function NewPitchPage() {
                     className="h-12 rounded-2xl border-[#263550] bg-[#0d1526] px-4 text-white placeholder:text-[#66738f]"
                   />
                 </div>
+              </div>
+
+              <div className="flex flex-col gap-3">
+                <label className="text-xs font-bold uppercase italic tracking-[0.24em] text-[#8899aa]">
+                  PowerPoint opcional
+                </label>
+                <Input
+                  type="file"
+                  accept=".ppt,.pptx,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation"
+                  onChange={(event) => setPresentationFile(event.target.files?.[0] ?? null)}
+                  disabled={isPending}
+                  className="h-12 rounded-2xl border-[#263550] bg-[#0d1526] px-4 py-2 text-white file:mr-4 file:rounded-full file:border-0 file:bg-[#83ce00] file:px-4 file:py-1.5 file:text-sm file:font-bold file:text-[#0d1526]"
+                />
+                <p className="text-xs text-[#8899aa]">
+                  Sube un archivo .ppt o .pptx. Se proyectara con un visor de PowerPoint en el navegador.
+                </p>
               </div>
             </div>
           </form>

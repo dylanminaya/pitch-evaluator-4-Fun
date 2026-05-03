@@ -1,4 +1,4 @@
-import { apiFetch, apiFetchBlob, apiFetchVoid } from "./api/client";
+import { apiFetch, apiFetchBlob, apiFetchFile, apiFetchVoid } from "./api/client";
 
 import {
   type CreatePublicVote,
@@ -73,6 +73,10 @@ export function updatePitch(pitchId: string, data: UpdateDashboardPitch) {
     method: "PATCH",
     body: JSON.stringify(data),
   });
+}
+
+export function uploadPitchPresentation(pitchId: string, file: File) {
+  return apiFetchFile<DashboardPitch>(`/api/pitch/${pitchId}/presentation`, file);
 }
 
 export function updatePitchStatus(

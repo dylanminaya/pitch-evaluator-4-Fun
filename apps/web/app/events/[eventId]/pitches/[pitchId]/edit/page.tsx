@@ -8,6 +8,7 @@ import { Button } from "@workspace/ui/components/button";
 import { Input } from "@workspace/ui/components/input";
 import { FeedbackPanel } from "@/components/feedback-panel";
 import { usePitches, useUpdatePitch } from "@/hooks/dashboard";
+import { uploadPitchPresentation } from "@/lib/dashboard-api";
 import { getFriendlyErrorItems, getPitchFormIssues } from "@/lib/user-feedback";
 import type { DashboardPitch } from "@workspace/shared/api";
 
@@ -26,6 +27,7 @@ function EditPitchForm({
   const [description, setDescription] = useState(pitch.description);
   const [color, setColor] = useState(pitch.color);
   const [logoUrl, setLogoUrl] = useState(pitch.logoUrl ?? "");
+  const [presentationFile, setPresentationFile] = useState<File | null>(null);
   const [hasTriedSubmit, setHasTriedSubmit] = useState(false);
   const formIssues = useMemo(
     () => getPitchFormIssues({ name, description, color, logoUrl }),
@@ -59,6 +61,10 @@ function EditPitchForm({
         logoUrl: logoUrl.trim() || null,
       },
     });
+
+    if (presentationFile) {
+      await uploadPitchPresentation(updatedPitch.id, presentationFile);
+    }
 
     router.push(
       `/dashboard?eventId=${updatedPitch.eventId}&pitchId=${updatedPitch.id}`,
@@ -192,6 +198,24 @@ function EditPitchForm({
                     className="h-12 rounded-2xl border-[#263550] bg-[#0d1526] px-4 text-white placeholder:text-[#66738f]"
                   />
                 </div>
+              </div>
+
+              <div className="flex flex-col gap-3">
+                <label className="text-xs font-bold uppercase italic tracking-[0.24em] text-[#8899aa]">
+                  PowerPoint opcional
+                </label>
+                <Input
+                  type="file"
+                  accept=".ppt,.pptx,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation"
+                  onChange={(event) => setPresentationFile(event.target.files?.[0] ?? null)}
+                  disabled={isPending}
+                  className="h-12 rounded-2xl border-[#263550] bg-[#0d1526] px-4 py-2 text-white file:mr-4 file:rounded-full file:border-0 file:bg-[#83ce00] file:px-4 file:py-1.5 file:text-sm file:font-bold file:text-[#0d1526]"
+                />
+                <p className="text-xs text-[#8899aa]">
+                  {pitch.presentationFileName
+                    ? `Archivo actual: ${pitch.presentationFileName}. Sube otro para reemplazarlo.`
+                    : "Sube un archivo .ppt o .pptx. Se proyectara con un visor de PowerPoint en el navegador."}
+                </p>
               </div>
             </div>
           </form>

@@ -7,6 +7,8 @@ export type Pitch = {
   status: "OPEN" | "CLOSED";
   color: string;
   logoUrl?: string | null;
+  presentationUrl?: string | null;
+  presentationFileName?: string | null;
   createdAt: Date;
 };
 
@@ -19,6 +21,8 @@ export type PublicPitch = {
   pitchStatus: "OPEN" | "CLOSED";
   color: string;
   logoUrl?: string | null;
+  presentationUrl?: string | null;
+  presentationFileName?: string | null;
   eventStatus: "OPEN" | "CLOSED";
 };
 
@@ -30,6 +34,8 @@ export type PitchDetail = {
   description: string;
   color: string;
   logoUrl: string | null;
+  presentationUrl: string | null;
+  presentationFileName: string | null;
   votesCount: number;
   innovationAvg: number;
   viabilityAvg: number;
@@ -69,6 +75,8 @@ export type PitchExportRow = {
   description: string;
   color: string;
   logoUrl: string | null;
+  presentationUrl: string | null;
+  presentationFileName: string | null;
   votesCount: number;
   innovationAvg: number;
   viabilityAvg: number;

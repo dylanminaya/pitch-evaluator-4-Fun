@@ -7,6 +7,8 @@ export const presentPitch = (pitch: {
   status: "OPEN" | "CLOSED";
   color: string;
   logoUrl?: string | null;
+  presentationUrl?: string | null;
+  presentationFileName?: string | null;
   createdAt?: Date | string;
 }) => ({
   id: pitch.id,
@@ -16,6 +18,8 @@ export const presentPitch = (pitch: {
   status: pitch.status,
   color: pitch.color,
   logoUrl: pitch.logoUrl ?? null,
+  presentationUrl: pitch.presentationUrl ?? null,
+  presentationFileName: pitch.presentationFileName ?? null,
   createdAt: pitch.createdAt instanceof Date ? pitch.createdAt.toISOString() : (pitch.createdAt ?? null),
 });
 
@@ -28,6 +32,8 @@ export const presentPublicPitch = (pitch: {
   pitchStatus: "OPEN" | "CLOSED";
   color: string;
   logoUrl?: string | null;
+  presentationUrl?: string | null;
+  presentationFileName?: string | null;
   eventStatus: "OPEN" | "CLOSED";
   hasVoted?: boolean;
   currentVote?: unknown;
@@ -39,6 +45,8 @@ export const presentPublicPitch = (pitch: {
   pitchStatus: pitch.pitchStatus,
   color: pitch.color,
   logoUrl: pitch.logoUrl ?? null,
+  presentationUrl: pitch.presentationUrl ?? null,
+  presentationFileName: pitch.presentationFileName ?? null,
   eventStatus: pitch.eventStatus,
   hasVoted: pitch.hasVoted ?? false,
   currentVote: pitch.currentVote ?? null,
@@ -52,6 +60,8 @@ export const presentPitchDetail = (pitch: {
   description: string;
   color: string;
   logoUrl?: string | null;
+  presentationUrl?: string | null;
+  presentationFileName?: string | null;
   votesCount: number;
   innovationAvg: number;
   viabilityAvg: number;
@@ -64,6 +74,8 @@ export const presentPitchDetail = (pitch: {
   description: pitch.description,
   color: pitch.color,
   logoUrl: pitch.logoUrl ?? null,
+  presentationUrl: pitch.presentationUrl ?? null,
+  presentationFileName: pitch.presentationFileName ?? null,
   votesCount: pitch.votesCount,
   innovationAvg: pitch.innovationAvg,
   viabilityAvg: pitch.viabilityAvg,

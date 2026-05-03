@@ -36,6 +36,8 @@ export const presentPitchRanking = (pitch: {
   description: string;
   color: string;
   logoUrl?: string | null;
+  presentationUrl?: string | null;
+  presentationFileName?: string | null;
   votesCount: number;
   innovationAvg: number;
   viabilityAvg: number;
@@ -55,6 +57,8 @@ export const presentPitchRanking = (pitch: {
   description: pitch.description,
   color: pitch.color,
   logoUrl: pitch.logoUrl ?? null,
+  presentationUrl: pitch.presentationUrl ?? null,
+  presentationFileName: pitch.presentationFileName ?? null,
   votesCount: Number(pitch.votesCount),
   innovationAvg: Number(pitch.innovationAvg),
   viabilityAvg: Number(pitch.viabilityAvg),

@@ -2,7 +2,16 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, Pause, Play, RotateCcw, SlidersHorizontal, X } from "lucide-react";
+import {
+  ArrowLeft,
+  ChevronLeft,
+  ChevronRight,
+  Pause,
+  Play,
+  RotateCcw,
+  SlidersHorizontal,
+  X,
+} from "lucide-react";
 import { Button } from "@workspace/ui/components/button";
 import { Input } from "@workspace/ui/components/input";
 import { usePublicPitch } from "@/hooks/dashboard";
@@ -63,11 +72,17 @@ export default function ProjectorPitchPage() {
     : DEFAULT_MINUTES;
 
   const { data: pitch, isLoading, error } = usePublicPitch(pitchId);
+  const pitchLogoUrl = pitch?.logoUrl ?? null;
+  const pitchPresentationFileName = pitch?.presentationFileName ?? null;
   const [durationMinutes, setDurationMinutes] = useState(initialMinutes);
   const [timeLeftSeconds, setTimeLeftSeconds] = useState(initialMinutes * 60);
   const [isRunning, setIsRunning] = useState(false);
   const [showControls, setShowControls] = useState(false);
-  const [imageFailed, setImageFailed] = useState(false);
+  const [failedImageUrl, setFailedImageUrl] = useState<string | null>(null);
+  const [projectorMode, setProjectorMode] = useState<"presentation" | "image" | null>(null);
+  const [currentSlide, setCurrentSlide] = useState(1);
+  const [slidesCount, setSlidesCount] = useState(1);
+  const [presentationError, setPresentationError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isRunning) {
@@ -89,10 +104,6 @@ export default function ProjectorPitchPage() {
     return () => window.clearInterval(intervalId);
   }, [isRunning]);
 
-  useEffect(() => {
-    setImageFailed(false);
-  }, [pitch?.logoUrl]);
-
   const progress = useMemo(() => {
     const totalSeconds = durationMinutes * 60;
 
@@ -104,12 +115,132 @@ export default function ProjectorPitchPage() {
   }, [durationMinutes, timeLeftSeconds]);
 
   const proxiedImageUrl = useMemo(() => {
-    if (!pitch?.logoUrl) {
+    if (!pitchLogoUrl) {
       return null;
     }
 
-    return `/api/image-proxy?url=${encodeURIComponent(normalizeRemoteImageUrl(pitch.logoUrl))}`;
-  }, [pitch?.logoUrl]);
+    return `/api/image-proxy?url=${encodeURIComponent(normalizeRemoteImageUrl(pitchLogoUrl))}`;
+  }, [pitchLogoUrl]);
+
+  const presentationBaseUrl = useMemo(() => {
+    if (!pitchPresentationFileName) {
+      return null;
+    }
+
+    const configuredApiBaseUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
+    const apiBaseUrl =
+      configuredApiBaseUrl ||
+      (typeof window === "undefined" ? "" : window.location.origin);
+    return `${apiBaseUrl}/api/pitch/public/${encodeURIComponent(pitchId)}/presentation`;
+  }, [pitchId, pitchPresentationFileName]);
+
+  const currentSlideImageUrl =
+    presentationBaseUrl == null
+      ? null
+      : `${presentationBaseUrl}/page/${currentSlide}.png`;
+
+  const hasPresentation = Boolean(presentationBaseUrl);
+  const hasImage = Boolean(pitchLogoUrl);
+  const imageFailed = Boolean(pitchLogoUrl && failedImageUrl === pitchLogoUrl);
+  const activeProjectorMode =
+    projectorMode === "image" && hasImage
+      ? "image"
+      : projectorMode === "presentation" && hasPresentation
+        ? "presentation"
+        : hasPresentation
+          ? "presentation"
+          : "image";
+  const isShowingPresentation =
+    activeProjectorMode === "presentation" && hasPresentation;
+
+  useEffect(() => {
+    if (!presentationBaseUrl) {
+      setCurrentSlide(1);
+      setSlidesCount(1);
+      setPresentationError(null);
+      return;
+    }
+
+    let isMounted = true;
+
+    async function loadPresentationMeta() {
+      try {
+        setPresentationError(null);
+        const response = await fetch(`${presentationBaseUrl}/meta`, {
+          credentials: "include",
+          cache: "no-store",
+        });
+
+        if (!response.ok) {
+          throw new Error("No pudimos cargar las paginas de la presentacion.");
+        }
+
+        const data = (await response.json()) as { pagesCount?: number };
+        const nextSlidesCount = Math.max(Number(data.pagesCount ?? 1), 1);
+
+        if (!isMounted) {
+          return;
+        }
+
+        setSlidesCount(nextSlidesCount);
+        setCurrentSlide((current) => Math.min(Math.max(current, 1), nextSlidesCount));
+      } catch {
+        if (isMounted) {
+          setPresentationError("No pudimos preparar las diapositivas de este PowerPoint.");
+        }
+      }
+    }
+
+    loadPresentationMeta();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [presentationBaseUrl]);
+
+  function goToPreviousSlide() {
+    setCurrentSlide((current) => Math.max(current - 1, 1));
+  }
+
+  function goToNextSlide() {
+    setCurrentSlide((current) => Math.min(current + 1, slidesCount));
+  }
+
+  useEffect(() => {
+    if (!isShowingPresentation) {
+      return;
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "ArrowLeft" || event.key === "PageUp") {
+        event.preventDefault();
+        setCurrentSlide((current) => Math.max(current - 1, 1));
+      }
+
+      if (
+        event.key === "ArrowRight" ||
+        event.key === "PageDown" ||
+        event.key === " "
+      ) {
+        event.preventDefault();
+        setCurrentSlide((current) => Math.min(current + 1, slidesCount));
+      }
+
+      if (event.key === "Home") {
+        event.preventDefault();
+        setCurrentSlide(1);
+      }
+
+      if (event.key === "End") {
+        event.preventDefault();
+        setCurrentSlide(slidesCount);
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isShowingPresentation, slidesCount]);
 
   function applyMinutes(nextMinutes: number) {
     const normalizedMinutes = clampDuration(nextMinutes);
@@ -198,55 +329,98 @@ export default function ProjectorPitchPage() {
         </div>
       </div>
 
-      <div className="mx-auto flex min-h-svh w-full max-w-[1700px] flex-col px-4 pb-8 pt-20 md:px-8 md:pb-10 md:pt-28">
-        <section className="flex flex-1 flex-col overflow-hidden rounded-[36px] border border-white/10 bg-white/5 shadow-[0_28px_100px_rgba(0,0,0,0.35)]">
-          <div className="relative flex min-h-[420px] flex-1 items-center justify-center bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.02))] p-6 md:p-10">
-            {pitch.logoUrl ? (
-              <img
-                src={proxiedImageUrl ?? pitch.logoUrl}
-                alt={pitch.name}
-                className="max-h-[68vh] w-auto max-w-full rounded-[28px] object-contain shadow-[0_24px_80px_rgba(0,0,0,0.28)]"
-                onError={() => setImageFailed(true)}
-              />
-            ) : (
-              <div
-                className="flex h-full min-h-[320px] w-full items-center justify-center rounded-[28px] border border-dashed border-white/15 text-center"
-                style={{ backgroundColor: `${pitch.color}18` }}
-              >
-                <div className="px-6">
-                  <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-[#83ce00]">
-                    Sin imagen
-                  </p>
-                  <p className="mt-4 text-2xl font-black tracking-tight text-white md:text-5xl">
-                    {pitch.name}
-                  </p>
-                  <p className="mt-3 text-sm text-[#9cb1cf] md:text-base">
-                    Este pitch no tiene una URL de imagen configurada.
-                  </p>
+      {isShowingPresentation && currentSlideImageUrl ? (
+        <div className="absolute inset-0 z-0 flex items-center justify-center bg-black">
+          {presentationError ? (
+            <div className="mx-6 max-w-xl rounded-[28px] border border-[#5a2433] bg-[#2a1018]/90 px-6 py-5 text-center text-[#ffb7c9]">
+              {presentationError}
+            </div>
+          ) : (
+            <img
+              src={currentSlideImageUrl}
+              alt={`Diapositiva ${currentSlide} de ${pitch.name}`}
+              className="h-full w-full object-contain"
+            />
+          )}
+
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-black/70 to-transparent" />
+
+          <div className="pointer-events-auto absolute bottom-5 left-1/2 z-20 flex -translate-x-1/2 items-center gap-3 rounded-full border border-white/10 bg-black/70 px-3 py-2 shadow-[0_18px_50px_rgba(0,0,0,0.45)] backdrop-blur">
+            <Button
+              type="button"
+              onClick={goToPreviousSlide}
+              disabled={currentSlide <= 1}
+              className="h-10 w-10 rounded-full bg-white/10 p-0 text-white hover:bg-white/20 disabled:opacity-35"
+              aria-label="Diapositiva anterior"
+            >
+              <ChevronLeft className="size-5" />
+            </Button>
+            <span className="min-w-[86px] text-center text-sm font-bold text-white">
+              {currentSlide} / {slidesCount}
+            </span>
+            <Button
+              type="button"
+              onClick={goToNextSlide}
+              disabled={currentSlide >= slidesCount}
+              className="h-10 w-10 rounded-full bg-white/10 p-0 text-white hover:bg-white/20 disabled:opacity-35"
+              aria-label="Siguiente diapositiva"
+            >
+              <ChevronRight className="size-5" />
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <div className="mx-auto flex min-h-svh w-full max-w-[1700px] flex-col px-4 pb-8 pt-20 md:px-8 md:pb-10 md:pt-28">
+          <section className="flex flex-1 flex-col overflow-hidden rounded-[36px] border border-white/10 bg-white/5 shadow-[0_28px_100px_rgba(0,0,0,0.35)]">
+            <div className="relative flex min-h-[420px] flex-1 items-center justify-center bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.02))] p-6 md:p-10">
+              {pitch.logoUrl ? (
+                <img
+                  src={proxiedImageUrl ?? pitch.logoUrl}
+                  alt={pitch.name}
+                  className="max-h-[68vh] w-auto max-w-full rounded-[28px] object-contain shadow-[0_24px_80px_rgba(0,0,0,0.28)]"
+                  onError={() => setFailedImageUrl(pitch.logoUrl)}
+                  onLoad={() => setFailedImageUrl(null)}
+                />
+              ) : (
+                <div
+                  className="flex h-full min-h-[320px] w-full items-center justify-center rounded-[28px] border border-dashed border-white/15 text-center"
+                  style={{ backgroundColor: `${pitch.color}18` }}
+                >
+                  <div className="px-6">
+                    <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-[#83ce00]">
+                      Sin imagen
+                    </p>
+                    <p className="mt-4 text-2xl font-black tracking-tight text-white md:text-5xl">
+                      {pitch.name}
+                    </p>
+                    <p className="mt-3 text-sm text-[#9cb1cf] md:text-base">
+                      Este pitch no tiene una URL de imagen configurada.
+                    </p>
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {pitch.logoUrl && imageFailed && (
-              <div className="absolute bottom-4 left-4 right-4 rounded-2xl border border-[#5a2433] bg-[#2a1018]/90 px-4 py-3 text-sm text-[#ffb7c9] backdrop-blur">
-                No pudimos mostrar esta imagen. Prueba con un enlace directo al archivo o usa una URL publica de imagen.
-              </div>
-            )}
-          </div>
+              {pitch.logoUrl && imageFailed && (
+                <div className="absolute bottom-4 left-4 right-4 rounded-2xl border border-[#5a2433] bg-[#2a1018]/90 px-4 py-3 text-sm text-[#ffb7c9] backdrop-blur">
+                  No pudimos mostrar esta imagen. Prueba con un enlace directo al archivo o usa una URL publica de imagen.
+                </div>
+              )}
+            </div>
 
-          <div className="border-t border-white/10 bg-black/20 px-6 py-5 md:px-8 md:py-6">
-            <p className="text-[11px] font-bold uppercase italic tracking-[0.32em] text-[#83ce00]">
-              Pantalla de proyeccion
-            </p>
-            <h1 className="mt-3 text-3xl font-black tracking-tight md:text-5xl">
-              {pitch.name}
-            </h1>
-            <p className="mt-4 max-w-5xl text-sm leading-7 text-[#c2ccdc] md:text-lg">
-              {pitch.description}
-            </p>
-          </div>
-        </section>
-      </div>
+            <div className="border-t border-white/10 bg-black/20 px-6 py-5 md:px-8 md:py-6">
+              <p className="text-[11px] font-bold uppercase italic tracking-[0.32em] text-[#83ce00]">
+                Pantalla de proyeccion
+              </p>
+              <h1 className="mt-3 text-3xl font-black tracking-tight md:text-5xl">
+                {pitch.name}
+              </h1>
+              <p className="mt-4 max-w-5xl text-sm leading-7 text-[#c2ccdc] md:text-lg">
+                {pitch.description}
+              </p>
+            </div>
+          </section>
+        </div>
+      )}
 
       <div className="pointer-events-none fixed inset-x-0 bottom-0 z-30 flex justify-center p-4 md:p-6">
         <div className="pointer-events-auto flex flex-col items-center gap-3">
@@ -264,6 +438,33 @@ export default function ProjectorPitchPage() {
               <p className="text-[11px] font-bold uppercase italic tracking-[0.32em] text-[#83ce00]">
                 Panel del operador
               </p>
+
+              {hasPresentation && hasImage && (
+                <div className="mt-4 grid grid-cols-2 gap-3">
+                  <Button
+                    type="button"
+                    onClick={() => setProjectorMode("presentation")}
+                    className={`h-11 rounded-2xl text-sm font-bold ${
+                      activeProjectorMode === "presentation"
+                        ? "bg-[#83ce00] text-[#07111f] hover:bg-[#a7ea2e]"
+                        : "bg-white/10 text-white hover:bg-white/15"
+                    }`}
+                  >
+                    Presentacion
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={() => setProjectorMode("image")}
+                    className={`h-11 rounded-2xl text-sm font-bold ${
+                      activeProjectorMode === "image"
+                        ? "bg-[#83ce00] text-[#07111f] hover:bg-[#a7ea2e]"
+                        : "bg-white/10 text-white hover:bg-white/15"
+                    }`}
+                  >
+                    Imagen
+                  </Button>
+                </div>
+              )}
 
               <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto]">
                 <Input

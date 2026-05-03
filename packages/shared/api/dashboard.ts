@@ -87,6 +87,8 @@ export const dashboardPitchSchema = z.object({
   status: z.enum(["OPEN", "CLOSED"]),
   color: z.string(),
   logoUrl: z.string().nullable(),
+  presentationUrl: z.string().nullable(),
+  presentationFileName: z.string().nullable(),
   createdAt: z.string().nullable(),
 });
 
@@ -97,6 +99,8 @@ export const dashboardRankingItemSchema = z.object({
   description: z.string(),
   color: z.string(),
   logoUrl: z.string().nullable(),
+  presentationUrl: z.string().nullable(),
+  presentationFileName: z.string().nullable(),
   votesCount: z.number(),
   innovationAvg: z.number(),
   viabilityAvg: z.number(),
@@ -113,6 +117,8 @@ export const dashboardPitchDetailSchema = z.object({
   description: z.string(),
   color: z.string(),
   logoUrl: z.string().nullable(),
+  presentationUrl: z.string().nullable(),
+  presentationFileName: z.string().nullable(),
   votesCount: z.number(),
   innovationAvg: z.number(),
   viabilityAvg: z.number(),
@@ -161,6 +167,8 @@ export const publicEventInvitationSchema = z.object({
       description: z.string(),
       color: z.string(),
       logoUrl: z.string().nullable(),
+      presentationUrl: z.string().nullable(),
+      presentationFileName: z.string().nullable(),
       status: z.enum(["OPEN", "CLOSED"]),
     }),
   ),
@@ -192,6 +200,7 @@ export const createDashboardPitchSchema = z.object({
     .string()
     .regex(/^#([A-Fa-f0-9]{6})$/, "Color must be a valid hex code"),
   logoUrl: z.string().url().nullable().optional(),
+  presentationUrl: z.string().url().nullable().optional(),
 });
 
 export const updateDashboardPitchSchema = z.object({
@@ -207,6 +216,7 @@ export const updateDashboardPitchSchema = z.object({
     .string()
     .regex(/^#([A-Fa-f0-9]{6})$/, "Color must be a valid hex code"),
   logoUrl: z.string().url().nullable().optional(),
+  presentationUrl: z.string().url().nullable().optional(),
 });
 
 export const publicPitchSchema = z.object({
@@ -217,6 +227,8 @@ export const publicPitchSchema = z.object({
   pitchStatus: z.enum(["OPEN", "CLOSED"]),
   color: z.string(),
   logoUrl: z.string().nullable(),
+  presentationUrl: z.string().nullable(),
+  presentationFileName: z.string().nullable(),
   eventStatus: z.enum(["OPEN", "CLOSED"]),
   hasVoted: z.boolean(),
   currentVote: dashboardVoteSchema.nullable().optional(),

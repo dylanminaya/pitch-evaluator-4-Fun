@@ -20,6 +20,8 @@ export type PitchRanking = {
   description: string;
   color: string;
   logoUrl:string | null;
+  presentationUrl: string | null;
+  presentationFileName: string | null;
   votesCount: number;
   innovationAvg: number;
   viabilityAvg: number;

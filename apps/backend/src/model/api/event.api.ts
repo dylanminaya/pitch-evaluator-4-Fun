@@ -56,6 +56,8 @@ eventRouter.get("/public/:eventId", async (req, res) => {
           p.description,
           p.color,
           p."logoUrl",
+          p."presentationUrl",
+          p."presentationFileName",
           p.status
         FROM pitch p
         WHERE p."eventId" = $1
@@ -77,6 +79,8 @@ eventRouter.get("/public/:eventId", async (req, res) => {
           description: pitch.description,
           color: pitch.color,
           logoUrl: pitch.logoUrl ?? null,
+          presentationUrl: pitch.presentationUrl ?? null,
+          presentationFileName: pitch.presentationFileName ?? null,
           status: pitch.status,
         })),
       }),
