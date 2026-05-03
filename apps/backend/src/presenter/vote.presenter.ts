@@ -4,6 +4,7 @@ export const presentVote = (vote: {
   pitchId: string;
   evaluatorId?: string | null;
   evaluatorEmail?: string | null;
+  criteriaScores?: Array<{ criterionId: string; score: number }> | null;
   innovation: number;
   viability: number;
   impact: number;
@@ -15,6 +16,10 @@ export const presentVote = (vote: {
   pitchId: vote.pitchId,
   evaluatorId: vote.evaluatorId ?? null,
   evaluatorEmail: vote.evaluatorEmail ?? null,
+  criteriaScores: vote.criteriaScores?.map((criterion) => ({
+    criterionId: criterion.criterionId,
+    score: Number(criterion.score),
+  })),
   innovation: vote.innovation,
   viability: vote.viability,
   impact: vote.impact,

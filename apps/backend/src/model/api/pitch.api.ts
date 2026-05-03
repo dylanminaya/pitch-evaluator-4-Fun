@@ -9,7 +9,11 @@ import {
   updatePitchStatusSchema,
 } from "../schema/pitch.schema.js";
 import { canManageEvent, getEventIdForPitch } from "../event.permissions.js";
-import { buildWeightedScoreSql, normalizeEventCriteria } from "../criteria.js";
+import {
+  buildCriteriaAveragesSql,
+  buildWeightedScoreSql,
+  normalizeEventCriteria,
+} from "../criteria.js";
 import { validateServerEnv } from "@workspace/shared/env/server";
 import { presentPitch, presentPitchComment, presentPitchDetail,presentPitchSummary, presentPublicPitch } from "../../presenter/pitch.presenter.js";
 import {
@@ -636,27 +640,50 @@ pitchRouter.get("/:pitchId/export", async (req, res) => {
 
     const detailResult = await db.query(
       `
+        WITH pitch_stats AS (
+          SELECT
+            p.id,
+            COUNT(v.id)::int AS "votesCount",
+            COALESCE(ROUND(AVG(v.innovation)::numeric, 2), 0) AS "innovationAvg",
+            COALESCE(ROUND(AVG(v.viability)::numeric, 2), 0) AS "viabilityAvg",
+            COALESCE(ROUND(AVG(v.impact)::numeric, 2), 0) AS "impactAvg",
+            COALESCE(ROUND(AVG(v.presentation)::numeric, 2), 0) AS "presentationAvg",
+            ${buildWeightedScoreSql("v", "e.criteria")} AS "scoreAvg",
+            ${buildCriteriaAveragesSql("p", "e.criteria")} AS "criteriaAverages"
+          FROM pitch p
+          INNER JOIN event e ON e.id = p."eventId"
+          LEFT JOIN vote v ON v."pitchId" = p.id
+          WHERE p.id = $1
+          GROUP BY
+            p.id,
+            e.criteria
+        )
         SELECT
           p.id,
           p.name,
           p.description,
           p.status,
-          COUNT(v.id)::int AS "votesCount",
-          COALESCE(ROUND(AVG(v.innovation)::numeric, 2), 0) AS "innovationAvg",
-          COALESCE(ROUND(AVG(v.viability)::numeric, 2), 0) AS "viabilityAvg",
-          COALESCE(ROUND(AVG(v.impact)::numeric, 2), 0) AS "impactAvg",
-          COALESCE(ROUND(AVG(v.presentation)::numeric, 2), 0) AS "presentationAvg",
-          ${buildWeightedScoreSql("v", "e.criteria")} AS "scoreAvg"
+          e.criteria,
+          ps."votesCount",
+          ps."innovationAvg",
+          ps."viabilityAvg",
+          ps."impactAvg",
+          ps."presentationAvg",
+          ps."scoreAvg",
+          ps."criteriaAverages",
+          v."evaluatorEmail",
+          v."criteriaScores",
+          v.innovation,
+          v.viability,
+          v.impact,
+          v.presentation,
+          v.comment
         FROM pitch p
         INNER JOIN event e ON e.id = p."eventId"
+        INNER JOIN pitch_stats ps ON ps.id = p.id
         LEFT JOIN vote v ON v."pitchId" = p.id
         WHERE p.id = $1
-        GROUP BY
-          p.id,
-          p.name,
-          p.description,
-          p.status,
-          e.criteria
+        ORDER BY v."createdAt" ASC
       `,
     [req.params.pitchId]
     )
@@ -670,37 +697,108 @@ pitchRouter.get("/:pitchId/export", async (req, res) => {
     const escapeCsvValue = (value: string | number | null | undefined) =>
       `"${String(value ?? "").replace(/"/g, '""')}"`;
 
-    const formatPitchStatus = (status: string) =>
-      status === "OPEN" ? "Activo" : "Cerrado";
+    const eventCriteria = normalizeEventCriteria(pitch.criteria);
 
+    const getVoteScore = (row: Record<string, unknown>, criterionId: string) => {
+      const scores = Array.isArray(row.criteriaScores) ? row.criteriaScores : [];
+      const scoreItem = scores.find(
+        (item): item is { criterionId: string; score: number } =>
+          typeof item === "object" &&
+          item !== null &&
+          "criterionId" in item &&
+          "score" in item &&
+          item.criterionId === criterionId,
+      );
+
+      if (scoreItem) {
+        return Number(scoreItem.score);
+      }
+
+      const legacyScores = new Map<string, unknown>([
+        ["innovation", row.innovation],
+        ["viability", row.viability],
+        ["impact", row.impact],
+        ["presentation", row.presentation],
+      ]);
+
+      const score = legacyScores.get(criterionId);
+      return score == null ? "" : Number(score);
+    };
+
+    const getAverageScore = (row: Record<string, unknown>, criterionId: string) => {
+      const averages = Array.isArray(row.criteriaAverages) ? row.criteriaAverages : [];
+      const averageItem = averages.find(
+        (item): item is { id: string; avg: number } =>
+          typeof item === "object" &&
+          item !== null &&
+          "id" in item &&
+          "avg" in item &&
+          item.id === criterionId,
+      );
+
+      if (averageItem) {
+        return Number(averageItem.avg);
+      }
+
+      const legacyAverages = new Map<string, unknown>([
+        ["innovation", row.innovationAvg],
+        ["viability", row.viabilityAvg],
+        ["impact", row.impactAvg],
+        ["presentation", row.presentationAvg],
+      ]);
+
+      return Number(legacyAverages.get(criterionId) ?? 0);
+    };
+
+    const getVoteAverage = (row: Record<string, unknown>) => {
+      const weightedTotal = eventCriteria.reduce((sum, criterion) => {
+        const score = getVoteScore(row, criterion.id);
+        return score === "" ? sum : sum + Number(score) * criterion.weight;
+      }, 0);
+
+      const totalWeight = eventCriteria.reduce((sum, criterion) => {
+        const score = getVoteScore(row, criterion.id);
+        return score === "" ? sum : sum + criterion.weight;
+      }, 0);
+
+      return totalWeight === 0 ? "" : Number((weightedTotal / totalWeight).toFixed(2));
+    };
 
     const csvHeader = [
       "pitch",
-      "estado",
+      "email",
       "votos",
+      "Total AVG",
       "porcentaje",
       "promedio",
-      "innovacion",
-      "viabilidad",
-      "impacto",
-      "presentacion",
+      ...eventCriteria.map((criterion) => criterion.label),
+      ...eventCriteria.map((criterion) => `${criterion.label} Promedio`),
+      "Comentario",
       "descripcion",
-    ].join(",")
+    ]
+      .map((value) => escapeCsvValue(value))
+      .join(",")
 
-    const csvRows = [
-      escapeCsvValue(pitch.name),
-      escapeCsvValue(formatPitchStatus(pitch.status)),
-      pitch.votesCount,
-      escapeCsvValue(`${(Number(pitch.scoreAvg) * 20).toFixed(1)}%`),
-      pitch.scoreAvg,
-      pitch.innovationAvg,
-      pitch.viabilityAvg,
-      pitch.impactAvg,
-      pitch.presentationAvg,
-      escapeCsvValue(pitch.description),
-    ].join(",")
+    const csvRows = detailResult.rows.map((row) => {
+      const voteAverage = getVoteAverage(row);
 
-    const csv = [csvHeader, csvRows].join("\n")
+      return [
+        escapeCsvValue(row.name),
+        escapeCsvValue(row.evaluatorEmail),
+        row.votesCount,
+        escapeCsvValue(
+          voteAverage === "" ? "" : `${(Number(voteAverage) * 20).toFixed(1)}%`,
+        ),
+        escapeCsvValue(`${(Number(row.scoreAvg) * 20).toFixed(1)}%`),
+        row.scoreAvg,
+        ...eventCriteria.map((criterion) => getVoteScore(row, criterion.id)),
+        ...eventCriteria.map((criterion) => getAverageScore(row, criterion.id)),
+        escapeCsvValue(row.comment),
+        escapeCsvValue(row.description),
+      ].join(",")
+    })
+
+    const csv = [csvHeader, ...csvRows].join("\n")
 
     const pitchName = String(pitch.name)
       .toLowerCase()

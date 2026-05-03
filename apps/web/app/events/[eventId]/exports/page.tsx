@@ -14,9 +14,13 @@ import {
 import { Button } from "@workspace/ui/components/button";
 import { FeedbackPanel } from "@/components/feedback-panel";
 import { useEvents, usePitches, useRanking } from "@/hooks/dashboard";
-import { exportPitch } from "@/lib/dashboard-api";
+import { exportPitch, getVotes } from "@/lib/dashboard-api";
 import { getFriendlyErrorItems } from "@/lib/user-feedback";
-import type { CriterionAverage, EventCriterion } from "@workspace/shared/api";
+import type {
+  CriterionAverage,
+  DashboardVote,
+  EventCriterion,
+} from "@workspace/shared/api";
 
 const defaultCriteria: EventCriterion[] = [
   { id: "innovation", label: "Innovacion", weight: 25, isDefault: true },
@@ -55,6 +59,78 @@ function triggerBlobDownload(blob: Blob, fileName: string) {
   URL.revokeObjectURL(url);//libera memoria con `URL.revokeObjectURL(url)`
 }
 
+type RankingRow = ReturnType<typeof buildRankingRows>[number];
+
+type ExportVoteRow = RankingRow & {
+  vote?: DashboardVote;
+};
+
+function buildRankingRows({
+  ranking,
+  selectedCriteria,
+  pitchStatusById,
+}: {
+  ranking: Array<{
+    id: string;
+    name: string;
+    description: string;
+    votesCount: number;
+    innovationAvg: number;
+    viabilityAvg: number;
+    impactAvg: number;
+    presentationAvg: number;
+    scoreAvg: number;
+    criteriaAverages?: CriterionAverage[];
+  }>;
+  selectedCriteria: EventCriterion[];
+  pitchStatusById: Map<string, "OPEN" | "CLOSED">;
+}) {
+  function getCriterionAverages(item: {
+    criteriaAverages?: CriterionAverage[];
+    innovationAvg: number;
+    viabilityAvg: number;
+    impactAvg: number;
+    presentationAvg: number;
+  }) {
+    if (item.criteriaAverages?.length) {
+      return item.criteriaAverages;
+    }
+
+    const legacyAverages = new Map([
+      ["innovation", item.innovationAvg],
+      ["viability", item.viabilityAvg],
+      ["impact", item.impactAvg],
+      ["presentation", item.presentationAvg],
+    ]);
+
+    return selectedCriteria.map((criterion) => ({
+      id: criterion.id,
+      label: criterion.label,
+      weight: criterion.weight,
+      avg: legacyAverages.get(criterion.id) ?? 0,
+    }));
+  }
+
+  return [...ranking]
+    .map((item) => ({
+      ...item,
+      percentage: Number((item.scoreAvg * 20).toFixed(1)),
+      pitchStatus: pitchStatusById.get(item.id) ?? "OPEN",
+      criterionAverages: getCriterionAverages(item),
+    }))
+    .sort((left, right) => {
+      if (right.percentage !== left.percentage) {
+        return right.percentage - left.percentage;
+      }
+
+      if (right.votesCount !== left.votesCount) {
+        return right.votesCount - left.votesCount;
+      }
+
+      return left.name.localeCompare(right.name);
+    });
+}
+
 export default function EventExportsPage() {
   const params = useParams<{ eventId: string }>();
   const router = useRouter();
@@ -79,50 +155,7 @@ export default function EventExportsPage() {
   );
 
   const rankingRows = useMemo(() => {
-    function getCriterionAverages(item: {
-      criteriaAverages?: CriterionAverage[];
-      innovationAvg: number;
-      viabilityAvg: number;
-      impactAvg: number;
-      presentationAvg: number;
-    }) {
-      if (item.criteriaAverages?.length) {
-        return item.criteriaAverages;
-      }
-
-      const legacyAverages = new Map([
-        ["innovation", item.innovationAvg],
-        ["viability", item.viabilityAvg],
-        ["impact", item.impactAvg],
-        ["presentation", item.presentationAvg],
-      ]);
-
-      return selectedCriteria.map((criterion) => ({
-        id: criterion.id,
-        label: criterion.label,
-        weight: criterion.weight,
-        avg: legacyAverages.get(criterion.id) ?? 0,
-      }));
-    }
-
-    return [...ranking]
-      .map((item) => ({
-        ...item,
-        percentage: Number((item.scoreAvg * 20).toFixed(1)),
-        pitchStatus: pitchStatusById.get(item.id) ?? "OPEN",
-        criterionAverages: getCriterionAverages(item),
-      }))
-      .sort((left, right) => {
-        if (right.percentage !== left.percentage) {
-          return right.percentage - left.percentage;
-        }
-
-        if (right.votesCount !== left.votesCount) {
-          return right.votesCount - left.votesCount;
-        }
-
-        return left.name.localeCompare(right.name);
-      });
+    return buildRankingRows({ ranking, selectedCriteria, pitchStatusById });
   }, [pitchStatusById, ranking, selectedCriteria]);
 
   useEffect(() => {
@@ -148,29 +181,99 @@ export default function EventExportsPage() {
     setSelectedPitchIds(allSelected ? [] : rankingRows.map((row) => row.id));
   }
 
-  function buildCombinedCsv(rows: typeof rankingRows) {
+  function getVoteScore(vote: DashboardVote | undefined, criterionId: string) {
+    if (!vote) return "";
+
+    const dynamicScore = vote.criteriaScores?.find(
+      (item) => item.criterionId === criterionId,
+    )?.score;
+
+    if (dynamicScore != null) {
+      return dynamicScore;
+    }
+
+    const legacyScores = new Map([
+      ["innovation", vote.innovation],
+      ["viability", vote.viability],
+      ["impact", vote.impact],
+      ["presentation", vote.presentation],
+    ]);
+
+    return legacyScores.get(criterionId) ?? "";
+  }
+
+  function getVoteAverage(vote: DashboardVote | undefined) {
+    if (!vote) return "";
+
+    const weightedTotal = selectedCriteria.reduce((sum, criterion) => {
+      const score = getVoteScore(vote, criterion.id);
+      return score === "" ? sum : sum + Number(score) * criterion.weight;
+    }, 0);
+
+    const totalWeight = selectedCriteria.reduce((sum, criterion) => {
+      const score = getVoteScore(vote, criterion.id);
+      return score === "" ? sum : sum + criterion.weight;
+    }, 0);
+
+    return totalWeight === 0 ? "" : Number((weightedTotal / totalWeight).toFixed(2));
+  }
+
+  async function buildRowsWithVotes(rows: RankingRow[]) {
+    const votesByPitch = await Promise.all(
+      rows.map(async (row) => ({
+        row,
+        votes: await getVotes(row.id),
+      })),
+    );
+
+    return votesByPitch.flatMap(({ row, votes }) => {
+      if (votes.length === 0) {
+        return [{ ...row }];
+      }
+
+      return votes.map((vote) => ({ ...row, vote }));
+    });
+  }
+
+  function buildCombinedCsv(rows: ExportVoteRow[]) {
+    const pitchPositions = new Map<string, number>();
+
+    for (const row of rows) {
+      if (!pitchPositions.has(row.id)) {
+        pitchPositions.set(row.id, pitchPositions.size + 1);
+      }
+    }
+
     const header = [
       "posicion",
       "pitch",
-      "estado",
+      "email",
       "votos",
+      "Total AVG",
       "porcentaje",
       "promedio",
-      ...selectedCriteria.map((criterion) => `${criterion.label.toLowerCase()}Promedio`),
+      ...selectedCriteria.map((criterion) => criterion.label),
+      ...selectedCriteria.map((criterion) => `${criterion.label} Promedio`),
+      "Comentario",
       "descripcion",
     ];
 
     const dataRows = rows.map((row, index) => [
-      index + 1,
+      pitchPositions.get(row.id) ?? index + 1,
       row.name,
-      formatPitchStatus(row.pitchStatus),
+      row.vote?.evaluatorEmail ?? "",
       row.votesCount,
+      getVoteAverage(row.vote) === ""
+        ? ""
+        : `${(Number(getVoteAverage(row.vote)) * 20).toFixed(1)}%`,
       `${row.percentage.toFixed(1)}%`,
       row.scoreAvg,
+      ...selectedCriteria.map((criterion) => getVoteScore(row.vote, criterion.id)),
       ...selectedCriteria.map(
         (criterion) =>
           row.criterionAverages.find((item) => item.id === criterion.id)?.avg ?? 0,
       ),
+      row.vote?.comment ?? "",
       row.description,
     ]);
 
@@ -206,13 +309,13 @@ export default function EventExportsPage() {
     router.push(`/projector/${pitchId}`);
   }
 
-  function handleExportCombined(rows: typeof rankingRows, mode: "selected" | "all") {
+  async function handleExportCombined(rows: RankingRow[], mode: "selected" | "all") {
     if (rows.length === 0) return;
 
     try {
       setExportError(null);
       setIsExportingSelection(true);
-      const csv = buildCombinedCsv(rows);
+      const csv = buildCombinedCsv(await buildRowsWithVotes(rows));
       const fileNameBase = createSlug(selectedEvent?.name ?? "event");
       const suffix = mode === "all" ? "all-pitches" : "selected-pitches";
       const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });

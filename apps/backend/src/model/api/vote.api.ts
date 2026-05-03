@@ -58,6 +58,7 @@ voteRouter.get("/", async (req, res) => {
           v."pitchId",
           v."evaluatorId",
           v."evaluatorEmail",
+          v."criteriaScores",
           v.innovation,
           v.viability,
           v.impact,

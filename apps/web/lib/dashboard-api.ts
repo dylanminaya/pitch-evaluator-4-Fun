@@ -11,6 +11,7 @@ import {
   type DashboardRankingItem,
   type DashboardPitchDetail,
   type DashboardPitchComment,
+  type DashboardVote,
   type DashboardPitchQr,
   type PublicPitch,
   type PublicEventInvitation,
@@ -31,6 +32,7 @@ export type {
   DashboardRankingItem,
   DashboardPitchDetail,
   DashboardPitchComment,
+  DashboardVote,
   DashboardPitchQr,
   PublicPitch,
   PublicEventInvitation,
@@ -96,6 +98,12 @@ export function getPitchDetail(pitchId: string) {
 export function getPitchComments(pitchId: string) {
   return apiFetch<DashboardPitchComment[]>(
     `/api/pitch/comments?pitchId=${pitchId}`,
+  );
+}
+
+export function getVotes(pitchId: string) {
+  return apiFetch<DashboardVote[]>(
+    `/api/vote?pitchId=${encodeURIComponent(pitchId)}`,
   );
 }
 
