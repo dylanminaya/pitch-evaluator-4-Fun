@@ -292,6 +292,36 @@ export function getFriendlyErrorItems(error: unknown): FeedbackItem[] {
     ];
   }
 
+  if (normalized.includes("unauthorized")) {
+    return [
+      createItem(
+        "friendly-unauthorized",
+        "Tu sesion expiro o el navegador no envio la sesion al servidor.",
+        "Inicia sesion de nuevo y vuelve a guardar el pitch.",
+      ),
+    ];
+  }
+
+  if (normalized.includes("failed to prepare presentation")) {
+    return [
+      createItem(
+        "friendly-presentation-prepare",
+        "No pudimos preparar el PowerPoint para proyectarlo.",
+        "El pitch quedo guardado. Prueba subir de nuevo el .ppt o .pptx desde editar pitch.",
+      ),
+    ];
+  }
+
+  if (normalized.includes("only .ppt and .pptx")) {
+    return [
+      createItem(
+        "friendly-presentation-format",
+        "El archivo seleccionado no parece ser un PowerPoint valido.",
+        "Sube un archivo con extension .ppt o .pptx.",
+      ),
+    ];
+  }
+
   if (normalized.includes("not found")) {
     return [
       createItem(

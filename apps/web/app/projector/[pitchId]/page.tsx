@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft,
   ChevronLeft,
@@ -9,19 +9,31 @@ import {
   Pause,
   Play,
   RotateCcw,
+  Lock,
   SlidersHorizontal,
+  Unlock,
   X,
 } from "lucide-react";
 import { Button } from "@workspace/ui/components/button";
 import { Input } from "@workspace/ui/components/input";
-import { usePublicPitch } from "@/hooks/dashboard";
+import { usePublicPitch, useUpdatePitchStatus } from "@/hooks/dashboard";
 
-const MIN_MINUTES = 5;
+const MIN_MINUTES = 1;
 const DEFAULT_MINUTES = 5;
 const MAX_MINUTES = 120;
+const MIN_AUTO_CLOSE_DELAY_SECONDS = 0;
+const DEFAULT_AUTO_CLOSE_DELAY_SECONDS = 30;
+const MAX_AUTO_CLOSE_DELAY_SECONDS = 600;
 
 function clampDuration(value: number) {
   return Math.min(Math.max(value, MIN_MINUTES), MAX_MINUTES);
+}
+
+function clampAutoCloseDelay(value: number) {
+  return Math.min(
+    Math.max(value, MIN_AUTO_CLOSE_DELAY_SECONDS),
+    MAX_AUTO_CLOSE_DELAY_SECONDS,
+  );
 }
 
 function formatTime(totalSeconds: number) {
@@ -64,18 +76,22 @@ function normalizeRemoteImageUrl(rawUrl: string) {
 export default function ProjectorPitchPage() {
   const params = useParams<{ pitchId: string }>();
   const router = useRouter();
-  const searchParams = useSearchParams();
   const pitchId = params.pitchId;
-  const initialMinutesFromUrl = Number(searchParams.get("minutes"));
-  const initialMinutes = Number.isFinite(initialMinutesFromUrl)
-    ? clampDuration(initialMinutesFromUrl)
-    : DEFAULT_MINUTES;
 
   const { data: pitch, isLoading, error } = usePublicPitch(pitchId);
+  const { mutateAsync: updatePitchStatus, isPending: isUpdatingPitchStatus } =
+    useUpdatePitchStatus();
   const pitchLogoUrl = pitch?.logoUrl ?? null;
   const pitchPresentationFileName = pitch?.presentationFileName ?? null;
-  const [durationMinutes, setDurationMinutes] = useState(initialMinutes);
-  const [timeLeftSeconds, setTimeLeftSeconds] = useState(initialMinutes * 60);
+  const [durationMinutes, setDurationMinutes] = useState(DEFAULT_MINUTES);
+  const [timeLeftSeconds, setTimeLeftSeconds] = useState(DEFAULT_MINUTES * 60);
+  const [autoCloseDelaySeconds, setAutoCloseDelaySeconds] = useState(
+    DEFAULT_AUTO_CLOSE_DELAY_SECONDS,
+  );
+  const [autoCloseCountdownSeconds, setAutoCloseCountdownSeconds] = useState<
+    number | null
+  >(null);
+  const [autoCloseError, setAutoCloseError] = useState<string | null>(null);
   const [isRunning, setIsRunning] = useState(false);
   const [showControls, setShowControls] = useState(false);
   const [failedImageUrl, setFailedImageUrl] = useState<string | null>(null);
@@ -83,6 +99,9 @@ export default function ProjectorPitchPage() {
   const [currentSlide, setCurrentSlide] = useState(1);
   const [slidesCount, setSlidesCount] = useState(1);
   const [presentationError, setPresentationError] = useState<string | null>(null);
+  const [isSlideLoading, setIsSlideLoading] = useState(false);
+  const hasScheduledAutoCloseRef = useRef(false);
+  const autoCloseDelaySecondsRef = useRef(DEFAULT_AUTO_CLOSE_DELAY_SECONDS);
 
   useEffect(() => {
     if (!isRunning) {
@@ -103,6 +122,62 @@ export default function ProjectorPitchPage() {
 
     return () => window.clearInterval(intervalId);
   }, [isRunning]);
+
+  useEffect(() => {
+    if (
+      timeLeftSeconds !== 0 ||
+      pitch?.pitchStatus !== "OPEN" ||
+      hasScheduledAutoCloseRef.current
+    ) {
+      return;
+    }
+
+    hasScheduledAutoCloseRef.current = true;
+    const delaySeconds = autoCloseDelaySecondsRef.current;
+    setAutoCloseError(null);
+    setAutoCloseCountdownSeconds(delaySeconds);
+
+    async function closePitchAfterDelay() {
+      try {
+        await updatePitchStatus({ pitchId, status: "CLOSED" });
+        setAutoCloseCountdownSeconds(0);
+      } catch {
+        setAutoCloseError(
+          "No pudimos cerrar las votaciones automaticamente. Revisa tu sesion o cierralas manualmente.",
+        );
+      }
+    }
+
+    if (delaySeconds === 0) {
+      void closePitchAfterDelay();
+      return;
+    }
+
+    const countdownIntervalId = window.setInterval(() => {
+      setAutoCloseCountdownSeconds((current) => {
+        if (current == null || current <= 1) {
+          window.clearInterval(countdownIntervalId);
+          return 0;
+        }
+
+        return current - 1;
+      });
+    }, 1000);
+
+    const closeTimeoutId = window.setTimeout(() => {
+      void closePitchAfterDelay();
+    }, delaySeconds * 1000);
+
+    return () => {
+      window.clearInterval(countdownIntervalId);
+      window.clearTimeout(closeTimeoutId);
+    };
+  }, [
+    pitch?.pitchStatus,
+    pitchId,
+    timeLeftSeconds,
+    updatePitchStatus,
+  ]);
 
   const progress = useMemo(() => {
     const totalSeconds = durationMinutes * 60;
@@ -198,6 +273,14 @@ export default function ProjectorPitchPage() {
     };
   }, [presentationBaseUrl]);
 
+  useEffect(() => {
+    if (!currentSlideImageUrl) {
+      return;
+    }
+
+    setIsSlideLoading(true);
+  }, [currentSlideImageUrl]);
+
   function goToPreviousSlide() {
     setCurrentSlide((current) => Math.max(current - 1, 1));
   }
@@ -247,6 +330,9 @@ export default function ProjectorPitchPage() {
     setDurationMinutes(normalizedMinutes);
     setTimeLeftSeconds(normalizedMinutes * 60);
     setIsRunning(false);
+    setAutoCloseCountdownSeconds(null);
+    setAutoCloseError(null);
+    hasScheduledAutoCloseRef.current = false;
   }
 
   function handleMinutesChange(event: React.ChangeEvent<HTMLInputElement>) {
@@ -260,6 +346,20 @@ export default function ProjectorPitchPage() {
     setDurationMinutes(clampDuration(nextValue));
   }
 
+  function handleAutoCloseDelayChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const nextValue = Number(event.target.value);
+
+    if (!Number.isFinite(nextValue)) {
+      autoCloseDelaySecondsRef.current = DEFAULT_AUTO_CLOSE_DELAY_SECONDS;
+      setAutoCloseDelaySeconds(DEFAULT_AUTO_CLOSE_DELAY_SECONDS);
+      return;
+    }
+
+    const normalizedDelay = clampAutoCloseDelay(Math.round(nextValue));
+    autoCloseDelaySecondsRef.current = normalizedDelay;
+    setAutoCloseDelaySeconds(normalizedDelay);
+  }
+
   function handleApplyTimer() {
     applyMinutes(durationMinutes);
   }
@@ -267,6 +367,22 @@ export default function ProjectorPitchPage() {
   function handleResetTimer() {
     setTimeLeftSeconds(durationMinutes * 60);
     setIsRunning(false);
+    setAutoCloseCountdownSeconds(null);
+    setAutoCloseError(null);
+    hasScheduledAutoCloseRef.current = false;
+  }
+
+  async function handlePitchStatusChange(status: "OPEN" | "CLOSED") {
+    try {
+      setAutoCloseError(null);
+      await updatePitchStatus({ pitchId, status });
+    } catch {
+      setAutoCloseError(
+        status === "CLOSED"
+          ? "No pudimos cerrar las votaciones. Revisa tu sesion e intenta otra vez."
+          : "No pudimos abrir las votaciones. Revisa tu sesion e intenta otra vez.",
+      );
+    }
   }
 
   async function handleBackToExports() {
@@ -326,6 +442,14 @@ export default function ProjectorPitchPage() {
               }}
             />
           </div>
+          <p className="mt-3 text-right text-[11px] font-bold uppercase tracking-[0.18em] text-[#c2ccdc]">
+            {pitch.pitchStatus === "OPEN" ? "Votos abiertos" : "Votos cerrados"}
+          </p>
+          {autoCloseCountdownSeconds != null && pitch.pitchStatus === "OPEN" && (
+            <p className="mt-1 text-right text-xs font-semibold text-[#ffcf6e]">
+              Cierre en {autoCloseCountdownSeconds}s
+            </p>
+          )}
         </div>
       </div>
 
@@ -336,11 +460,30 @@ export default function ProjectorPitchPage() {
               {presentationError}
             </div>
           ) : (
-            <img
-              src={currentSlideImageUrl}
-              alt={`Diapositiva ${currentSlide} de ${pitch.name}`}
-              className="h-full w-full object-contain"
-            />
+            <>
+              {isSlideLoading && (
+                <div className="absolute inset-0 z-10 flex items-center justify-center bg-black text-center">
+                  <div className="mx-6 max-w-xl rounded-[28px] border border-white/10 bg-white/10 px-6 py-5 text-white shadow-[0_18px_60px_rgba(0,0,0,0.35)] backdrop-blur">
+                    <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-[#83ce00]">
+                      Cargando presentacion
+                    </p>
+                    <p className="mt-3 text-sm font-semibold text-[#c2ccdc]">
+                      Estamos preparando las diapositivas.
+                    </p>
+                  </div>
+                </div>
+              )}
+              <img
+                src={currentSlideImageUrl}
+                alt={`Diapositiva ${currentSlide} de ${pitch.name}`}
+                className="h-full w-full object-contain"
+                onLoad={() => setIsSlideLoading(false)}
+                onError={() => {
+                  setIsSlideLoading(false);
+                  setPresentationError("No pudimos mostrar esta diapositiva del PowerPoint.");
+                }}
+              />
+            </>
           )}
 
           <div className="pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-black/70 to-transparent" />
@@ -485,6 +628,21 @@ export default function ProjectorPitchPage() {
                 </Button>
               </div>
 
+              <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_auto]">
+                <Input
+                  type="number"
+                  min={MIN_AUTO_CLOSE_DELAY_SECONDS}
+                  max={MAX_AUTO_CLOSE_DELAY_SECONDS}
+                  step={1}
+                  value={autoCloseDelaySeconds}
+                  onChange={handleAutoCloseDelayChange}
+                  className="h-12 rounded-2xl border-white/10 bg-white/5 px-4 text-base text-white"
+                />
+                <div className="flex h-12 items-center rounded-2xl border border-white/10 bg-white/5 px-4 text-sm font-bold text-[#c2ccdc]">
+                  segundos para cerrar
+                </div>
+              </div>
+
               <div className="mt-3 grid gap-3 sm:grid-cols-2">
                 <Button
                   type="button"
@@ -506,8 +664,35 @@ export default function ProjectorPitchPage() {
                 </Button>
               </div>
 
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <Button
+                  type="button"
+                  onClick={() => handlePitchStatusChange("OPEN")}
+                  disabled={pitch.pitchStatus === "OPEN" || isUpdatingPitchStatus}
+                  className="h-12 rounded-2xl bg-white/10 text-sm font-bold text-white hover:bg-white/15 disabled:opacity-45"
+                >
+                  <Unlock className="size-4" />
+                  Abrir votos
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => handlePitchStatusChange("CLOSED")}
+                  disabled={pitch.pitchStatus === "CLOSED" || isUpdatingPitchStatus}
+                  className="h-12 rounded-2xl bg-[#ffcf6e] text-sm font-bold text-[#07111f] hover:bg-[#ffe08f] disabled:opacity-45"
+                >
+                  <Lock className="size-4" />
+                  Cerrar votos
+                </Button>
+              </div>
+
+              {autoCloseError && (
+                <div className="mt-4 rounded-[20px] border border-[#5a2433] bg-[#2a1018]/90 px-4 py-3 text-sm leading-6 text-[#ffb7c9]">
+                  {autoCloseError}
+                </div>
+              )}
+
               <div className="mt-4 rounded-[20px] border border-white/10 bg-white/5 px-4 py-3 text-sm leading-6 text-[#aebbd1]">
-                El tiempo por defecto es 5 minutos y el minimo permitido tambien es 5.
+                El cronometro cierra este pitch automaticamente al terminar el tiempo mas la espera configurada.
               </div>
             </aside>
           )}

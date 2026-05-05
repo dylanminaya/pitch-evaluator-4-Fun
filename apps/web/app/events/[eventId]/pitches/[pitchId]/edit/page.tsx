@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Palette, QrCode, Sparkles } from "lucide-react";
@@ -22,18 +22,21 @@ function EditPitchForm({
   pitch: DashboardPitch;
 }) {
   const router = useRouter();
-  const { mutateAsync, isPending, error } = useUpdatePitch();
+  const { mutateAsync, error } = useUpdatePitch();
   const [name, setName] = useState(pitch.name);
   const [description, setDescription] = useState(pitch.description);
   const [color, setColor] = useState(pitch.color);
   const [logoUrl, setLogoUrl] = useState(pitch.logoUrl ?? "");
   const [presentationFile, setPresentationFile] = useState<File | null>(null);
   const [hasTriedSubmit, setHasTriedSubmit] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<unknown>(null);
+  const isSavingRef = useRef(false);
   const formIssues = useMemo(
     () => getPitchFormIssues({ name, description, color, logoUrl }),
     [color, description, logoUrl, name],
   );
-  const errorItems = error ? getFriendlyErrorItems(error) : [];
+  const errorItems = saveError || error ? getFriendlyErrorItems(saveError ?? error) : [];
 
   function handleColorTextChange(value: string) {
     // Normalize manual color input so the API always receives a proper hex value.
@@ -51,24 +54,39 @@ function EditPitchForm({
       return;
     }
 
-    // Send only editable fields, then return to dashboard focused on the updated pitch.
-    const updatedPitch = await mutateAsync({
-      pitchId,
-      data: {
-        name,
-        description,
-        color,
-        logoUrl: logoUrl.trim() || null,
-      },
-    });
-
-    if (presentationFile) {
-      await uploadPitchPresentation(updatedPitch.id, presentationFile);
+    if (isSavingRef.current) {
+      return;
     }
 
-    router.push(
-      `/dashboard?eventId=${updatedPitch.eventId}&pitchId=${updatedPitch.id}`,
-    );
+    isSavingRef.current = true;
+    setIsSaving(true);
+    setSaveError(null);
+
+    try {
+      // Send only editable fields, then return to dashboard focused on the updated pitch.
+      const updatedPitch = await mutateAsync({
+        pitchId,
+        data: {
+          name,
+          description,
+          color,
+          logoUrl: logoUrl.trim() || null,
+        },
+      });
+
+      if (presentationFile) {
+        await uploadPitchPresentation(updatedPitch.id, presentationFile);
+      }
+
+      router.push(
+        `/dashboard?eventId=${updatedPitch.eventId}&pitchId=${updatedPitch.id}`,
+      );
+    } catch (error) {
+      setSaveError(error);
+    } finally {
+      isSavingRef.current = false;
+      setIsSaving(false);
+    }
   }
 
   return (
@@ -98,9 +116,9 @@ function EditPitchForm({
             form="edit-pitch-form"
             type="submit"
             className="rounded-full bg-[#83ce00] text-sm font-bold italic text-[#0d1526] hover:bg-[#a7ea2e]"
-            disabled={isPending}
+            disabled={isSaving}
           >
-            {isPending ? "Guardando..." : "Guardar cambios"}
+            {isSaving ? "Guardando..." : "Guardar cambios"}
           </Button>
         </header>
 
@@ -140,7 +158,7 @@ function EditPitchForm({
                   value={name}
                   onChange={(event) => setName(event.target.value)}
                   placeholder="Ej. EcoTrack AI"
-                  disabled={isPending}
+                  disabled={isSaving}
                   className="h-12 rounded-2xl border-[#263550] bg-[#0d1526] px-4 text-white placeholder:text-[#66738f]"
                 />
                 <p className="text-xs text-[#8899aa]">
@@ -156,7 +174,7 @@ function EditPitchForm({
                   value={description}
                   onChange={(event) => setDescription(event.target.value)}
                   placeholder="Describe la solucion, el problema y el valor del pitch."
-                  disabled={isPending}
+                  disabled={isSaving}
                   className="min-h-36 rounded-2xl border border-[#263550] bg-[#0d1526] px-4 py-3 text-sm text-white outline-none placeholder:text-[#66738f]"
                 />
               </div>
@@ -171,14 +189,14 @@ function EditPitchForm({
                       type="color"
                       value={color}
                       onChange={(event) => setColor(event.target.value.toUpperCase())}
-                      disabled={isPending}
+                      disabled={isSaving}
                       className="h-12 w-16 cursor-pointer rounded-2xl border border-[#263550] bg-[#0d1526] p-2"
                     />
                     <Input
                       value={color}
                       onChange={(event) => handleColorTextChange(event.target.value)}
                       placeholder="#83CE00"
-                      disabled={isPending}
+                      disabled={isSaving}
                       className="h-12 rounded-2xl border-[#263550] bg-[#0d1526] px-4 text-white placeholder:text-[#66738f]"
                     />
                   </div>
@@ -194,7 +212,7 @@ function EditPitchForm({
                     value={logoUrl}
                     onChange={(event) => setLogoUrl(event.target.value)}
                     placeholder="https://..."
-                    disabled={isPending}
+                    disabled={isSaving}
                     className="h-12 rounded-2xl border-[#263550] bg-[#0d1526] px-4 text-white placeholder:text-[#66738f]"
                   />
                 </div>
@@ -204,17 +222,20 @@ function EditPitchForm({
                 <label className="text-xs font-bold uppercase italic tracking-[0.24em] text-[#8899aa]">
                   PowerPoint opcional
                 </label>
+                <p className="rounded-2xl border border-[#263550] bg-[#0d1526] px-4 py-3 text-xs leading-5 text-[#a9b3c9]">
+                  Tamano maximo permitido: 50 MB. Usa archivos .ppt o .pptx.
+                </p>
                 <Input
                   type="file"
                   accept=".ppt,.pptx,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation"
                   onChange={(event) => setPresentationFile(event.target.files?.[0] ?? null)}
-                  disabled={isPending}
+                  disabled={isSaving}
                   className="h-12 rounded-2xl border-[#263550] bg-[#0d1526] px-4 py-2 text-white file:mr-4 file:rounded-full file:border-0 file:bg-[#83ce00] file:px-4 file:py-1.5 file:text-sm file:font-bold file:text-[#0d1526]"
                 />
                 <p className="text-xs text-[#8899aa]">
                   {pitch.presentationFileName
                     ? `Archivo actual: ${pitch.presentationFileName}. Sube otro para reemplazarlo.`
-                    : "Sube un archivo .ppt o .pptx. Se proyectara con un visor de PowerPoint en el navegador."}
+                    : "La presentacion se preparara como diapositivas para proyectarla en el navegador."}
                 </p>
               </div>
             </div>

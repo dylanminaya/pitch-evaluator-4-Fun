@@ -44,6 +44,27 @@ const presentationUpload = express.raw({
   ],
 });
 
+type PreparedPresentation = {
+  pdfBuffer: Buffer;
+  pitchName: string;
+  fileName: string;
+};
+
+type CachedPresentation = {
+  fileName: string;
+  pages: Map<number, Buffer>;
+  pagesCount: number;
+  version: number;
+};
+
+const presentationPreparationTasks = new Map<
+  string,
+  Promise<PreparedPresentation | null>
+>();
+const presentationCache = new Map<string, CachedPresentation>();
+const presentationWarmupTasks = new Map<string, Promise<CachedPresentation | null>>();
+const presentationVersions = new Map<string, number>();
+
 // Detecta errores de Postgres por codigo para aplicar fallbacks de schema.
 const hasPgErrorCode = (error: unknown, code: string) =>
   typeof error === "object" &&
@@ -169,7 +190,70 @@ async function convertPresentationBufferToPdf(
   }
 }
 
-async function writePresentationPdfToTempFile(pitchId: string) {
+function getPresentationVersion(pitchId: string) {
+  return presentationVersions.get(pitchId) ?? 0;
+}
+
+function bumpPresentationVersion(pitchId: string) {
+  const nextVersion = getPresentationVersion(pitchId) + 1;
+  presentationVersions.set(pitchId, nextVersion);
+  presentationPreparationTasks.delete(pitchId);
+  presentationWarmupTasks.delete(pitchId);
+  presentationCache.delete(pitchId);
+  return nextVersion;
+}
+
+async function getPdfPagesCount(pdfBuffer: Buffer) {
+  const workDir = await mkdtemp(join(tmpdir(), "pitch-presentation-meta-"));
+  const pdfPath = join(workDir, "presentation.pdf");
+
+  try {
+    await writeFile(pdfPath, pdfBuffer);
+    const { stdout } = await runProcess("pdfinfo", [pdfPath], 15000);
+    const pagesMatch = stdout.match(/^Pages:\s+(\d+)/m);
+    const pagesCount = Number(pagesMatch?.[1] ?? 0);
+
+    if (!Number.isFinite(pagesCount) || pagesCount <= 0) {
+      throw new Error("Failed to read presentation pages");
+    }
+
+    return pagesCount;
+  } finally {
+    rm(workDir, { recursive: true, force: true }).catch(() => undefined);
+  }
+}
+
+async function renderPresentationPage(pdfBuffer: Buffer, pageNumber: number) {
+  const workDir = await mkdtemp(join(tmpdir(), "pitch-presentation-render-"));
+  const pdfPath = join(workDir, "presentation.pdf");
+  const outputPrefix = join(workDir, "slide");
+
+  try {
+    await writeFile(pdfPath, pdfBuffer);
+    await runProcess(
+      "pdftoppm",
+      [
+        "-f",
+        String(pageNumber),
+        "-l",
+        String(pageNumber),
+        "-singlefile",
+        "-png",
+        "-r",
+        "180",
+        pdfPath,
+        outputPrefix,
+      ],
+      30000,
+    );
+
+    return await readFile(`${outputPrefix}.png`);
+  } finally {
+    rm(workDir, { recursive: true, force: true }).catch(() => undefined);
+  }
+}
+
+async function preparePresentationPdf(pitchId: string): Promise<PreparedPresentation | null> {
   const result = await db.query(
     `
       SELECT
@@ -190,21 +274,22 @@ async function writePresentationPdfToTempFile(pitchId: string) {
   }
 
   const row = result.rows[0];
-  let presentationPdf = row.presentationPdf;
+  const presentationFile = row.presentationFile;
+  const storedFileName = row.presentationFileName;
+  const storedContentType = row.presentationContentType;
+  const fileName = String(storedFileName ?? "presentation.pptx");
+  const contentType =
+    storedContentType ??
+    getPowerPointContentType(fileName, undefined) ??
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+  let pdfBuffer = row.presentationPdf;
 
-  if (!presentationPdf) {
-    const presentationFile = row.presentationFile;
-    const fileName = String(row.presentationFileName ?? "presentation.pptx");
-    const contentType =
-      row.presentationContentType ??
-      getPowerPointContentType(fileName, undefined) ??
-      "application/vnd.openxmlformats-officedocument.presentationml.presentation";
-
+  if (!pdfBuffer) {
     if (!presentationFile) {
       return null;
     }
 
-    presentationPdf = await convertPresentationBufferToPdf(
+    pdfBuffer = await convertPresentationBufferToPdf(
       presentationFile,
       fileName,
       contentType,
@@ -214,22 +299,121 @@ async function writePresentationPdfToTempFile(pitchId: string) {
       `
         UPDATE pitch
         SET "presentationPdf" = $1
-        WHERE id = $2
+        WHERE
+          id = $2
+          AND "presentationFileName" IS NOT DISTINCT FROM $3
+          AND "presentationContentType" IS NOT DISTINCT FROM $4
+          AND "presentationFile" = $5
       `,
-      [presentationPdf, row.id],
+      [pdfBuffer, row.id, storedFileName, storedContentType, presentationFile],
     );
   }
 
-  const workDir = await mkdtemp(join(tmpdir(), "pitch-presentation-page-"));
-  const pdfPath = join(workDir, "presentation.pdf");
-  await writeFile(pdfPath, presentationPdf);
-
   return {
-    workDir,
-    pdfPath,
+    pdfBuffer,
     pitchName: String(row.name ?? "presentation"),
-    fileName: String(row.presentationFileName ?? "presentation.pptx"),
+    fileName,
   };
+}
+
+function ensurePresentationPdf(pitchId: string) {
+  const currentTask = presentationPreparationTasks.get(pitchId);
+
+  if (currentTask) {
+    return currentTask;
+  }
+
+  const task = preparePresentationPdf(pitchId).finally(() => {
+    if (presentationPreparationTasks.get(pitchId) === task) {
+      presentationPreparationTasks.delete(pitchId);
+    }
+  });
+
+  presentationPreparationTasks.set(pitchId, task);
+  return task;
+}
+
+async function renderRemainingPresentationPages(
+  pitchId: string,
+  version: number,
+  pdfBuffer: Buffer,
+  pages: Map<number, Buffer>,
+  pagesCount: number,
+) {
+  for (let pageNumber = 2; pageNumber <= pagesCount; pageNumber += 1) {
+    if (getPresentationVersion(pitchId) !== version) {
+      return;
+    }
+
+    if (!pages.has(pageNumber)) {
+      pages.set(
+        pageNumber,
+        await renderPresentationPage(pdfBuffer, pageNumber),
+      );
+    }
+  }
+}
+
+async function warmPresentationCache(
+  pitchId: string,
+  version = getPresentationVersion(pitchId),
+) {
+  const cachedPresentation = presentationCache.get(pitchId);
+
+  if (cachedPresentation?.version === version) {
+    return cachedPresentation;
+  }
+
+  const currentTask = presentationWarmupTasks.get(pitchId);
+
+  if (currentTask) {
+    return currentTask;
+  }
+
+  const task = (async () => {
+    const preparedPresentation = await ensurePresentationPdf(pitchId);
+
+    if (!preparedPresentation || getPresentationVersion(pitchId) !== version) {
+      return null;
+    }
+
+    const pagesCount = await getPdfPagesCount(preparedPresentation.pdfBuffer);
+
+    if (getPresentationVersion(pitchId) !== version) {
+      return null;
+    }
+
+    const pages = new Map<number, Buffer>();
+    const cached: CachedPresentation = {
+      fileName: preparedPresentation.fileName,
+      pages,
+      pagesCount,
+      version,
+    };
+
+    presentationCache.set(pitchId, cached);
+
+    pages.set(1, await renderPresentationPage(preparedPresentation.pdfBuffer, 1));
+
+    void renderRemainingPresentationPages(
+      pitchId,
+      version,
+      preparedPresentation.pdfBuffer,
+      pages,
+      pagesCount,
+    ).catch((error) => {
+      console.warn("Presentation pages could not be fully cached", error);
+    });
+
+    return cached;
+  })().finally(() => {
+    if (presentationWarmupTasks.get(pitchId) === task) {
+      presentationWarmupTasks.delete(pitchId);
+    }
+  });
+
+  presentationWarmupTasks.set(pitchId, task);
+  return task;
 }
 
 // Lista los pitches de un evento.
@@ -466,8 +650,6 @@ pitchRouter.post("/:pitchId/presentation", presentationUpload, async (req, res) 
       });
     }
 
-    const pdfBuffer = await convertPresentationBufferToPdf(req.body, fileName, contentType);
-
     const result = await db.query(
       `
         UPDATE pitch
@@ -475,17 +657,22 @@ pitchRouter.post("/:pitchId/presentation", presentationUpload, async (req, res) 
           "presentationFileName" = $1,
           "presentationContentType" = $2,
           "presentationFile" = $3,
-          "presentationPdf" = $4,
+          "presentationPdf" = NULL,
           "presentationUrl" = NULL
-        WHERE id = $5
+        WHERE id = $4
         RETURNING id, "eventId", name, description, status, color, "logoUrl", "presentationUrl", "presentationFileName", "createdAt"
       `,
-      [fileName, contentType, req.body, pdfBuffer, req.params.pitchId],
+      [fileName, contentType, req.body, req.params.pitchId],
     );
 
     if ((result.rowCount ?? 0) === 0) {
       return res.status(404).json({ message: "Pitch not found" });
     }
+
+    const presentationVersion = bumpPresentationVersion(req.params.pitchId);
+    void warmPresentationCache(req.params.pitchId, presentationVersion).catch((error) => {
+      console.warn("Presentation uploaded but could not be prepared yet", error);
+    });
 
     return res.json(dashboardPitchSchema.parse(presentPitch(result.rows[0])));
   } catch (error) {
@@ -730,30 +917,20 @@ pitchRouter.get("/public/:pitchId/presentation/file", async (req, res) => {
 
 // Devuelve metadatos de las diapositivas ya preparadas para proyeccion.
 pitchRouter.get("/public/:pitchId/presentation/meta", async (req, res) => {
-  const tempPdf = await writePresentationPdfToTempFile(req.params.pitchId);
-
-  if (!tempPdf) {
-    return res.status(404).json({ message: "Presentation not found" });
-  }
-
   try {
-    const { stdout } = await runProcess("pdfinfo", [tempPdf.pdfPath], 15000);
-    const pagesMatch = stdout.match(/^Pages:\s+(\d+)/m);
-    const pagesCount = Number(pagesMatch?.[1] ?? 0);
+    const cachedPresentation = await warmPresentationCache(req.params.pitchId);
 
-    if (!Number.isFinite(pagesCount) || pagesCount <= 0) {
-      return res.status(500).json({ message: "Failed to read presentation pages" });
+    if (!cachedPresentation) {
+      return res.status(404).json({ message: "Presentation not found" });
     }
 
     return res.json({
-      fileName: tempPdf.fileName,
-      pagesCount,
+      fileName: cachedPresentation.fileName,
+      pagesCount: cachedPresentation.pagesCount,
     });
   } catch (error) {
     console.error(error);
     return res.status(500).json({ message: "Failed to read presentation metadata" });
-  } finally {
-    rm(tempPdf.workDir, { recursive: true, force: true }).catch(() => undefined);
   }
 });
 
@@ -765,33 +942,34 @@ pitchRouter.get("/public/:pitchId/presentation/page/:pageNumber.png", async (req
     return res.status(400).json({ message: "Invalid page number" });
   }
 
-  const tempPdf = await writePresentationPdfToTempFile(req.params.pitchId);
-
-  if (!tempPdf) {
-    return res.status(404).json({ message: "Presentation not found" });
-  }
-
   try {
-    const outputPrefix = join(tempPdf.workDir, "slide");
+    const version = getPresentationVersion(req.params.pitchId);
+    let cachedPresentation = presentationCache.get(req.params.pitchId);
 
-    await runProcess(
-      "pdftoppm",
-      [
-        "-f",
-        String(pageNumber),
-        "-l",
-        String(pageNumber),
-        "-singlefile",
-        "-png",
-        "-r",
-        "180",
-        tempPdf.pdfPath,
-        outputPrefix,
-      ],
-      30000,
-    );
+    if (cachedPresentation?.version !== version) {
+      cachedPresentation = await warmPresentationCache(req.params.pitchId, version) ?? undefined;
+    }
 
-    const pngBuffer = await readFile(`${outputPrefix}.png`);
+    if (!cachedPresentation) {
+      return res.status(404).json({ message: "Presentation not found" });
+    }
+
+    if (pageNumber > cachedPresentation.pagesCount) {
+      return res.status(404).json({ message: "Presentation page not found" });
+    }
+
+    let pngBuffer = cachedPresentation.pages.get(pageNumber);
+
+    if (!pngBuffer) {
+      const preparedPresentation = await ensurePresentationPdf(req.params.pitchId);
+
+      if (!preparedPresentation) {
+        return res.status(404).json({ message: "Presentation not found" });
+      }
+
+      pngBuffer = await renderPresentationPage(preparedPresentation.pdfBuffer, pageNumber);
+      cachedPresentation.pages.set(pageNumber, pngBuffer);
+    }
 
     res.setHeader("Content-Type", "image/png");
     res.setHeader("Cache-Control", "no-store");
@@ -799,8 +977,6 @@ pitchRouter.get("/public/:pitchId/presentation/page/:pageNumber.png", async (req
   } catch (error) {
     console.error(error);
     return res.status(500).json({ message: "Failed to render presentation page" });
-  } finally {
-    rm(tempPdf.workDir, { recursive: true, force: true }).catch(() => undefined);
   }
 });
 
