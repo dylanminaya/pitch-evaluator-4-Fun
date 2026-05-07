@@ -36,6 +36,7 @@ export default function VotingScreenPage() {
   const hasAlreadyVoted = Boolean(pitch?.hasVoted);
   const hasSavedVote = hasAlreadyVoted || isSuccess;
   const isVotingClosed = pitch?.eventStatus !== "OPEN" || pitch?.pitchStatus !== "OPEN";
+  const canEditVote = !isVotingClosed && !hasSavedVote;
 
   useEffect(() => {
     if (isLoadingSession) {
@@ -137,7 +138,7 @@ export default function VotingScreenPage() {
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (isVotingClosed) {
+    if (isVotingClosed || hasAlreadyVoted) {
       return;
     }
 
@@ -249,6 +250,8 @@ export default function VotingScreenPage() {
               <span className="text-sm text-[#8899aa]">
                 {isVotingClosed
                   ? "La votacion esta cerrada. Tu voto queda en modo lectura."
+                  : hasSavedVote
+                  ? "Ya enviaste tu voto. No puede ser modificado."
                   : "Evalua el pitch y envia tu voto."}
               </span>
             </div>
@@ -277,7 +280,7 @@ export default function VotingScreenPage() {
               {isVotingClosed
                 ? "La votacion para este pitch ya esta cerrada. Puedes ver las estrellas y el comentario guardados, pero no modificarlos."
                 : hasSavedVote
-                  ? "Este correo ya registro un voto para este pitch. Puedes editarlo mientras el pitch siga abierto."
+                  ? "Este correo ya registro un voto para este pitch. Tu evaluacion ya esta registrada y no puede cambiarse."
                   : "Tu voto cuenta una sola vez por correo electronico. Toma unos segundos para evaluar de forma honesta cada criterio."}
             </div>
             <button
@@ -320,7 +323,7 @@ export default function VotingScreenPage() {
                           key={value}
                           type="button"
                           onClick={() => updateScore(criterion.id, value)}
-                          disabled={isVotingClosed || isSuccess}
+                          disabled={!canEditVote}
                           aria-label={`Calificar ${criterion.label} con ${value} estrellas`}
                           className="rounded-md p-1 transition hover:bg-[#263550] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-transparent"
                         >
@@ -351,7 +354,7 @@ export default function VotingScreenPage() {
                 value={commentDraft ?? pitch.currentVote?.comment ?? ""}
                 onChange={(event) => setCommentDraft(event.target.value)}
                 placeholder="Que te dirias del equipo o de la solucion?"
-                disabled={isVotingClosed || isSuccess}
+                disabled={!canEditVote}
                 className="mt-4 min-h-28 w-full rounded-2xl border border-[#263550] bg-[#0d1526] px-4 py-3 text-sm text-white outline-none placeholder:text-[#66738f]"
               />
             </section>
@@ -366,7 +369,7 @@ export default function VotingScreenPage() {
               <div className="rounded-2xl border border-[#263550] bg-[#121d30] p-4 text-sm text-[#83ce00]">
                 <div className="inline-flex items-center gap-2">
                   <CheckCircle2 className="size-4" />
-                  Voto guardado. Puedes seguir editandolo mientras el pitch este abierto.
+                  Voto guardado. Tu evaluacion ya esta registrada.
                 </div>
               </div>
             )}
@@ -388,7 +391,7 @@ export default function VotingScreenPage() {
               </Button>
               <Button
                 type="submit"
-                disabled={isPending || isVotingClosed}
+                disabled={isPending || isVotingClosed || hasSavedVote}
                 className="h-12 rounded-full bg-[#83ce00] px-6 text-sm font-bold italic text-[#0d1526] hover:bg-[#a7ea2e]"
               >
                 {isVotingClosed
@@ -396,7 +399,7 @@ export default function VotingScreenPage() {
                   : isPending
                   ? "Guardando..."
                   : hasSavedVote
-                    ? "Guardar cambios"
+                    ? "Voto enviado"
                     : "Enviar voto"}
               </Button>
             </div>

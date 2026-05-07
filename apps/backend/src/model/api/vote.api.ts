@@ -186,89 +186,10 @@ voteRouter.post("/", async (req, res) => {
       );
     }
 
-    if (existingVoteResult.rowCount !== null && existingVoteResult.rowCount > 0 ) {
-      try {
-        const result = await db.query(
-          `
-            UPDATE vote
-            SET
-              "evaluatorId" = $1,
-              "evaluatorEmail" = $2,
-              "criteriaScores" = $3::jsonb,
-              innovation = $4,
-              viability = $5,
-              impact = $6,
-              presentation = $7,
-              comment = $8
-            WHERE id = $9
-            RETURNING
-              id,
-              "pitchId",
-              "evaluatorId",
-              "evaluatorEmail",
-              "criteriaScores",
-              innovation,
-              viability,
-              impact,
-              presentation,
-              comment,
-              "createdAt"
-          `,
-          [
-            evaluatorId ?? null,
-            evaluatorEmail,
-            JSON.stringify(criteriaScores),
-            innovation,
-            viability,
-            impact,
-            presentation,
-            comment ?? null,
-            existingVoteResult.rows[0].id,
-          ],
-        );
-
-        return res.status(200).json(presentVote(result.rows[0]));
-      } catch (error) {
-        if (!hasPgErrorCode(error, "42703")) {
-          throw error;
-        }
-
-        const result = await db.query(
-          `
-            UPDATE vote
-            SET
-              "evaluatorId" = $1,
-              innovation = $2,
-              viability = $3,
-              impact = $4,
-              presentation = $5,
-              comment = $6
-            WHERE id = $7
-            RETURNING
-              id,
-              "pitchId",
-              "evaluatorId",
-              "evaluatorId" AS "evaluatorEmail",
-              innovation,
-              viability,
-              impact,
-              presentation,
-              comment,
-              "createdAt"
-          `,
-          [
-            evaluatorId ?? evaluatorEmail,
-            innovation,
-            viability,
-            impact,
-            presentation,
-            comment ?? null,
-            existingVoteResult.rows[0].id,
-          ],
-        );
-
-        return res.status(200).json(presentVote(result.rows[0]));
-      }
+    if (existingVoteResult.rowCount !== null && existingVoteResult.rowCount > 0) {
+      return res.status(409).json({
+        message: "Ya has votado este pitch",
+      });
     }
 
     let result;
