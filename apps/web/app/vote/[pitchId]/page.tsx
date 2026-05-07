@@ -320,7 +320,7 @@ export default function VotingScreenPage() {
                           key={value}
                           type="button"
                           onClick={() => updateScore(criterion.id, value)}
-                          disabled={isVotingClosed}
+                          disabled={isVotingClosed || isSuccess}
                           aria-label={`Calificar ${criterion.label} con ${value} estrellas`}
                           className="rounded-md p-1 transition hover:bg-[#263550] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-transparent"
                         >
@@ -351,7 +351,7 @@ export default function VotingScreenPage() {
                 value={commentDraft ?? pitch.currentVote?.comment ?? ""}
                 onChange={(event) => setCommentDraft(event.target.value)}
                 placeholder="Que te dirias del equipo o de la solucion?"
-                disabled={isVotingClosed}
+                disabled={isVotingClosed || isSuccess}
                 className="mt-4 min-h-28 w-full rounded-2xl border border-[#263550] bg-[#0d1526] px-4 py-3 text-sm text-white outline-none placeholder:text-[#66738f]"
               />
             </section>

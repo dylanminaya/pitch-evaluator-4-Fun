@@ -239,8 +239,17 @@ export default function EventInvitationPage() {
                       className="rounded-2xl border border-[#263550] bg-[#0d1526] p-5"
                     >
                       <div
-                        className="inline-flex rounded-full px-3 py-1 text-[11px] font-bold uppercase italic tracking-[0.24em] text-[#83ce00]"
-                        style={{ backgroundColor: `${pitch.color}22` }}
+                        className={`inline-flex rounded-full px-3 py-1 text-[11px] font-bold uppercase italic tracking-[0.24em] ${
+                          pitch.status === "OPEN"
+                            ? "text-[#83ce00]"
+                            : "text-[#ff6b6b]"
+                        }`}
+                        style={{
+                          backgroundColor:
+                            pitch.status === "OPEN"
+                              ? `${pitch.color}22`
+                              : "#ff6b6b22",
+                        }}
                       >
                         {pitch.status === "OPEN" ? "Disponible" : "Cerrado"}
                       </div>
