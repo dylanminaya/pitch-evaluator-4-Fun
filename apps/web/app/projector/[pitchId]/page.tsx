@@ -92,7 +92,9 @@ export default function ProjectorPitchPage() {
     number | null
   >(null);
   const [autoCloseError, setAutoCloseError] = useState<string | null>(null);
+  const [isTimerEnabled, setIsTimerEnabled] = useState(true);
   const [isRunning, setIsRunning] = useState(false);
+  const [autoAdvanceSlidesEnabled, setAutoAdvanceSlidesEnabled] = useState(true);
   const [showControls, setShowControls] = useState(false);
   const [failedImageUrl, setFailedImageUrl] = useState<string | null>(null);
   const [projectorMode, setProjectorMode] = useState<"presentation" | "image" | null>(null);
@@ -104,7 +106,7 @@ export default function ProjectorPitchPage() {
   const autoCloseDelaySecondsRef = useRef(DEFAULT_AUTO_CLOSE_DELAY_SECONDS);
 
   useEffect(() => {
-    if (!isRunning) {
+    if (!isTimerEnabled || !isRunning) {
       return;
     }
 
@@ -121,10 +123,11 @@ export default function ProjectorPitchPage() {
     }, 1000);
 
     return () => window.clearInterval(intervalId);
-  }, [isRunning]);
+  }, [isRunning, isTimerEnabled]);
 
   useEffect(() => {
     if (
+      !isTimerEnabled ||
       timeLeftSeconds !== 0 ||
       pitch?.pitchStatus !== "OPEN" ||
       hasScheduledAutoCloseRef.current
@@ -227,6 +230,26 @@ export default function ProjectorPitchPage() {
           : "image";
   const isShowingPresentation =
     activeProjectorMode === "presentation" && hasPresentation;
+
+  const slideDurationSeconds = useMemo(() => {
+    if (!autoAdvanceSlidesEnabled || !isShowingPresentation || slidesCount <= 0) {
+      return null;
+    }
+
+    return (durationMinutes * 60) / slidesCount;
+  }, [autoAdvanceSlidesEnabled, isShowingPresentation, slidesCount, durationMinutes]);
+
+  useEffect(() => {
+    if (!isRunning || !slideDurationSeconds || currentSlide >= slidesCount) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setCurrentSlide((current) => Math.min(current + 1, slidesCount));
+    }, slideDurationSeconds * 1000);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [currentSlide, isRunning, slideDurationSeconds, slidesCount]);
 
   useEffect(() => {
     if (!presentationBaseUrl) {
@@ -426,31 +449,33 @@ export default function ProjectorPitchPage() {
           Volver
         </Button>
 
-        <div className="rounded-[22px] border border-white/10 bg-black/45 px-4 py-3 shadow-[0_18px_60px_rgba(0,0,0,0.35)] backdrop-blur md:px-5 md:py-4">
-          <p className="text-right text-[10px] font-bold uppercase tracking-[0.28em] text-[#83ce00]">
-            Tiempo
-          </p>
-          <p className="mt-1 text-3xl font-black tracking-[-0.08em] md:text-5xl">
-            {formatTime(timeLeftSeconds)}
-          </p>
-          <div className="mt-3 h-2 w-[120px] overflow-hidden rounded-full bg-white/10 md:w-[180px]">
-            <div
-              className="h-full rounded-full transition-[width] duration-500"
-              style={{
-                width: `${progress}%`,
-                background: `linear-gradient(90deg, ${pitch.color}, #83ce00)`,
-              }}
-            />
-          </div>
-          <p className="mt-3 text-right text-[11px] font-bold uppercase tracking-[0.18em] text-[#c2ccdc]">
-            {pitch.pitchStatus === "OPEN" ? "Votos abiertos" : "Votos cerrados"}
-          </p>
-          {autoCloseCountdownSeconds != null && pitch.pitchStatus === "OPEN" && (
-            <p className="mt-1 text-right text-xs font-semibold text-[#ffcf6e]">
-              Cierre en {autoCloseCountdownSeconds}s
+        {isTimerEnabled && (
+          <div className="rounded-[22px] border border-white/10 bg-black/45 px-4 py-3 shadow-[0_18px_60px_rgba(0,0,0,0.35)] backdrop-blur md:px-5 md:py-4">
+            <p className="text-right text-[10px] font-bold uppercase tracking-[0.28em] text-[#83ce00]">
+              Tiempo
             </p>
-          )}
-        </div>
+            <p className="mt-1 text-3xl font-black tracking-[-0.08em] md:text-5xl">
+              {formatTime(timeLeftSeconds)}
+            </p>
+            <div className="mt-3 h-2 w-[120px] overflow-hidden rounded-full bg-white/10 md:w-[180px]">
+              <div
+                className="h-full rounded-full transition-[width] duration-500"
+                style={{
+                  width: `${progress}%`,
+                  background: `linear-gradient(90deg, ${pitch.color}, #83ce00)`,
+                }}
+              />
+            </div>
+            <p className="mt-3 text-right text-[11px] font-bold uppercase tracking-[0.18em] text-[#c2ccdc]">
+              {pitch.pitchStatus === "OPEN" ? "Votos abiertos" : "Votos cerrados"}
+            </p>
+            {autoCloseCountdownSeconds != null && pitch.pitchStatus === "OPEN" && (
+              <p className="mt-1 text-right text-xs font-semibold text-[#ffcf6e]">
+                Cierre en {autoCloseCountdownSeconds}s
+              </p>
+            )}
+          </div>
+        )}
       </div>
 
       {isShowingPresentation && currentSlideImageUrl ? (
@@ -628,6 +653,41 @@ export default function ProjectorPitchPage() {
                 </Button>
               </div>
 
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <Button
+                  type="button"
+                  onClick={() => {
+                    setIsTimerEnabled((current) => !current);
+                    setIsRunning(false);
+                  }}
+                  className={`h-12 rounded-2xl text-sm font-bold ${
+                    isTimerEnabled
+                      ? "bg-white text-[#07111f] hover:bg-white/90"
+                      : "bg-[#ffcf6e] text-[#07111f] hover:bg-[#ffe08f]"
+                  }`}
+                >
+                  {isTimerEnabled ? "Temporizador activado" : "Temporizador desactivado"}
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => setAutoAdvanceSlidesEnabled((current) => !current)}
+                  disabled={!hasPresentation}
+                  className={`h-12 rounded-2xl text-sm font-bold ${
+                    autoAdvanceSlidesEnabled
+                      ? "bg-white text-[#07111f] hover:bg-white/90"
+                      : "bg-white/10 text-white hover:bg-white/15"
+                  }`}
+                >
+                  {autoAdvanceSlidesEnabled ? "Avance automático ON" : "Avance automático OFF"}
+                </Button>
+              </div>
+
+              {/* {hasPresentation && autoAdvanceSlidesEnabled && slideDurationSeconds != null && (
+                <div className="mt-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-[#c2ccdc]">
+                  Cada diapositiva durará aproximadamente {formatTime(Math.round(slideDurationSeconds))}.
+                </div>
+              )} */}
+
               <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_auto]">
                 <Input
                   type="number"
@@ -647,7 +707,7 @@ export default function ProjectorPitchPage() {
                 <Button
                   type="button"
                   onClick={() => setIsRunning((current) => !current)}
-                  disabled={timeLeftSeconds === 0}
+                  disabled={timeLeftSeconds === 0 || !isTimerEnabled}
                   className="h-12 rounded-2xl bg-white text-sm font-bold text-[#07111f] hover:bg-white/90"
                 >
                   {isRunning ? <Pause className="size-4" /> : <Play className="size-4" />}
