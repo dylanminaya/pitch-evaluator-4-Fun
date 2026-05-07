@@ -242,32 +242,36 @@ function DashboardPageContent() {
     <main className="min-h-svh bg-[#0d1526] text-white">
       <div className="mx-auto flex min-h-svh w-full max-w-[1440px] flex-col gap-4 px-4 py-4 md:px-8 md:py-6">
         <header className={`${shellClass} flex flex-col gap-4 px-5 py-4 md:flex-row md:items-center md:justify-between md:px-8`}>
-          <div className="flex items-center gap-3">
-            <Image src="/logo.svg" alt="Pitch 4 Fun" width={98} height={42} className="h-10 w-auto" />
-            <div className="flex flex-col">
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-[#263550]">/</span>
-                <span className="text-xs font-bold uppercase italic tracking-[0.28em] text-[#83ce00]">
-                  Organizer Dashboard
-                </span>
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:gap-6">
+            <div className="flex items-center gap-3">
+              <Link
+                href={`/events`}
+                className="inline-flex items-center gap-2 text-sm font-semibold text-[#8899aa] transition hover:text-white"
+              >
+                <ArrowLeft className="size-4" />
+                <span>Volver al dashboard</span>
+              </Link>
+
+              <div className="hidden h-8 w-px rounded-full bg-[#263550] md:block" />
+
+              <div className="flex items-center gap-3">
+                <Image src="/logo.svg" alt="Pitch 4 Fun" width={98} height={42} className="h-10 w-auto" />
+                <div className="flex flex-col">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-[#263550]">/</span>
+                    <span className="text-xs font-bold uppercase italic tracking-[0.28em] text-[#83ce00]">
+                      Organizer Dashboard
+                    </span>
+                  </div>
+                  <span className="text-sm text-[#8899aa]">
+                    {selectedEvent?.name ?? "Sin eventos"}
+                  </span>
+                </div>
               </div>
-              <span className="text-sm text-[#8899aa]">
-                {selectedEvent?.name ?? "Sin eventos"}
-              </span>
             </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            <Link href="/events">
-              <Button
-                variant="outline"
-                className="rounded-full border-[#263550] bg-[#0d1526] text-white hover:bg-[#1a2640] hover:text-white"
-              >
-                <ArrowLeft className="size-4" />
-                Volver a eventos
-              </Button>
-            </Link>
-
             <Link href={selectedEventId ? `/events/${selectedEventId}/team` : "#"}>
               <Button
                 variant="outline"

@@ -158,6 +158,32 @@ export default function EventExportsPage() {
     return buildRankingRows({ ranking, selectedCriteria, pitchStatusById });
   }, [pitchStatusById, ranking, selectedCriteria]);
 
+  const pitchesById = useMemo(
+    () => new Map(pitches.map((pitch) => [pitch.id, pitch])),
+    [pitches],
+  );
+
+  const rankingRowsByCreatedAt = useMemo(() => {
+    return [...rankingRows].sort((left, right) => {
+      const leftCreatedAt = Date.parse(pitchesById.get(left.id)?.createdAt ?? "");
+      const rightCreatedAt = Date.parse(pitchesById.get(right.id)?.createdAt ?? "");
+
+      if (Number.isFinite(rightCreatedAt) && Number.isFinite(leftCreatedAt)) {
+        return rightCreatedAt - leftCreatedAt;
+      }
+
+      if (Number.isFinite(rightCreatedAt)) {
+        return 1;
+      }
+
+      if (Number.isFinite(leftCreatedAt)) {
+        return -1;
+      }
+
+      return left.name.localeCompare(right.name);
+    });
+  }, [pitchesById, rankingRows]);
+
   useEffect(() => {
     setSelectedPitchIds((current) =>
       current.filter((pitchId) => rankingRows.some((row) => row.id === pitchId)),
@@ -165,9 +191,9 @@ export default function EventExportsPage() {
   }, [rankingRows]);
 
   const allSelected =
-    rankingRows.length > 0 && selectedPitchIds.length === rankingRows.length;
+    rankingRowsByCreatedAt.length > 0 && selectedPitchIds.length === rankingRowsByCreatedAt.length;
 
-  const selectedRows = rankingRows.filter((row) => selectedPitchIds.includes(row.id));
+  const selectedRows = rankingRowsByCreatedAt.filter((row) => selectedPitchIds.includes(row.id));
 
   function togglePitchSelection(pitchId: string) {
     setSelectedPitchIds((current) =>
@@ -178,7 +204,7 @@ export default function EventExportsPage() {
   }
 
   function toggleSelectAll() {
-    setSelectedPitchIds(allSelected ? [] : rankingRows.map((row) => row.id));
+    setSelectedPitchIds(allSelected ? [] : rankingRowsByCreatedAt.map((row) => row.id));
   }
 
   function getVoteScore(vote: DashboardVote | undefined, criterionId: string) {
@@ -466,7 +492,7 @@ export default function EventExportsPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {rankingRows.map((row, index) => {
+                    {rankingRowsByCreatedAt.map((row, index) => {
                       const isSelected = selectedPitchIds.includes(row.id);
 
                       return (
