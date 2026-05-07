@@ -200,20 +200,30 @@ export default function EventsPage() {
                 return (
                   <article
                     key={event.id}
-                    className="overflow-hidden rounded-[24px] border border-[#263550] bg-[#1a2640] shadow-[0_18px_45px_rgba(2,8,23,0.35)] transition hover:border-[#3a5678]"
+                    className="flex h-full flex-col overflow-hidden rounded-[24px] border border-[#263550] bg-[#1a2640] shadow-[0_18px_45px_rgba(2,8,23,0.35)] transition hover:border-[#3a5678]"
                   >
                     <Link
                       href={`/dashboard?eventId=${event.id}`}
-                      className="group block"
+                      className="group block flex-1"
                     >
                       <div className={`h-1.5 w-full bg-gradient-to-r ${accent}`} />
-                      <div className="flex flex-col gap-5 p-6">
+                      <div className="flex h-full flex-col gap-5 p-6">
                         <div className="flex items-start justify-between gap-4">
                           <div>
                             <h2 className="text-xl font-bold tracking-tight text-white">
                               {event.name}
                             </h2>
-                            <p className="mt-2 text-sm leading-6 text-[#a9b3c9]">
+                            <p
+                              className="mt-2 text-sm leading-6 text-[#a9b3c9]"
+                              style={{
+                                display: "-webkit-box",
+                                WebkitLineClamp: 2,
+                                WebkitBoxOrient: "vertical",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "normal",
+                              }}
+                            >
                               {event.description}
                             </p>
                           </div>

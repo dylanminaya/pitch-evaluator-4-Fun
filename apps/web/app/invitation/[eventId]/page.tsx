@@ -245,7 +245,19 @@ export default function EventInvitationPage() {
                         {pitch.status === "OPEN" ? "Disponible" : "Cerrado"}
                       </div>
                       <h2 className="mt-4 text-xl font-bold text-white">{pitch.name}</h2>
-                      <p className="mt-3 text-sm leading-6 text-[#a9b3c9]">{pitch.description}</p>
+                      <p
+                        className="mt-3 text-sm leading-6 text-[#a9b3c9]"
+                        style={{
+                          display: "-webkit-box",
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: "vertical",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "normal",
+                        }}
+                      >
+                        {pitch.description}
+                      </p>
                       <div className="mt-5">
                         <Link href={canOpenPitch ? `/vote/${pitch.id}${evaluatorEmailQuery}` : "#"} aria-disabled={!canOpenPitch}>
                           <Button

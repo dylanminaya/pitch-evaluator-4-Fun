@@ -493,8 +493,16 @@ export default function EventExportsPage() {
                             <div className="flex flex-col gap-1">
                               <span className="font-semibold text-white">{row.name}</span>
                               <span
-                                className="block max-w-xl truncate text-xs text-[#8899aa]"
+                                className="block max-w-[280px] text-xs text-[#8899aa]"
                                 title={row.description ?? ""}
+                                style={{
+                                  display: "-webkit-box",
+                                  WebkitLineClamp: 2,
+                                  WebkitBoxOrient: "vertical",
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                  whiteSpace: "normal",
+                                }}
                               >
                                 {row.description}
                               </span>
