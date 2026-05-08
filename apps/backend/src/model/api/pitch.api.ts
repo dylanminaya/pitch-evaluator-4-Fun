@@ -2,9 +2,10 @@ import { Router } from "express";
 import express from "express";
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { constants } from "node:fs";
+import { access, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { isAbsolute, join } from "node:path";
 import { z } from "zod";
 import { requireSession } from "../../auth.js";
 import { db } from "../../db.js";
@@ -64,6 +65,72 @@ const presentationPreparationTasks = new Map<
 const presentationCache = new Map<string, CachedPresentation>();
 const presentationWarmupTasks = new Map<string, Promise<CachedPresentation | null>>();
 const presentationVersions = new Map<string, number>();
+
+const PATH_SEPARATOR = process.platform === "win32" ? ";" : ":";
+const executablePathCache = new Map<string, string>();
+
+async function resolveExecutablePath(command: string) {
+  if (isAbsolute(command)) {
+    await access(command, constants.X_OK);
+    return command;
+  }
+
+  if (executablePathCache.has(command)) {
+    return executablePathCache.get(command)!;
+  }
+
+  // eslint-disable-next-line turbo/no-undeclared-env-vars
+  const pathEnv = process.env.PATH ?? "";
+  const searchPaths = pathEnv.split(PATH_SEPARATOR).filter(Boolean);
+
+  for (const dir of searchPaths) {
+    const candidatePath = join(dir, command);
+
+    try {
+      await access(candidatePath, constants.X_OK);
+      executablePathCache.set(command, candidatePath);
+      return candidatePath;
+    } catch {
+      // ignore missing candidates
+    }
+  }
+
+  return null;
+}
+
+class MissingBinaryError extends Error {
+  constructor(candidates: string[]) {
+    super(
+      `Required binary not found: ${candidates.join(", ")}. ` +
+        `Install the required system package and make sure the executable is on PATH, or set the environment variable.`
+    );
+    this.name = "MissingBinaryError";
+  }
+}
+
+async function resolveSystemCommand(envVarName: string, fallbackNames: string[]) {
+  const candidates = [] as string[];
+
+  if (process.env[envVarName]) {
+    candidates.push(process.env[envVarName]!);
+  }
+
+  candidates.push(...fallbackNames);
+
+  for (const candidate of candidates) {
+    try {
+      const path = await resolveExecutablePath(candidate);
+
+      if (path) {
+        return path;
+      }
+    } catch {
+      // try next candidate
+    }
+  }
+
+  throw new MissingBinaryError(candidates);
+}
 
 // Detecta errores de Postgres por codigo para aplicar fallbacks de schema.
 const hasPgErrorCode = (error: unknown, code: string) =>
@@ -171,8 +238,25 @@ async function convertPresentationBufferToPdf(
 
   try {
     await writeFile(inputPath, buffer);
+    let libreofficeCommand: string;
+
+    try {
+      libreofficeCommand = await resolveSystemCommand("LIBREOFFICE_BINARY", [
+        "libreoffice",
+        "soffice",
+      ]);
+    } catch (error) {
+      if (error instanceof MissingBinaryError) {
+        throw new Error(
+          "LibreOffice binary not found. Install LibreOffice and make sure `libreoffice` or `soffice` is available on PATH, or set LIBREOFFICE_BINARY."
+        );
+      }
+
+      throw error;
+    }
+
     await runProcess(
-      "libreoffice",
+      libreofficeCommand,
       [
         "--headless",
         "--convert-to",
@@ -209,7 +293,8 @@ async function getPdfPagesCount(pdfBuffer: Buffer) {
 
   try {
     await writeFile(pdfPath, pdfBuffer);
-    const { stdout } = await runProcess("pdfinfo", [pdfPath], 15000);
+    const pdfinfoCommand = await resolveSystemCommand("PDFINFO_BINARY", ["pdfinfo"]);
+    const { stdout } = await runProcess(pdfinfoCommand, [pdfPath], 15000);
     const pagesMatch = stdout.match(/^Pages:\s+(\d+)/m);
     const pagesCount = Number(pagesMatch?.[1] ?? 0);
 
@@ -230,8 +315,10 @@ async function renderPresentationPage(pdfBuffer: Buffer, pageNumber: number) {
 
   try {
     await writeFile(pdfPath, pdfBuffer);
+    const pdftoppmCommand = await resolveSystemCommand("PDFTOPPM_BINARY", ["pdftoppm"]);
+
     await runProcess(
-      "pdftoppm",
+      pdftoppmCommand,
       [
         "-f",
         String(pageNumber),
@@ -671,7 +758,10 @@ pitchRouter.post("/:pitchId/presentation", presentationUpload, async (req, res) 
 
     const presentationVersion = bumpPresentationVersion(req.params.pitchId);
     void warmPresentationCache(req.params.pitchId, presentationVersion).catch((error) => {
-      console.warn("Presentation uploaded but could not be prepared yet", error);
+      console.warn(
+        "Presentation uploaded but could not be prepared yet. Ensure LibreOffice is installed or set LIBREOFFICE_BINARY.",
+        error,
+      );
     });
 
     return res.json(dashboardPitchSchema.parse(presentPitch(result.rows[0])));
