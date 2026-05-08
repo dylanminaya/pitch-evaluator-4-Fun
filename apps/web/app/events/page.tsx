@@ -10,18 +10,20 @@ import {
   Trash2,
   Plus,
   Search,
+  UserRoundCheck,
   Users,
 } from "lucide-react";
 import { Button } from "@workspace/ui/components/button";
 import { useSignOut } from "@/hooks/auth";
 import { useDeleteEvent, useEvents } from "@/hooks/dashboard";
 
-type FilterKey = "all" | "open" | "closed";
+type FilterKey = "all" | "open" | "closed" | "groups";
 
 const filterLabels: Record<FilterKey, string> = {
   all: "Todo",
   open: "Activos",
   closed: "Cerrados",
+  groups: "Grupos",
 };
 
 const accentTones = [
@@ -58,7 +60,13 @@ export default function EventsPage() {
 
     return events.filter((event) => {
       const matchesFilter =
-        filter === "all" ? true : filter === "open" ? event.status === "OPEN" : event.status === "CLOSED";
+        filter === "all"
+          ? true
+          : filter === "open"
+            ? event.status === "OPEN"
+            : filter === "closed"
+              ? event.status === "CLOSED"
+              : event.accessRole === "CO_ORGANIZER";
 
       const matchesSearch =
         normalizedSearch.length === 0 ||
@@ -192,20 +200,30 @@ export default function EventsPage() {
                 return (
                   <article
                     key={event.id}
-                    className="overflow-hidden rounded-[24px] border border-[#263550] bg-[#1a2640] shadow-[0_18px_45px_rgba(2,8,23,0.35)] transition hover:border-[#3a5678]"
+                    className="flex h-full flex-col overflow-hidden rounded-[24px] border border-[#263550] bg-[#1a2640] shadow-[0_18px_45px_rgba(2,8,23,0.35)] transition hover:border-[#3a5678]"
                   >
                     <Link
                       href={`/dashboard?eventId=${event.id}`}
-                      className="group block"
+                      className="group block flex-1"
                     >
                       <div className={`h-1.5 w-full bg-gradient-to-r ${accent}`} />
-                      <div className="flex flex-col gap-5 p-6">
+                      <div className="flex h-full flex-col gap-5 p-6">
                         <div className="flex items-start justify-between gap-4">
                           <div>
                             <h2 className="text-xl font-bold tracking-tight text-white">
                               {event.name}
                             </h2>
-                            <p className="mt-2 text-sm leading-6 text-[#a9b3c9]">
+                            <p
+                              className="mt-2 text-sm leading-6 text-[#a9b3c9]"
+                              style={{
+                                display: "-webkit-box",
+                                WebkitLineClamp: 2,
+                                WebkitBoxOrient: "vertical",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "normal",
+                              }}
+                            >
                               {event.description}
                             </p>
                           </div>
@@ -229,11 +247,17 @@ export default function EventsPage() {
                             <CircleDot className="size-4" />
                             <span>{isOpen ? "Recepcionando votos" : "Sesion cerrada"}</span>
                           </div>
+                          {event.accessRole === "CO_ORGANIZER" ? (
+                            <div className="inline-flex items-center gap-2">
+                              <UserRoundCheck className="size-4" />
+                              <span>Invitado a coordinar</span>
+                            </div>
+                          ) : null}
                         </div>
 
                         <div className="flex items-center justify-between">
                           <span className="text-[11px] font-bold uppercase italic tracking-[0.28em] text-[#83ce00]">
-                            Abrir dashboard
+                            {event.accessRole === "CO_ORGANIZER" ? "Eres co-organizer" : "Abrir dashboard"}
                           </span>
                           <div className="inline-flex items-center gap-2 rounded-full border border-[#263550] bg-[#0d1526] px-4 py-2 text-sm font-semibold text-white">
                             Entrar

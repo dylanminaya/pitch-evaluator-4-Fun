@@ -1,4 +1,4 @@
-import { apiFetch, apiFetchBlob, apiFetchVoid } from "./api/client";
+import { apiFetch, apiFetchBlob, apiFetchFile, apiFetchVoid } from "./api/client";
 
 import {
   type CreatePublicVote,
@@ -11,6 +11,7 @@ import {
   type DashboardRankingItem,
   type DashboardPitchDetail,
   type DashboardPitchComment,
+  type DashboardVote,
   type DashboardPitchQr,
   type PublicPitch,
   type PublicEventInvitation,
@@ -31,6 +32,7 @@ export type {
   DashboardRankingItem,
   DashboardPitchDetail,
   DashboardPitchComment,
+  DashboardVote,
   DashboardPitchQr,
   PublicPitch,
   PublicEventInvitation,
@@ -73,6 +75,10 @@ export function updatePitch(pitchId: string, data: UpdateDashboardPitch) {
   });
 }
 
+export function uploadPitchPresentation(pitchId: string, file: File) {
+  return apiFetchFile<DashboardPitch>(`/api/pitch/${pitchId}/presentation`, file);
+}
+
 export function updatePitchStatus(
   pitchId: string,
   status: "OPEN" | "CLOSED",
@@ -99,6 +105,12 @@ export function getPitchComments(pitchId: string) {
   );
 }
 
+export function getVotes(pitchId: string) {
+  return apiFetch<DashboardVote[]>(
+    `/api/vote?pitchId=${encodeURIComponent(pitchId)}`,
+  );
+}
+
 export function getPitchQr(pitchId: string) {
   return apiFetch<DashboardPitchQr>(`/api/pitch/${pitchId}/qr`);
 }
@@ -107,8 +119,12 @@ export function getEventQr(eventId: string) {
   return apiFetch<DashboardPitchQr>(`/api/event/${eventId}/qr`);
 }
 
-export function getPublicPitch(pitchId: string) {
-  return apiFetch<PublicPitch>(`/api/pitch/public/${pitchId}`);
+export function getPublicPitch(pitchId: string, evaluatorEmail?: string) {
+  const query = evaluatorEmail
+    ? `?evaluatorEmail=${encodeURIComponent(evaluatorEmail)}`
+    : "";
+
+  return apiFetch<PublicPitch>(`/api/pitch/public/${pitchId}${query}`);
 }
 
 export function getPublicEventInvitation(eventId: string) {
@@ -181,6 +197,12 @@ export function getEventOrganizers(eventId: string) {
   return apiFetch<DashboardEventOrganizer[]>(
     `/api/event/${eventId}/organizers`,
   );
+}
+
+export function removeOrganizer(eventId: string, organizerId: string) {
+  return apiFetchVoid(`/api/event/${eventId}/organizers/${organizerId}`, {
+    method: "DELETE",
+  });
 }
 
 export function getOrganizerInvitationByToken(token: string) {

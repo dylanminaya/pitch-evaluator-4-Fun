@@ -4,9 +4,9 @@ import { SignupForm } from "@/components/signup-form";
 export default async function Page({
   searchParams,
 }: {
-  searchParams: Promise<{ redirect?: string }>;
+  searchParams: Promise<{ redirect?: string; switchAccount?: string }>;
 }) {
-  const { redirect } = await searchParams;
+  const { redirect, switchAccount } = await searchParams;
 
   return (
     <AuthShell
@@ -17,7 +17,7 @@ export default async function Page({
       ctaLabel="Ya tengo cuenta"
       accent="Registra tu cuenta y en el siguiente paso podrás entrar al dashboard para crear eventos, criterios y sesiones de voto."
     >
-        <SignupForm redirectTo={redirect} />
+        <SignupForm redirectTo={redirect} forceSignOut={switchAccount === "1"} />
     </AuthShell>
   );
 }

@@ -17,19 +17,6 @@ import {
 
 export const voteRouter: Router = Router();
 
-// Normaliza la IP aunque venga por proxy o encabezados encadenados.
-const getClientIpAddress = (value: string | string[] | undefined) => {
-  if (Array.isArray(value)) {
-    return value[0] ?? null;
-  }
-
-  if (typeof value === "string" && value.length > 0) {
-    return value.split(",")[0]?.trim() ?? null;
-  }
-
-  return null;
-};
-
 // Detecta errores de Postgres por codigo para aplicar fallbacks o respuestas claras.
 const hasPgErrorCode = (error: unknown, code: string) =>
   typeof error === "object" &&
@@ -70,7 +57,8 @@ voteRouter.get("/", async (req, res) => {
           v.id,
           v."pitchId",
           v."evaluatorId",
-          v."ipAddress",
+          v."evaluatorEmail",
+          v."criteriaScores",
           v.innovation,
           v.viability,
           v.impact,
@@ -105,6 +93,7 @@ voteRouter.post("/", async (req, res) => {
   const {
     pitchId,
     evaluatorId,
+    evaluatorEmail,
     criteriaScores,
     comment,
   } = parsed.data;
@@ -157,41 +146,50 @@ voteRouter.post("/", async (req, res) => {
       return res.status(400).json({ message: criteriaValidationError });
     }
 
-    const innovation = getScoreByCriterionId(criteriaScores, "innovation");
-    const viability = getScoreByCriterionId(criteriaScores, "viability");
-    const impact = getScoreByCriterionId(criteriaScores, "impact");
-    const presentation = getScoreByCriterionId(criteriaScores, "presentation");
+    const legacyScoreFallback =
+      criteriaScores.length > 0
+        ? Math.round(
+            criteriaScores.reduce((sum, criterion) => sum + criterion.score, 0) /
+              criteriaScores.length,
+          )
+        : 3;
+    const innovation = getScoreByCriterionId(criteriaScores, "innovation") ?? legacyScoreFallback;
+    const viability = getScoreByCriterionId(criteriaScores, "viability") ?? legacyScoreFallback;
+    const impact = getScoreByCriterionId(criteriaScores, "impact") ?? legacyScoreFallback;
+    const presentation = getScoreByCriterionId(criteriaScores, "presentation") ?? legacyScoreFallback;
 
-    if (
-      innovation === null ||
-      viability === null ||
-      impact === null ||
-      presentation === null
-    ) {
-      return res.status(400).json({
-        message: "Missing one or more required default criteria scores",
-      });
-    }
+    let existingVoteResult;
 
-    // Evita voto duplicado por IP.
-    const ipAddress =
-      getClientIpAddress(req.headers["x-forwarded-for"]) ?? req.ip ?? null;
-
-    if(ipAddress) {
-      const existingVoteResult = await db.query(
+    try {
+      existingVoteResult = await db.query(
         `
         SELECT id
         FROM vote
         WHERE "pitchId" = $1
-          AND "ipAddress" = $2
+          AND "evaluatorEmail" = $2
         LIMIT 1`,
-        [pitchId, ipAddress]
+        [pitchId, evaluatorEmail]
       );
-
-      if (existingVoteResult.rowCount !== null && existingVoteResult.rowCount > 0 ) {
-        return res.status(409).json({ message: "You have already voted for this pitch",
-        });
+    } catch (error) {
+      if (!hasPgErrorCode(error, "42703")) {
+        throw error;
       }
+
+      existingVoteResult = await db.query(
+        `
+        SELECT id
+        FROM vote
+        WHERE "pitchId" = $1
+          AND "evaluatorId" = $2
+        LIMIT 1`,
+        [pitchId, evaluatorEmail]
+      );
+    }
+
+    if (existingVoteResult.rowCount !== null && existingVoteResult.rowCount > 0) {
+      return res.status(409).json({
+        message: "Ya has votado este pitch",
+      });
     }
 
     let result;
@@ -204,7 +202,7 @@ voteRouter.post("/", async (req, res) => {
               id,
               "pitchId",
               "evaluatorId",
-              "ipAddress",
+              "evaluatorEmail",
               "criteriaScores",
               innovation,
               viability,
@@ -218,7 +216,8 @@ voteRouter.post("/", async (req, res) => {
               id,
               "pitchId",
               "evaluatorId",
-              "ipAddress",
+              "evaluatorEmail",
+              "criteriaScores",
               innovation,
               viability,
               impact,
@@ -230,7 +229,7 @@ voteRouter.post("/", async (req, res) => {
             randomUUID(),
             pitchId,
             evaluatorId ?? null,
-            ipAddress,
+            evaluatorEmail,
             JSON.stringify(criteriaScores),
             innovation,
             viability,
@@ -240,50 +239,142 @@ voteRouter.post("/", async (req, res) => {
           ],
         );
       } catch (error) {
-        // Fallback para bases viejas sin `criteriaScores`.
         if (!hasPgErrorCode(error, "42703")) {
           throw error;
         }
 
-        result = await db.query(
-          `
-            INSERT INTO vote (
-              id,
-              "pitchId",
-              "evaluatorId",
-              "ipAddress",
+        try {
+          // Fallback para bases viejas sin `criteriaScores`.
+          result = await db.query(
+            `
+              INSERT INTO vote (
+                id,
+                "pitchId",
+                "evaluatorId",
+                "evaluatorEmail",
+                innovation,
+                viability,
+                impact,
+                presentation,
+                comment,
+                "createdAt"
+              )
+              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
+              RETURNING
+                id,
+                "pitchId",
+                "evaluatorId",
+                "evaluatorEmail",
+                innovation,
+                viability,
+                impact,
+                presentation,
+                comment,
+                "createdAt"
+            `,
+            [
+              randomUUID(),
+              pitchId,
+              evaluatorId ?? null,
+              evaluatorEmail,
               innovation,
               viability,
               impact,
               presentation,
-              comment,
-              "createdAt"
-            )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
-            RETURNING
-              id,
-              "pitchId",
-              "evaluatorId",
-              "ipAddress",
-              innovation,
-              viability,
-              impact,
-              presentation,
-              comment,
-              "createdAt"
-          `,
-          [
-            randomUUID(),
-            pitchId,
-            evaluatorId ?? null,
-            ipAddress,
-            innovation,
-            viability,
-            impact,
-            presentation,
-            comment ?? null,
-          ],
-        );
+              comment ?? null,
+            ],
+          );
+        } catch (fallbackError) {
+          if (!hasPgErrorCode(fallbackError, "42703")) {
+            throw fallbackError;
+          }
+
+          try {
+            // Fallback para bases viejas sin `evaluatorEmail`.
+            result = await db.query(
+              `
+                INSERT INTO vote (
+                  id,
+                  "pitchId",
+                  "evaluatorId",
+                  "criteriaScores",
+                  innovation,
+                  viability,
+                  impact,
+                  presentation,
+                  comment,
+                  "createdAt"
+                )
+                VALUES ($1, $2, $3, $4::jsonb, $5, $6, $7, $8, $9, NOW())
+                RETURNING
+                  id,
+                  "pitchId",
+                  "evaluatorId",
+                  "evaluatorId" AS "evaluatorEmail",
+                  innovation,
+                  viability,
+                  impact,
+                  presentation,
+                  comment,
+                  "createdAt"
+              `,
+              [
+                randomUUID(),
+                pitchId,
+                evaluatorId ?? evaluatorEmail,
+                JSON.stringify(criteriaScores),
+                innovation,
+                viability,
+                impact,
+                presentation,
+                comment ?? null,
+              ],
+            );
+          } catch (legacyError) {
+            if (!hasPgErrorCode(legacyError, "42703")) {
+              throw legacyError;
+            }
+
+            // Fallback para bases viejas sin `evaluatorEmail` ni `criteriaScores`.
+            result = await db.query(
+              `
+                INSERT INTO vote (
+                  id,
+                  "pitchId",
+                  "evaluatorId",
+                  innovation,
+                  viability,
+                  impact,
+                  presentation,
+                  comment,
+                  "createdAt"
+                )
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+                RETURNING
+                  id,
+                  "pitchId",
+                  "evaluatorId",
+                  "evaluatorId" AS "evaluatorEmail",
+                  innovation,
+                  viability,
+                  impact,
+                  presentation,
+                  comment,
+                  "createdAt"
+              `,
+              [
+                randomUUID(),
+                pitchId,
+                evaluatorId ?? evaluatorEmail,
+                innovation,
+                viability,
+                impact,
+                presentation,
+                comment ?? null,
+              ],
+            );
+          }
+        }
       }
     } catch(error) {
     if (
@@ -336,6 +427,8 @@ voteRouter.get("/ranking", async (req, res) => {
                 p.description,
                 p.color,
                 p."logoUrl",
+                p."presentationUrl",
+                p."presentationFileName",
                 COUNT(v.id)::int AS "votesCount",
                 COALESCE(ROUND(AVG(v.innovation)::numeric, 2), 0) AS "innovationAvg",
                 COALESCE(ROUND(AVG(v.viability)::numeric, 2), 0) AS "viabilityAvg",
@@ -354,6 +447,8 @@ voteRouter.get("/ranking", async (req, res) => {
                 p.description,
                 p.color,
                 p."logoUrl",
+                p."presentationUrl",
+                p."presentationFileName",
                 e.criteria,
                 p."createdAt"
               ORDER BY "scoreAvg" DESC, "votesCount" DESC, p."createdAt" ASC
@@ -374,6 +469,8 @@ voteRouter.get("/ranking", async (req, res) => {
                 p.description,
                 p.color,
                 p."logoUrl",
+                NULL AS "presentationUrl",
+                NULL AS "presentationFileName",
                 COUNT(v.id)::int AS "votesCount",
                 COALESCE(ROUND(AVG(v.innovation)::numeric, 2), 0) AS "innovationAvg",
                 COALESCE(ROUND(AVG(v.viability)::numeric, 2), 0) AS "viabilityAvg",

@@ -3,7 +3,7 @@ import { eventCriterionSchema } from "@workspace/shared/api";
 
 const criteriaSchema = z
   .array(eventCriterionSchema)
-  .min(1, "At least 1 criterion is required")
+  .min(2, "At least 2 criteria are required")
   .max(6, "No more than 6 criteria are allowed")
   .superRefine((criteria, ctx) => {
     const totalWeight = criteria.reduce((sum, criterion) => sum + criterion.weight, 0);

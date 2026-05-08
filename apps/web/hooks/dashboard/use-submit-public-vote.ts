@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   type CreatePublicVote,
   createPublicVoteSchema,
@@ -8,6 +8,8 @@ import {
 import { submitPublicVote } from "@/lib/dashboard-api";
 
 export function useSubmitPublicVote() {
+  const queryClient = useQueryClient();
+
   return useMutation({
     mutationFn: async (data: CreatePublicVote) => {
       const validation = createPublicVoteSchema.safeParse(data);
@@ -18,6 +20,9 @@ export function useSubmitPublicVote() {
       }
 
       return submitPublicVote(validation.data);
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["public-pitch", variables.pitchId] });
     },
   });
 }

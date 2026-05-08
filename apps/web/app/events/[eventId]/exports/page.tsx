@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft,
   ArrowUpRight,
@@ -14,9 +14,13 @@ import {
 import { Button } from "@workspace/ui/components/button";
 import { FeedbackPanel } from "@/components/feedback-panel";
 import { useEvents, usePitches, useRanking } from "@/hooks/dashboard";
-import { exportPitch } from "@/lib/dashboard-api";
+import { exportPitch, getVotes } from "@/lib/dashboard-api";
 import { getFriendlyErrorItems } from "@/lib/user-feedback";
-import type { CriterionAverage, EventCriterion } from "@workspace/shared/api";
+import type {
+  CriterionAverage,
+  DashboardVote,
+  EventCriterion,
+} from "@workspace/shared/api";
 
 const defaultCriteria: EventCriterion[] = [
   { id: "innovation", label: "Innovacion", weight: 25, isDefault: true },
@@ -55,8 +59,81 @@ function triggerBlobDownload(blob: Blob, fileName: string) {
   URL.revokeObjectURL(url);//libera memoria con `URL.revokeObjectURL(url)`
 }
 
+type RankingRow = ReturnType<typeof buildRankingRows>[number];
+
+type ExportVoteRow = RankingRow & {
+  vote?: DashboardVote;
+};
+
+function buildRankingRows({
+  ranking,
+  selectedCriteria,
+  pitchStatusById,
+}: {
+  ranking: Array<{
+    id: string;
+    name: string;
+    description: string;
+    votesCount: number;
+    innovationAvg: number;
+    viabilityAvg: number;
+    impactAvg: number;
+    presentationAvg: number;
+    scoreAvg: number;
+    criteriaAverages?: CriterionAverage[];
+  }>;
+  selectedCriteria: EventCriterion[];
+  pitchStatusById: Map<string, "OPEN" | "CLOSED">;
+}) {
+  function getCriterionAverages(item: {
+    criteriaAverages?: CriterionAverage[];
+    innovationAvg: number;
+    viabilityAvg: number;
+    impactAvg: number;
+    presentationAvg: number;
+  }) {
+    if (item.criteriaAverages?.length) {
+      return item.criteriaAverages;
+    }
+
+    const legacyAverages = new Map([
+      ["innovation", item.innovationAvg],
+      ["viability", item.viabilityAvg],
+      ["impact", item.impactAvg],
+      ["presentation", item.presentationAvg],
+    ]);
+
+    return selectedCriteria.map((criterion) => ({
+      id: criterion.id,
+      label: criterion.label,
+      weight: criterion.weight,
+      avg: legacyAverages.get(criterion.id) ?? 0,
+    }));
+  }
+
+  return [...ranking]
+    .map((item) => ({
+      ...item,
+      percentage: Number((item.scoreAvg * 20).toFixed(1)),
+      pitchStatus: pitchStatusById.get(item.id) ?? "OPEN",
+      criterionAverages: getCriterionAverages(item),
+    }))
+    .sort((left, right) => {
+      if (right.percentage !== left.percentage) {
+        return right.percentage - left.percentage;
+      }
+
+      if (right.votesCount !== left.votesCount) {
+        return right.votesCount - left.votesCount;
+      }
+
+      return left.name.localeCompare(right.name);
+    });
+}
+
 export default function EventExportsPage() {
   const params = useParams<{ eventId: string }>();
+  const router = useRouter();
   const eventId = params.eventId;
   const { data: events = [], isLoading: isLoadingEvents } = useEvents();
   const { data: pitches = [], isLoading: isLoadingPitches } = usePitches(eventId);
@@ -78,51 +155,34 @@ export default function EventExportsPage() {
   );
 
   const rankingRows = useMemo(() => {
-    function getCriterionAverages(item: {
-      criteriaAverages?: CriterionAverage[];
-      innovationAvg: number;
-      viabilityAvg: number;
-      impactAvg: number;
-      presentationAvg: number;
-    }) {
-      if (item.criteriaAverages?.length) {
-        return item.criteriaAverages;
+    return buildRankingRows({ ranking, selectedCriteria, pitchStatusById });
+  }, [pitchStatusById, ranking, selectedCriteria]);
+
+  const pitchesById = useMemo(
+    () => new Map(pitches.map((pitch) => [pitch.id, pitch])),
+    [pitches],
+  );
+
+  const rankingRowsByCreatedAt = useMemo(() => {
+    return [...rankingRows].sort((left, right) => {
+      const leftCreatedAt = Date.parse(pitchesById.get(left.id)?.createdAt ?? "");
+      const rightCreatedAt = Date.parse(pitchesById.get(right.id)?.createdAt ?? "");
+
+      if (Number.isFinite(rightCreatedAt) && Number.isFinite(leftCreatedAt)) {
+        return rightCreatedAt - leftCreatedAt;
       }
 
-      const legacyAverages = new Map([
-        ["innovation", item.innovationAvg],
-        ["viability", item.viabilityAvg],
-        ["impact", item.impactAvg],
-        ["presentation", item.presentationAvg],
-      ]);
+      if (Number.isFinite(rightCreatedAt)) {
+        return 1;
+      }
 
-      return selectedCriteria.map((criterion) => ({
-        id: criterion.id,
-        label: criterion.label,
-        weight: criterion.weight,
-        avg: legacyAverages.get(criterion.id) ?? 0,
-      }));
-    }
+      if (Number.isFinite(leftCreatedAt)) {
+        return -1;
+      }
 
-    return [...ranking]
-      .map((item) => ({
-        ...item,
-        percentage: Number((item.scoreAvg * 20).toFixed(1)),
-        pitchStatus: pitchStatusById.get(item.id) ?? "OPEN",
-        criterionAverages: getCriterionAverages(item),
-      }))
-      .sort((left, right) => {
-        if (right.percentage !== left.percentage) {
-          return right.percentage - left.percentage;
-        }
-
-        if (right.votesCount !== left.votesCount) {
-          return right.votesCount - left.votesCount;
-        }
-
-        return left.name.localeCompare(right.name);
-      });
-  }, [pitchStatusById, ranking, selectedCriteria]);
+      return left.name.localeCompare(right.name);
+    });
+  }, [pitchesById, rankingRows]);
 
   useEffect(() => {
     setSelectedPitchIds((current) =>
@@ -131,9 +191,9 @@ export default function EventExportsPage() {
   }, [rankingRows]);
 
   const allSelected =
-    rankingRows.length > 0 && selectedPitchIds.length === rankingRows.length;
+    rankingRowsByCreatedAt.length > 0 && selectedPitchIds.length === rankingRowsByCreatedAt.length;
 
-  const selectedRows = rankingRows.filter((row) => selectedPitchIds.includes(row.id));
+  const selectedRows = rankingRowsByCreatedAt.filter((row) => selectedPitchIds.includes(row.id));
 
   function togglePitchSelection(pitchId: string) {
     setSelectedPitchIds((current) =>
@@ -144,32 +204,102 @@ export default function EventExportsPage() {
   }
 
   function toggleSelectAll() {
-    setSelectedPitchIds(allSelected ? [] : rankingRows.map((row) => row.id));
+    setSelectedPitchIds(allSelected ? [] : rankingRowsByCreatedAt.map((row) => row.id));
   }
 
-  function buildCombinedCsv(rows: typeof rankingRows) {
+  function getVoteScore(vote: DashboardVote | undefined, criterionId: string) {
+    if (!vote) return "";
+
+    const dynamicScore = vote.criteriaScores?.find(
+      (item) => item.criterionId === criterionId,
+    )?.score;
+
+    if (dynamicScore != null) {
+      return dynamicScore;
+    }
+
+    const legacyScores = new Map([
+      ["innovation", vote.innovation],
+      ["viability", vote.viability],
+      ["impact", vote.impact],
+      ["presentation", vote.presentation],
+    ]);
+
+    return legacyScores.get(criterionId) ?? "";
+  }
+
+  function getVoteAverage(vote: DashboardVote | undefined) {
+    if (!vote) return "";
+
+    const weightedTotal = selectedCriteria.reduce((sum, criterion) => {
+      const score = getVoteScore(vote, criterion.id);
+      return score === "" ? sum : sum + Number(score) * criterion.weight;
+    }, 0);
+
+    const totalWeight = selectedCriteria.reduce((sum, criterion) => {
+      const score = getVoteScore(vote, criterion.id);
+      return score === "" ? sum : sum + criterion.weight;
+    }, 0);
+
+    return totalWeight === 0 ? "" : Number((weightedTotal / totalWeight).toFixed(2));
+  }
+
+  async function buildRowsWithVotes(rows: RankingRow[]) {
+    const votesByPitch = await Promise.all(
+      rows.map(async (row) => ({
+        row,
+        votes: await getVotes(row.id),
+      })),
+    );
+
+    return votesByPitch.flatMap(({ row, votes }) => {
+      if (votes.length === 0) {
+        return [{ ...row }];
+      }
+
+      return votes.map((vote) => ({ ...row, vote }));
+    });
+  }
+
+  function buildCombinedCsv(rows: ExportVoteRow[]) {
+    const pitchPositions = new Map<string, number>();
+
+    for (const row of rows) {
+      if (!pitchPositions.has(row.id)) {
+        pitchPositions.set(row.id, pitchPositions.size + 1);
+      }
+    }
+
     const header = [
       "posicion",
       "pitch",
-      "estado",
+      "email",
       "votos",
+      "Total AVG",
       "porcentaje",
       "promedio",
-      ...selectedCriteria.map((criterion) => `${criterion.label.toLowerCase()}Promedio`),
+      ...selectedCriteria.map((criterion) => criterion.label),
+      ...selectedCriteria.map((criterion) => `${criterion.label} Promedio`),
+      "Comentario",
       "descripcion",
     ];
 
     const dataRows = rows.map((row, index) => [
-      index + 1,
+      pitchPositions.get(row.id) ?? index + 1,
       row.name,
-      formatPitchStatus(row.pitchStatus),
+      row.vote?.evaluatorEmail ?? "",
       row.votesCount,
+      getVoteAverage(row.vote) === ""
+        ? ""
+        : `${(Number(getVoteAverage(row.vote)) * 20).toFixed(1)}%`,
       `${row.percentage.toFixed(1)}%`,
       row.scoreAvg,
+      ...selectedCriteria.map((criterion) => getVoteScore(row.vote, criterion.id)),
       ...selectedCriteria.map(
         (criterion) =>
           row.criterionAverages.find((item) => item.id === criterion.id)?.avg ?? 0,
       ),
+      row.vote?.comment ?? "",
       row.description,
     ]);
 
@@ -193,13 +323,25 @@ export default function EventExportsPage() {
     }
   }
 
-  function handleExportCombined(rows: typeof rankingRows, mode: "selected" | "all") {
+  async function handleProjectPitch(pitchId: string) {
+    try {
+      if (!document.fullscreenElement) {
+        await document.documentElement.requestFullscreen();
+      }
+    } catch {
+      // Some browsers can reject fullscreen; projection should still open.
+    }
+
+    router.push(`/projector/${pitchId}`);
+  }
+
+  async function handleExportCombined(rows: RankingRow[], mode: "selected" | "all") {
     if (rows.length === 0) return;
 
     try {
       setExportError(null);
       setIsExportingSelection(true);
-      const csv = buildCombinedCsv(rows);
+      const csv = buildCombinedCsv(await buildRowsWithVotes(rows));
       const fileNameBase = createSlug(selectedEvent?.name ?? "event");
       const suffix = mode === "all" ? "all-pitches" : "selected-pitches";
       const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
@@ -244,7 +386,7 @@ export default function EventExportsPage() {
           </div>
         </header>
 
-        <section className="mt-6 grid gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
+        <section className="mt-6 grid items-start gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
           <aside className="space-y-4">
             <div className="rounded-[24px] border border-[#263550] bg-[#1a2640] p-6 shadow-[0_18px_45px_rgba(2,8,23,0.35)]">
               <p className="text-[11px] font-bold uppercase italic tracking-[0.3em] text-[#83ce00]">
@@ -307,7 +449,7 @@ export default function EventExportsPage() {
             </div>
           </aside>
 
-          <section className="overflow-hidden rounded-[24px] border border-[#263550] bg-[#1a2640] shadow-[0_18px_45px_rgba(2,8,23,0.35)]">
+          <section className="self-start overflow-hidden rounded-[24px] border border-[#263550] bg-[#1a2640] shadow-[0_18px_45px_rgba(2,8,23,0.35)]">
             <div className="flex flex-col gap-4 border-b border-[#263550] bg-[#121d30] px-5 py-4 md:flex-row md:items-center md:justify-between">
               <div>
                 <p className="text-[11px] font-bold uppercase italic tracking-[0.3em] text-[#83ce00]">
@@ -350,7 +492,7 @@ export default function EventExportsPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {rankingRows.map((row, index) => {
+                    {rankingRowsByCreatedAt.map((row, index) => {
                       const isSelected = selectedPitchIds.includes(row.id);
 
                       return (
@@ -377,8 +519,16 @@ export default function EventExportsPage() {
                             <div className="flex flex-col gap-1">
                               <span className="font-semibold text-white">{row.name}</span>
                               <span
-                                className="block max-w-xl truncate text-xs text-[#8899aa]"
+                                className="block max-w-[280px] text-xs text-[#8899aa]"
                                 title={row.description ?? ""}
+                                style={{
+                                  display: "-webkit-box",
+                                  WebkitLineClamp: 2,
+                                  WebkitBoxOrient: "vertical",
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                  whiteSpace: "normal",
+                                }}
                               >
                                 {row.description}
                               </span>
@@ -403,15 +553,14 @@ export default function EventExportsPage() {
                           </td>
                           <td className="px-4 py-4 text-right">
                             <div className="flex justify-end gap-2">
-                              <Link
-                                href={`/projector/${row.id}`}
-                                target="_blank"
-                                rel="noreferrer"
+                              <Button
+                                type="button"
+                                onClick={() => handleProjectPitch(row.id)}
                                 className="inline-flex h-9 items-center gap-2 rounded-full border border-[#263550] bg-[#0d1526] px-4 text-xs font-bold text-white transition hover:bg-[#121d30]"
                               >
                                 <ArrowUpRight className="size-4" />
                                 Proyectar
-                              </Link>
+                              </Button>
                               <Button
                                 type="button"
                                 onClick={() => handleExportPitch(row.id, row.name)}

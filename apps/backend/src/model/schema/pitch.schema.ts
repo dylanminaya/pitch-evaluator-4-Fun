@@ -19,6 +19,7 @@ export const pitchSchema = z.object({
     .string()
     .regex(/^#([A-Fa-f0-9]{6})$/, "Color must be a valid hex code"),
   logoUrl: z.string().url().nullable().optional(),
+  presentationUrl: z.string().url().nullable().optional(),
   createdAt: z.string().datetime(),
 });
 
@@ -37,6 +38,7 @@ export const createPitchSchema = z.object({
     .string()
     .regex(/^#([A-Fa-f0-9]{6})$/, "Color must be a valid hex code"),
   logoUrl: z.string().url().nullable().optional(),
+  presentationUrl: z.string().url().nullable().optional(),
 });
 
 // Payload para editar un pitch.
@@ -53,6 +55,7 @@ export const updatePitchSchema = z.object({
     .string()
     .regex(/^#([A-Fa-f0-9]{6})$/, "Color must be a valid hex code"),
   logoUrl: z.string().url().nullable().optional(),
+  presentationUrl: z.string().url().nullable().optional(),
 });
 
 export const updatePitchStatusSchema = z.object({

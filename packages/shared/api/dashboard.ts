@@ -21,7 +21,7 @@ export const criterionAverageSchema = z.object({
 
 const criteriaArraySchema = z
   .array(eventCriterionSchema)
-  .min(1, "At least 1 criterion is required")
+  .min(2, "At least 2 criteria are required")
   .max(6, "No more than 6 criteria are allowed")
   .superRefine((criteria, ctx) => {
     const totalWeight = criteria.reduce((sum, criterion) => sum + criterion.weight, 0);
@@ -50,7 +50,7 @@ const criteriaArraySchema = z
 
 const voteCriteriaScoresSchema = z
   .array(voteCriterionScoreSchema)
-  .min(1, "At least 1 score is required")
+  .min(2, "At least 2 scores are required")
   .max(6, "No more than 6 scores are allowed")
   .superRefine((criteriaScores, ctx) => {
     const criterionIds = new Set<string>();
@@ -75,6 +75,7 @@ export const dashboardEventSchema = z.object({
   status: z.enum(["OPEN", "CLOSED"]),
   createdAt: z.string().nullable(),
   organizerId: z.string(),
+  accessRole: z.enum(["OWNER", "CO_ORGANIZER"]).default("OWNER"),
   criteria: z.array(eventCriterionSchema),
 });
 
@@ -86,6 +87,8 @@ export const dashboardPitchSchema = z.object({
   status: z.enum(["OPEN", "CLOSED"]),
   color: z.string(),
   logoUrl: z.string().nullable(),
+  presentationUrl: z.string().nullable(),
+  presentationFileName: z.string().nullable(),
   createdAt: z.string().nullable(),
 });
 
@@ -96,6 +99,8 @@ export const dashboardRankingItemSchema = z.object({
   description: z.string(),
   color: z.string(),
   logoUrl: z.string().nullable(),
+  presentationUrl: z.string().nullable(),
+  presentationFileName: z.string().nullable(),
   votesCount: z.number(),
   innovationAvg: z.number(),
   viabilityAvg: z.number(),
@@ -112,6 +117,8 @@ export const dashboardPitchDetailSchema = z.object({
   description: z.string(),
   color: z.string(),
   logoUrl: z.string().nullable(),
+  presentationUrl: z.string().nullable(),
+  presentationFileName: z.string().nullable(),
   votesCount: z.number(),
   innovationAvg: z.number(),
   viabilityAvg: z.number(),
@@ -123,6 +130,20 @@ export const dashboardPitchCommentSchema = z.object({
   id: z.string(),
   comment: z.string(),
   createdAt: z.string(),
+});
+
+export const dashboardVoteSchema = z.object({
+  id: z.string(),
+  pitchId: z.string(),
+  evaluatorId: z.string().nullable(),
+  evaluatorEmail: z.string().nullable(),
+  criteriaScores: z.array(voteCriterionScoreSchema).optional(),
+  innovation: z.number(),
+  viability: z.number(),
+  impact: z.number(),
+  presentation: z.number(),
+  comment: z.string().nullable(),
+  createdAt: z.string().nullable(),
 });
 
 export const dashboardEventQrSchema = z.object({
@@ -146,6 +167,8 @@ export const publicEventInvitationSchema = z.object({
       description: z.string(),
       color: z.string(),
       logoUrl: z.string().nullable(),
+      presentationUrl: z.string().nullable(),
+      presentationFileName: z.string().nullable(),
       status: z.enum(["OPEN", "CLOSED"]),
     }),
   ),
@@ -177,6 +200,7 @@ export const createDashboardPitchSchema = z.object({
     .string()
     .regex(/^#([A-Fa-f0-9]{6})$/, "Color must be a valid hex code"),
   logoUrl: z.string().url().nullable().optional(),
+  presentationUrl: z.string().url().nullable().optional(),
 });
 
 export const updateDashboardPitchSchema = z.object({
@@ -192,6 +216,7 @@ export const updateDashboardPitchSchema = z.object({
     .string()
     .regex(/^#([A-Fa-f0-9]{6})$/, "Color must be a valid hex code"),
   logoUrl: z.string().url().nullable().optional(),
+  presentationUrl: z.string().url().nullable().optional(),
 });
 
 export const publicPitchSchema = z.object({
@@ -202,13 +227,21 @@ export const publicPitchSchema = z.object({
   pitchStatus: z.enum(["OPEN", "CLOSED"]),
   color: z.string(),
   logoUrl: z.string().nullable(),
+  presentationUrl: z.string().nullable(),
+  presentationFileName: z.string().nullable(),
   eventStatus: z.enum(["OPEN", "CLOSED"]),
   hasVoted: z.boolean(),
+  currentVote: dashboardVoteSchema.nullable().optional(),
   criteria: z.array(eventCriterionSchema),
 });
 
 export const createPublicVoteSchema = z.object({
   pitchId: z.string().min(1, "Pitch id is required"),
+  evaluatorEmail: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .email("Please enter a valid email address"),
   evaluatorId: z.string().nullable().optional(),
   criteriaScores: voteCriteriaScoresSchema,
   comment: z.string().max(500).optional().nullable(),
@@ -275,6 +308,7 @@ export type DashboardRankingItem = z.infer<typeof dashboardRankingItemSchema>;
 export type CriterionAverage = z.infer<typeof criterionAverageSchema>;
 export type DashboardPitchDetail = z.infer<typeof dashboardPitchDetailSchema>;
 export type DashboardPitchComment = z.infer<typeof dashboardPitchCommentSchema>;
+export type DashboardVote = z.infer<typeof dashboardVoteSchema>;
 export type DashboardPitchQr = z.infer<typeof dashboardEventQrSchema>;
 export type DashboardEventStats = z.infer<typeof dashboardEventStatsSchema>;
 export type PublicEventInvitation = z.infer<typeof publicEventInvitationSchema>;

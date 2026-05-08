@@ -11,6 +11,7 @@ import {
   useCreateOrganizerInvitation,
   useEventOrganizers,
   useOrganizerInvitations,
+  useRemoveOrganizer,
 } from "@/hooks/dashboard";
 
 export default function EventTeamPage() {
@@ -22,6 +23,10 @@ export default function EventTeamPage() {
     mutateAsync: cancelInvitation,
     isPending: isCancelingInvitation,
   } = useCancelOrganizerInvitation();
+  const {
+    mutateAsync: removeOrganizer,
+    isPending: isRemovingOrganizer,
+  } = useRemoveOrganizer();
   const {
     data: invitations = [],
     isLoading,
@@ -49,6 +54,13 @@ export default function EventTeamPage() {
     await cancelInvitation({
       eventId,
       invitationId,
+    });
+  }
+
+  async function handleRemoveOrganizer(organizerId: string) {
+    await removeOrganizer({
+      eventId,
+      organizerId,
     });
   }
 
@@ -146,8 +158,22 @@ export default function EventTeamPage() {
                           </p>
                         </div>
 
-                        <div className="rounded-full border border-[#263550] bg-[#121d30] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-[#83ce00]">
-                          {organizer.role}
+                        <div className="flex items-center gap-2">
+                          <div className="rounded-full border border-[#263550] bg-[#121d30] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-[#83ce00]">
+                            {organizer.role}
+                          </div>
+
+                          {!organizer.id.includes('-owner') && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              disabled={isRemovingOrganizer}
+                              onClick={() => handleRemoveOrganizer(organizer.id)}
+                              className="rounded-full border-[#5a2433] bg-transparent px-3 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-[#ff8cab] hover:bg-[#2a1018] hover:text-[#ffb5c7]"
+                            >
+                              {isRemovingOrganizer ? "Sacando..." : "Sacar"}
+                            </Button>
+                          )}
                         </div>
                       </div>
                     </article>

@@ -1,5 +1,10 @@
 import { Router } from "express";
+import express from "express";
+import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { z } from "zod";
 import { requireSession } from "../../auth.js";
 import { db } from "../../db.js";
@@ -9,8 +14,13 @@ import {
   updatePitchStatusSchema,
 } from "../schema/pitch.schema.js";
 import { canManageEvent, getEventIdForPitch } from "../event.permissions.js";
-import { buildWeightedScoreSql, normalizeEventCriteria } from "../criteria.js";
+import {
+  buildCriteriaAveragesSql,
+  buildWeightedScoreSql,
+  normalizeEventCriteria,
+} from "../criteria.js";
 import { validateServerEnv } from "@workspace/shared/env/server";
+import { presentVote } from "../../presenter/vote.presenter.js";
 import { presentPitch, presentPitchComment, presentPitchDetail,presentPitchSummary, presentPublicPitch } from "../../presenter/pitch.presenter.js";
 import {
   dashboardPitchSchema,
@@ -20,6 +30,40 @@ import {
 } from "@workspace/shared/api";
 
 export const pitchRouter: Router = Router();
+const POWERPOINT_CONTENT_TYPES = new Set([
+  "application/vnd.ms-powerpoint",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+]);
+
+const presentationUpload = express.raw({
+  limit: "50mb",
+  type: [
+    "application/vnd.ms-powerpoint",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    "application/octet-stream",
+  ],
+});
+
+type PreparedPresentation = {
+  pdfBuffer: Buffer;
+  pitchName: string;
+  fileName: string;
+};
+
+type CachedPresentation = {
+  fileName: string;
+  pages: Map<number, Buffer>;
+  pagesCount: number;
+  version: number;
+};
+
+const presentationPreparationTasks = new Map<
+  string,
+  Promise<PreparedPresentation | null>
+>();
+const presentationCache = new Map<string, CachedPresentation>();
+const presentationWarmupTasks = new Map<string, Promise<CachedPresentation | null>>();
+const presentationVersions = new Map<string, number>();
 
 // Detecta errores de Postgres por codigo para aplicar fallbacks de schema.
 const hasPgErrorCode = (error: unknown, code: string) =>
@@ -28,17 +72,349 @@ const hasPgErrorCode = (error: unknown, code: string) =>
   "code" in error &&
   error.code === code;
 
-const getClientIpAddress = (value: string | string[] | undefined) => {
-  if (Array.isArray(value)) {
-    return value[0] ?? null;
+function sanitizePresentationFileName(rawFileName: string) {
+  let decodedFileName = rawFileName;
+
+  try {
+    decodedFileName = decodeURIComponent(rawFileName);
+  } catch {
+    decodedFileName = rawFileName;
   }
 
-  if (typeof value === "string" && value.length > 0) {
-    return value.split(",")[0]?.trim() ?? null;
+  return (
+    decodedFileName
+      .replace(/[^\w.\- ]/g, "")
+      .trim()
+      .replace(/\s+/g, " ") || "presentation.pptx"
+  );
+}
+
+function getPowerPointContentType(fileName: string, rawContentType: string | undefined) {
+  const contentType = rawContentType?.split(";")[0]?.trim().toLowerCase() ?? "";
+  const lowerFileName = fileName.toLowerCase();
+
+  if (contentType !== "application/octet-stream" && POWERPOINT_CONTENT_TYPES.has(contentType)) {
+    return contentType;
+  }
+
+  if (lowerFileName.endsWith(".pptx")) {
+    return "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+  }
+
+  if (lowerFileName.endsWith(".ppt")) {
+    return "application/vnd.ms-powerpoint";
   }
 
   return null;
-};
+}
+
+function getPresentationExtension(fileName: string, contentType: string) {
+  const lowerFileName = fileName.toLowerCase();
+  const lowerContentType = contentType.toLowerCase();
+
+  if (lowerFileName.endsWith(".pptx") || lowerContentType.includes("presentationml")) {
+    return "pptx";
+  }
+
+  if (lowerFileName.endsWith(".ppt") || lowerContentType.includes("powerpoint")) {
+    return "ppt";
+  }
+
+  return "pptx";
+}
+
+function runProcess(command: string, args: string[], timeoutMs = 45000) {
+  return new Promise<{ stdout: string; stderr: string }>((resolve, reject) => {
+    const child = spawn(command, args);
+    let stdout = "";
+    let stderr = "";
+    const timeoutId = setTimeout(() => {
+      child.kill("SIGKILL");
+      reject(new Error(`${command} timed out`));
+    }, timeoutMs);
+
+    child.stdout.on("data", (chunk) => {
+      stdout += String(chunk);
+    });
+
+    child.stderr.on("data", (chunk) => {
+      stderr += String(chunk);
+    });
+
+    child.on("error", (error) => {
+      clearTimeout(timeoutId);
+      reject(error);
+    });
+
+    child.on("close", (code) => {
+      clearTimeout(timeoutId);
+
+      if (code === 0) {
+        resolve({ stdout, stderr });
+        return;
+      }
+
+      reject(new Error(stderr.trim() || `${command} failed`));
+    });
+  });
+}
+
+async function convertPresentationBufferToPdf(
+  buffer: Buffer,
+  fileName: string,
+  contentType: string,
+) {
+  const workDir = await mkdtemp(join(tmpdir(), "pitch-presentation-"));
+  const extension = getPresentationExtension(fileName, contentType);
+  const inputPath = join(workDir, `presentation.${extension}`);
+  const outputPath = join(workDir, "presentation.pdf");
+
+  try {
+    await writeFile(inputPath, buffer);
+    await runProcess(
+      "libreoffice",
+      [
+        "--headless",
+        "--convert-to",
+        "pdf",
+        "--outdir",
+        workDir,
+        inputPath,
+      ],
+      60000,
+    );
+
+    return await readFile(outputPath);
+  } finally {
+    rm(workDir, { recursive: true, force: true }).catch(() => undefined);
+  }
+}
+
+function getPresentationVersion(pitchId: string) {
+  return presentationVersions.get(pitchId) ?? 0;
+}
+
+function bumpPresentationVersion(pitchId: string) {
+  const nextVersion = getPresentationVersion(pitchId) + 1;
+  presentationVersions.set(pitchId, nextVersion);
+  presentationPreparationTasks.delete(pitchId);
+  presentationWarmupTasks.delete(pitchId);
+  presentationCache.delete(pitchId);
+  return nextVersion;
+}
+
+async function getPdfPagesCount(pdfBuffer: Buffer) {
+  const workDir = await mkdtemp(join(tmpdir(), "pitch-presentation-meta-"));
+  const pdfPath = join(workDir, "presentation.pdf");
+
+  try {
+    await writeFile(pdfPath, pdfBuffer);
+    const { stdout } = await runProcess("pdfinfo", [pdfPath], 15000);
+    const pagesMatch = stdout.match(/^Pages:\s+(\d+)/m);
+    const pagesCount = Number(pagesMatch?.[1] ?? 0);
+
+    if (!Number.isFinite(pagesCount) || pagesCount <= 0) {
+      throw new Error("Failed to read presentation pages");
+    }
+
+    return pagesCount;
+  } finally {
+    rm(workDir, { recursive: true, force: true }).catch(() => undefined);
+  }
+}
+
+async function renderPresentationPage(pdfBuffer: Buffer, pageNumber: number) {
+  const workDir = await mkdtemp(join(tmpdir(), "pitch-presentation-render-"));
+  const pdfPath = join(workDir, "presentation.pdf");
+  const outputPrefix = join(workDir, "slide");
+
+  try {
+    await writeFile(pdfPath, pdfBuffer);
+    await runProcess(
+      "pdftoppm",
+      [
+        "-f",
+        String(pageNumber),
+        "-l",
+        String(pageNumber),
+        "-singlefile",
+        "-png",
+        "-r",
+        "180",
+        pdfPath,
+        outputPrefix,
+      ],
+      30000,
+    );
+
+    return await readFile(`${outputPrefix}.png`);
+  } finally {
+    rm(workDir, { recursive: true, force: true }).catch(() => undefined);
+  }
+}
+
+async function preparePresentationPdf(pitchId: string): Promise<PreparedPresentation | null> {
+  const result = await db.query(
+    `
+      SELECT
+        p.id,
+        p.name,
+        p."presentationFileName",
+        p."presentationContentType",
+        p."presentationFile",
+        p."presentationPdf"
+      FROM pitch p
+      WHERE p.id = $1
+    `,
+    [pitchId],
+  );
+
+  if ((result.rowCount ?? 0) === 0) {
+    return null;
+  }
+
+  const row = result.rows[0];
+  const presentationFile = row.presentationFile;
+  const storedFileName = row.presentationFileName;
+  const storedContentType = row.presentationContentType;
+  const fileName = String(storedFileName ?? "presentation.pptx");
+  const contentType =
+    storedContentType ??
+    getPowerPointContentType(fileName, undefined) ??
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+  let pdfBuffer = row.presentationPdf;
+
+  if (!pdfBuffer) {
+    if (!presentationFile) {
+      return null;
+    }
+
+    pdfBuffer = await convertPresentationBufferToPdf(
+      presentationFile,
+      fileName,
+      contentType,
+    );
+
+    await db.query(
+      `
+        UPDATE pitch
+        SET "presentationPdf" = $1
+        WHERE
+          id = $2
+          AND "presentationFileName" IS NOT DISTINCT FROM $3
+          AND "presentationContentType" IS NOT DISTINCT FROM $4
+          AND "presentationFile" = $5
+      `,
+      [pdfBuffer, row.id, storedFileName, storedContentType, presentationFile],
+    );
+  }
+
+  return {
+    pdfBuffer,
+    pitchName: String(row.name ?? "presentation"),
+    fileName,
+  };
+}
+
+function ensurePresentationPdf(pitchId: string) {
+  const currentTask = presentationPreparationTasks.get(pitchId);
+
+  if (currentTask) {
+    return currentTask;
+  }
+
+  const task = preparePresentationPdf(pitchId).finally(() => {
+    if (presentationPreparationTasks.get(pitchId) === task) {
+      presentationPreparationTasks.delete(pitchId);
+    }
+  });
+
+  presentationPreparationTasks.set(pitchId, task);
+  return task;
+}
+
+async function renderRemainingPresentationPages(
+  pitchId: string,
+  version: number,
+  pdfBuffer: Buffer,
+  pages: Map<number, Buffer>,
+  pagesCount: number,
+) {
+  for (let pageNumber = 2; pageNumber <= pagesCount; pageNumber += 1) {
+    if (getPresentationVersion(pitchId) !== version) {
+      return;
+    }
+
+    if (!pages.has(pageNumber)) {
+      pages.set(
+        pageNumber,
+        await renderPresentationPage(pdfBuffer, pageNumber),
+      );
+    }
+  }
+}
+
+async function warmPresentationCache(
+  pitchId: string,
+  version = getPresentationVersion(pitchId),
+) {
+  const cachedPresentation = presentationCache.get(pitchId);
+
+  if (cachedPresentation?.version === version) {
+    return cachedPresentation;
+  }
+
+  const currentTask = presentationWarmupTasks.get(pitchId);
+
+  if (currentTask) {
+    return currentTask;
+  }
+
+  const task = (async () => {
+    const preparedPresentation = await ensurePresentationPdf(pitchId);
+
+    if (!preparedPresentation || getPresentationVersion(pitchId) !== version) {
+      return null;
+    }
+
+    const pagesCount = await getPdfPagesCount(preparedPresentation.pdfBuffer);
+
+    if (getPresentationVersion(pitchId) !== version) {
+      return null;
+    }
+
+    const pages = new Map<number, Buffer>();
+    const cached: CachedPresentation = {
+      fileName: preparedPresentation.fileName,
+      pages,
+      pagesCount,
+      version,
+    };
+
+    presentationCache.set(pitchId, cached);
+
+    pages.set(1, await renderPresentationPage(preparedPresentation.pdfBuffer, 1));
+
+    void renderRemainingPresentationPages(
+      pitchId,
+      version,
+      preparedPresentation.pdfBuffer,
+      pages,
+      pagesCount,
+    ).catch((error) => {
+      console.warn("Presentation pages could not be fully cached", error);
+    });
+
+    return cached;
+  })().finally(() => {
+    if (presentationWarmupTasks.get(pitchId) === task) {
+      presentationWarmupTasks.delete(pitchId);
+    }
+  });
+
+  presentationWarmupTasks.set(pitchId, task);
+  return task;
+}
 
 // Lista los pitches de un evento.
 pitchRouter.get("/", async (req, res) => {
@@ -63,7 +439,7 @@ pitchRouter.get("/", async (req, res) => {
 
     const result = await db.query(
       `
-        SELECT p.id, p."eventId", p.name, p.description, p.status, p.color, p."logoUrl", p."createdAt"
+        SELECT p.id, p."eventId", p.name, p.description, p.status, p.color, p."logoUrl", p."presentationUrl", p."presentationFileName", p."createdAt"
         FROM pitch p
         WHERE p."eventId" = $1
         ORDER BY p."createdAt" DESC
@@ -113,7 +489,7 @@ pitchRouter.patch("/:id/status", async (req, res) => {
         UPDATE pitch
         SET status = $1
         WHERE id = $2
-        RETURNING id, "eventId", name, description, status, color, "logoUrl", "createdAt"
+        RETURNING id, "eventId", name, description, status, color, "logoUrl", "presentationUrl", "presentationFileName", "createdAt"
       `,
       [parsed.data.status, req.params.id],
     );
@@ -147,7 +523,7 @@ pitchRouter.post("/", async (req, res) => {
     });
   }
   // Datos ya validados.
-  const { eventId, name, description, color, logoUrl } = parsed.data;
+  const { eventId, name, description, color, logoUrl, presentationUrl } = parsed.data;
 
   try {
     const canManage = await canManageEvent(session.user.id, eventId);
@@ -158,11 +534,20 @@ pitchRouter.post("/", async (req, res) => {
 
     const result = await db.query(
       `
-        INSERT INTO pitch (id, "eventId", name, description, status, color, "logoUrl", "createdAt")
-        VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
-        RETURNING id, "eventId", name, description, status, color, "logoUrl", "createdAt"
+        INSERT INTO pitch (id, "eventId", name, description, status, color, "logoUrl", "presentationUrl", "createdAt")
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+        RETURNING id, "eventId", name, description, status, color, "logoUrl", "presentationUrl", "presentationFileName", "createdAt"
       `,
-      [randomUUID(), eventId, name, description, "OPEN", color, logoUrl ?? null],
+      [
+        randomUUID(),
+        eventId,
+        name,
+        description,
+        "OPEN",
+        color,
+        logoUrl ?? null,
+        presentationUrl ?? null,
+      ],
     );
 
     return res.status(201).json(dashboardPitchSchema.parse(presentPitch(result.rows[0])));
@@ -189,7 +574,7 @@ pitchRouter.patch("/:id", async (req, res) => {
     });
   }
 
-  const { name, description, color, logoUrl } = parsed.data;
+  const { name, description, color, logoUrl, presentationUrl } = parsed.data;
 
   try {
     const eventId = await getEventIdForPitch(req.params.id);
@@ -211,11 +596,12 @@ pitchRouter.patch("/:id", async (req, res) => {
           name = $1,
           description = $2,
           color = $3,
-          "logoUrl" = $4
-        WHERE id = $5
-        RETURNING id, "eventId", name, description, status, color, "logoUrl", "createdAt"
+          "logoUrl" = $4,
+          "presentationUrl" = $5
+        WHERE id = $6
+        RETURNING id, "eventId", name, description, status, color, "logoUrl", "presentationUrl", "presentationFileName", "createdAt"
       `,
-      [name, description, color, logoUrl ?? null, req.params.id],
+      [name, description, color, logoUrl ?? null, presentationUrl ?? null, req.params.id],
     );
 
     if (result.rowCount === 0) {
@@ -226,6 +612,72 @@ pitchRouter.patch("/:id", async (req, res) => {
   } catch (error) {
     console.error(error);
     return res.status(500).json({ message: "Failed to update pitch" });
+  }
+});
+
+// Recibe un archivo PowerPoint y prepara sus diapositivas para proyeccion local.
+pitchRouter.post("/:pitchId/presentation", presentationUpload, async (req, res) => {
+  const session = await requireSession(req, res);
+
+  if (!session) {
+    return;
+  }
+
+  if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
+    return res.status(400).json({ message: "Presentation file is required" });
+  }
+
+  try {
+    const eventId = await getEventIdForPitch(req.params.pitchId);
+
+    if (!eventId) {
+      return res.status(404).json({ message: "Pitch not found" });
+    }
+
+    const canManage = await canManageEvent(session.user.id, eventId);
+
+    if (!canManage) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    const rawFileName = req.header("x-file-name") ?? "presentation.pptx";
+    const fileName = sanitizePresentationFileName(rawFileName);
+    const contentType = getPowerPointContentType(fileName, req.header("content-type"));
+
+    if (!contentType) {
+      return res.status(400).json({
+        message: "Only .ppt and .pptx presentation files are supported",
+      });
+    }
+
+    const result = await db.query(
+      `
+        UPDATE pitch
+        SET
+          "presentationFileName" = $1,
+          "presentationContentType" = $2,
+          "presentationFile" = $3,
+          "presentationPdf" = NULL,
+          "presentationUrl" = NULL
+        WHERE id = $4
+        RETURNING id, "eventId", name, description, status, color, "logoUrl", "presentationUrl", "presentationFileName", "createdAt"
+      `,
+      [fileName, contentType, req.body, req.params.pitchId],
+    );
+
+    if ((result.rowCount ?? 0) === 0) {
+      return res.status(404).json({ message: "Pitch not found" });
+    }
+
+    const presentationVersion = bumpPresentationVersion(req.params.pitchId);
+    void warmPresentationCache(req.params.pitchId, presentationVersion).catch((error) => {
+      console.warn("Presentation uploaded but could not be prepared yet", error);
+    });
+
+    return res.json(dashboardPitchSchema.parse(presentPitch(result.rows[0])));
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: "Failed to prepare presentation" });
   }
 });
 
@@ -272,8 +724,19 @@ pitchRouter.delete("/:id", async (req, res) => {
 // Endpoint publico para la pantalla de voto.
 pitchRouter.get("/public/:pitchId", async (req, res) => {
   try {
-    const ipAddress =
-      getClientIpAddress(req.headers["x-forwarded-for"]) ?? req.ip ?? null;
+    const evaluatorEmailParam = req.query.evaluatorEmail;
+    let evaluatorEmail: string | null = null;
+
+    if (typeof evaluatorEmailParam === "string" && evaluatorEmailParam.length > 0) {
+      const parsedEmail = z.string().trim().toLowerCase().email().safeParse(evaluatorEmailParam);
+
+      if (!parsedEmail.success) {
+        return res.status(400).json({ message: "Invalid evaluator email" });
+      }
+
+      evaluatorEmail = parsedEmail.data;
+    }
+
     let result;
 
     try {
@@ -288,6 +751,8 @@ pitchRouter.get("/public/:pitchId", async (req, res) => {
             p.status AS "pitchStatus",
             p.color,
             p."logoUrl",
+            p."presentationUrl",
+            p."presentationFileName",
             e.status AS "eventStatus",
             e.criteria
           FROM pitch p
@@ -312,6 +777,8 @@ pitchRouter.get("/public/:pitchId", async (req, res) => {
             p.status AS "pitchStatus",
             p.color,
             p."logoUrl",
+            NULL AS "presentationUrl",
+            NULL AS "presentationFileName",
             e.status AS "eventStatus"
           FROM pitch p
           INNER JOIN event e ON e.id = p."eventId"
@@ -327,33 +794,189 @@ pitchRouter.get("/public/:pitchId", async (req, res) => {
       });
     }
 
-    let hasVoted = false;
+    let currentVote = null;
 
-    if (ipAddress) {
-      const existingVoteResult = await db.query(
-        `
-          SELECT id
-          FROM vote
-          WHERE "pitchId" = $1
-            AND "ipAddress" = $2
-          LIMIT 1
-        `,
-        [req.params.pitchId, ipAddress],
-      );
+    if (evaluatorEmail) {
+      try {
+        const existingVoteResult = await db.query(
+          `
+            SELECT
+              id,
+              "pitchId",
+              "evaluatorId",
+              "evaluatorEmail",
+              "criteriaScores",
+              innovation,
+              viability,
+              impact,
+              presentation,
+              comment,
+              "createdAt"
+            FROM vote
+            WHERE "pitchId" = $1
+              AND "evaluatorEmail" = $2
+            LIMIT 1
+          `,
+          [req.params.pitchId, evaluatorEmail],
+        );
 
-      hasVoted = (existingVoteResult.rowCount ?? 0) > 0;
+        currentVote =
+          (existingVoteResult.rowCount ?? 0) > 0
+            ? presentVote(existingVoteResult.rows[0])
+            : null;
+      } catch (error) {
+        if (!hasPgErrorCode(error, "42703")) {
+          throw error;
+        }
+
+        const existingVoteResult = await db.query(
+          `
+            SELECT
+              id,
+              "pitchId",
+              "evaluatorId",
+              "evaluatorId" AS "evaluatorEmail",
+              innovation,
+              viability,
+              impact,
+              presentation,
+              comment,
+              "createdAt"
+            FROM vote
+            WHERE "pitchId" = $1
+              AND "evaluatorId" = $2
+            LIMIT 1
+          `,
+          [req.params.pitchId, evaluatorEmail],
+        );
+
+        currentVote =
+          (existingVoteResult.rowCount ?? 0) > 0
+            ? presentVote(existingVoteResult.rows[0])
+            : null;
+      }
     }
 
     return res.status(200).json(publicPitchSchema.parse({
       ...presentPublicPitch({
         ...result.rows[0],
-        hasVoted,
+        hasVoted: Boolean(currentVote),
+        currentVote,
       }),
       criteria: normalizeEventCriteria(result.rows[0].criteria),
     }));
   } catch (error) {
     console.error(error);
     return res.status(500).json({ message: "Failed to get pitch" });
+  }
+});
+
+// Devuelve el archivo PowerPoint original para el visor de presentaciones.
+pitchRouter.get("/public/:pitchId/presentation/file", async (req, res) => {
+  try {
+    const result = await db.query(
+      `
+        SELECT
+          p.name,
+          p."presentationFileName",
+          p."presentationContentType",
+          p."presentationFile"
+        FROM pitch p
+        WHERE p.id = $1
+      `,
+      [req.params.pitchId],
+    );
+
+    if ((result.rowCount ?? 0) === 0) {
+      return res.status(404).json({ message: "Pitch not found" });
+    }
+
+    const presentationFile = result.rows[0].presentationFile;
+
+    if (!presentationFile) {
+      return res.status(404).json({ message: "Presentation not found" });
+    }
+
+    const safeFileName = sanitizePresentationFileName(
+      String(result.rows[0].presentationFileName ?? result.rows[0].name ?? "presentation.pptx"),
+    );
+    const contentType =
+      result.rows[0].presentationContentType ??
+      getPowerPointContentType(safeFileName, undefined) ??
+      "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+
+    res.setHeader("Content-Type", contentType);
+    res.setHeader("Content-Disposition", `inline; filename="${safeFileName}"`);
+    res.setHeader("Cache-Control", "no-store");
+    return res.status(200).send(presentationFile);
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: "Failed to load presentation file" });
+  }
+});
+
+// Devuelve metadatos de las diapositivas ya preparadas para proyeccion.
+pitchRouter.get("/public/:pitchId/presentation/meta", async (req, res) => {
+  try {
+    const cachedPresentation = await warmPresentationCache(req.params.pitchId);
+
+    if (!cachedPresentation) {
+      return res.status(404).json({ message: "Presentation not found" });
+    }
+
+    return res.json({
+      fileName: cachedPresentation.fileName,
+      pagesCount: cachedPresentation.pagesCount,
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: "Failed to read presentation metadata" });
+  }
+});
+
+// Renderiza una diapositiva como imagen para que el navegador la proyecte localmente.
+pitchRouter.get("/public/:pitchId/presentation/page/:pageNumber.png", async (req, res) => {
+  const pageNumber = Number(req.params.pageNumber);
+
+  if (!Number.isInteger(pageNumber) || pageNumber < 1) {
+    return res.status(400).json({ message: "Invalid page number" });
+  }
+
+  try {
+    const version = getPresentationVersion(req.params.pitchId);
+    let cachedPresentation = presentationCache.get(req.params.pitchId);
+
+    if (cachedPresentation?.version !== version) {
+      cachedPresentation = await warmPresentationCache(req.params.pitchId, version) ?? undefined;
+    }
+
+    if (!cachedPresentation) {
+      return res.status(404).json({ message: "Presentation not found" });
+    }
+
+    if (pageNumber > cachedPresentation.pagesCount) {
+      return res.status(404).json({ message: "Presentation page not found" });
+    }
+
+    let pngBuffer = cachedPresentation.pages.get(pageNumber);
+
+    if (!pngBuffer) {
+      const preparedPresentation = await ensurePresentationPdf(req.params.pitchId);
+
+      if (!preparedPresentation) {
+        return res.status(404).json({ message: "Presentation not found" });
+      }
+
+      pngBuffer = await renderPresentationPage(preparedPresentation.pdfBuffer, pageNumber);
+      cachedPresentation.pages.set(pageNumber, pngBuffer);
+    }
+
+    res.setHeader("Content-Type", "image/png");
+    res.setHeader("Cache-Control", "no-store");
+    return res.status(200).send(pngBuffer);
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: "Failed to render presentation page" });
   }
 });
 
@@ -389,6 +1012,8 @@ pitchRouter.get("/detail/:pitchId", async (req, res) => {
         p.description,
         p.color,
         p."logoUrl",
+        p."presentationUrl",
+        p."presentationFileName",
         COUNT(v.id)::int AS "votesCount",
         COALESCE(ROUND(AVG(v.innovation)::numeric, 2), 0) AS "innovationAvg",
         COALESCE(ROUND(AVG(v.viability)::numeric, 2), 0) AS "viabilityAvg",
@@ -403,7 +1028,9 @@ pitchRouter.get("/detail/:pitchId", async (req, res) => {
         p.name,
         p.description,
         p.color,
-        p."logoUrl"
+        p."logoUrl",
+        p."presentationUrl",
+        p."presentationFileName"
       `,
       [req.params.pitchId],
     )
@@ -618,27 +1245,50 @@ pitchRouter.get("/:pitchId/export", async (req, res) => {
 
     const detailResult = await db.query(
       `
+        WITH pitch_stats AS (
+          SELECT
+            p.id,
+            COUNT(v.id)::int AS "votesCount",
+            COALESCE(ROUND(AVG(v.innovation)::numeric, 2), 0) AS "innovationAvg",
+            COALESCE(ROUND(AVG(v.viability)::numeric, 2), 0) AS "viabilityAvg",
+            COALESCE(ROUND(AVG(v.impact)::numeric, 2), 0) AS "impactAvg",
+            COALESCE(ROUND(AVG(v.presentation)::numeric, 2), 0) AS "presentationAvg",
+            ${buildWeightedScoreSql("v", "e.criteria")} AS "scoreAvg",
+            ${buildCriteriaAveragesSql("p", "e.criteria")} AS "criteriaAverages"
+          FROM pitch p
+          INNER JOIN event e ON e.id = p."eventId"
+          LEFT JOIN vote v ON v."pitchId" = p.id
+          WHERE p.id = $1
+          GROUP BY
+            p.id,
+            e.criteria
+        )
         SELECT
           p.id,
           p.name,
           p.description,
           p.status,
-          COUNT(v.id)::int AS "votesCount",
-          COALESCE(ROUND(AVG(v.innovation)::numeric, 2), 0) AS "innovationAvg",
-          COALESCE(ROUND(AVG(v.viability)::numeric, 2), 0) AS "viabilityAvg",
-          COALESCE(ROUND(AVG(v.impact)::numeric, 2), 0) AS "impactAvg",
-          COALESCE(ROUND(AVG(v.presentation)::numeric, 2), 0) AS "presentationAvg",
-          ${buildWeightedScoreSql("v", "e.criteria")} AS "scoreAvg"
+          e.criteria,
+          ps."votesCount",
+          ps."innovationAvg",
+          ps."viabilityAvg",
+          ps."impactAvg",
+          ps."presentationAvg",
+          ps."scoreAvg",
+          ps."criteriaAverages",
+          v."evaluatorEmail",
+          v."criteriaScores",
+          v.innovation,
+          v.viability,
+          v.impact,
+          v.presentation,
+          v.comment
         FROM pitch p
         INNER JOIN event e ON e.id = p."eventId"
+        INNER JOIN pitch_stats ps ON ps.id = p.id
         LEFT JOIN vote v ON v."pitchId" = p.id
         WHERE p.id = $1
-        GROUP BY
-          p.id,
-          p.name,
-          p.description,
-          p.status,
-          e.criteria
+        ORDER BY v."createdAt" ASC
       `,
     [req.params.pitchId]
     )
@@ -652,37 +1302,108 @@ pitchRouter.get("/:pitchId/export", async (req, res) => {
     const escapeCsvValue = (value: string | number | null | undefined) =>
       `"${String(value ?? "").replace(/"/g, '""')}"`;
 
-    const formatPitchStatus = (status: string) =>
-      status === "OPEN" ? "Activo" : "Cerrado";
+    const eventCriteria = normalizeEventCriteria(pitch.criteria);
 
+    const getVoteScore = (row: Record<string, unknown>, criterionId: string) => {
+      const scores = Array.isArray(row.criteriaScores) ? row.criteriaScores : [];
+      const scoreItem = scores.find(
+        (item): item is { criterionId: string; score: number } =>
+          typeof item === "object" &&
+          item !== null &&
+          "criterionId" in item &&
+          "score" in item &&
+          item.criterionId === criterionId,
+      );
+
+      if (scoreItem) {
+        return Number(scoreItem.score);
+      }
+
+      const legacyScores = new Map<string, unknown>([
+        ["innovation", row.innovation],
+        ["viability", row.viability],
+        ["impact", row.impact],
+        ["presentation", row.presentation],
+      ]);
+
+      const score = legacyScores.get(criterionId);
+      return score == null ? "" : Number(score);
+    };
+
+    const getAverageScore = (row: Record<string, unknown>, criterionId: string) => {
+      const averages = Array.isArray(row.criteriaAverages) ? row.criteriaAverages : [];
+      const averageItem = averages.find(
+        (item): item is { id: string; avg: number } =>
+          typeof item === "object" &&
+          item !== null &&
+          "id" in item &&
+          "avg" in item &&
+          item.id === criterionId,
+      );
+
+      if (averageItem) {
+        return Number(averageItem.avg);
+      }
+
+      const legacyAverages = new Map<string, unknown>([
+        ["innovation", row.innovationAvg],
+        ["viability", row.viabilityAvg],
+        ["impact", row.impactAvg],
+        ["presentation", row.presentationAvg],
+      ]);
+
+      return Number(legacyAverages.get(criterionId) ?? 0);
+    };
+
+    const getVoteAverage = (row: Record<string, unknown>) => {
+      const weightedTotal = eventCriteria.reduce((sum, criterion) => {
+        const score = getVoteScore(row, criterion.id);
+        return score === "" ? sum : sum + Number(score) * criterion.weight;
+      }, 0);
+
+      const totalWeight = eventCriteria.reduce((sum, criterion) => {
+        const score = getVoteScore(row, criterion.id);
+        return score === "" ? sum : sum + criterion.weight;
+      }, 0);
+
+      return totalWeight === 0 ? "" : Number((weightedTotal / totalWeight).toFixed(2));
+    };
 
     const csvHeader = [
       "pitch",
-      "estado",
+      "email",
       "votos",
+      "Total AVG",
       "porcentaje",
       "promedio",
-      "innovacion",
-      "viabilidad",
-      "impacto",
-      "presentacion",
+      ...eventCriteria.map((criterion) => criterion.label),
+      ...eventCriteria.map((criterion) => `${criterion.label} Promedio`),
+      "Comentario",
       "descripcion",
-    ].join(",")
+    ]
+      .map((value) => escapeCsvValue(value))
+      .join(",")
 
-    const csvRows = [
-      escapeCsvValue(pitch.name),
-      escapeCsvValue(formatPitchStatus(pitch.status)),
-      pitch.votesCount,
-      escapeCsvValue(`${(Number(pitch.scoreAvg) * 20).toFixed(1)}%`),
-      pitch.scoreAvg,
-      pitch.innovationAvg,
-      pitch.viabilityAvg,
-      pitch.impactAvg,
-      pitch.presentationAvg,
-      escapeCsvValue(pitch.description),
-    ].join(",")
+    const csvRows = detailResult.rows.map((row) => {
+      const voteAverage = getVoteAverage(row);
 
-    const csv = [csvHeader, csvRows].join("\n")
+      return [
+        escapeCsvValue(row.name),
+        escapeCsvValue(row.evaluatorEmail),
+        row.votesCount,
+        escapeCsvValue(
+          voteAverage === "" ? "" : `${(Number(voteAverage) * 20).toFixed(1)}%`,
+        ),
+        escapeCsvValue(`${(Number(row.scoreAvg) * 20).toFixed(1)}%`),
+        row.scoreAvg,
+        ...eventCriteria.map((criterion) => getVoteScore(row, criterion.id)),
+        ...eventCriteria.map((criterion) => getAverageScore(row, criterion.id)),
+        escapeCsvValue(row.comment),
+        escapeCsvValue(row.description),
+      ].join(",")
+    })
+
+    const csv = [csvHeader, ...csvRows].join("\n")
 
     const pitchName = String(pitch.name)
       .toLowerCase()

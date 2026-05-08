@@ -3,7 +3,7 @@ export type Vote = {
   id: string;
   pitchId: string;
   evaluatorId?: string | null;
-  ipAddress?: string | null;
+  evaluatorEmail?: string | null;
   innovation: number;
   viability: number;
   impact: number;
@@ -20,6 +20,8 @@ export type PitchRanking = {
   description: string;
   color: string;
   logoUrl:string | null;
+  presentationUrl: string | null;
+  presentationFileName: string | null;
   votesCount: number;
   innovationAvg: number;
   viabilityAvg: number;

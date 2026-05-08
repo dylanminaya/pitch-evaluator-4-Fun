@@ -32,17 +32,37 @@ CREATE TABLE IF NOT EXISTS pitch (
   status        TEXT        NOT NULL DEFAULT 'OPEN' CHECK (status IN ('OPEN', 'CLOSED')),
   color         TEXT        NOT NULL,
   "logoUrl"     TEXT,
+  "presentationUrl" TEXT,
+  "presentationFileName" TEXT,
+  "presentationContentType" TEXT,
+  "presentationFile" BYTEA,
+  "presentationPdf" BYTEA,
   "createdAt"   TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 ALTER TABLE pitch
 ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'OPEN';
 
+ALTER TABLE pitch
+ADD COLUMN IF NOT EXISTS "presentationUrl" TEXT;
+
+ALTER TABLE pitch
+ADD COLUMN IF NOT EXISTS "presentationFileName" TEXT;
+
+ALTER TABLE pitch
+ADD COLUMN IF NOT EXISTS "presentationContentType" TEXT;
+
+ALTER TABLE pitch
+ADD COLUMN IF NOT EXISTS "presentationFile" BYTEA;
+
+ALTER TABLE pitch
+ADD COLUMN IF NOT EXISTS "presentationPdf" BYTEA;
+
 CREATE TABLE IF NOT EXISTS vote (
   id            TEXT        PRIMARY KEY,
   "pitchId"     TEXT        NOT NULL REFERENCES pitch(id) ON DELETE CASCADE,
   "evaluatorId" TEXT,
-  "ipAddress"   TEXT,
+  "evaluatorEmail" TEXT,
   "criteriaScores" JSONB    NOT NULL DEFAULT '[]'::jsonb,
   innovation    INTEGER     NOT NULL CHECK (innovation BETWEEN 1 AND 5),
   viability     INTEGER     NOT NULL CHECK (viability BETWEEN 1 AND 5),
@@ -50,17 +70,24 @@ CREATE TABLE IF NOT EXISTS vote (
   presentation  INTEGER     NOT NULL CHECK (presentation BETWEEN 1 AND 5),
   comment       TEXT,
   "createdAt"   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  UNIQUE ("pitchId", "ipAddress")
+  UNIQUE ("pitchId", "evaluatorEmail")
 );
 
 ALTER TABLE vote
 ADD COLUMN IF NOT EXISTS "criteriaScores" JSONB NOT NULL DEFAULT '[]'::jsonb;
 
+ALTER TABLE vote
+ADD COLUMN IF NOT EXISTS "evaluatorEmail" TEXT;
+
+CREATE UNIQUE INDEX IF NOT EXISTS vote_pitch_evaluator_email_unique
+ON vote ("pitchId", "evaluatorEmail")
+WHERE "evaluatorEmail" IS NOT NULL;
+
 
 --tabla para el co-organizador
 CREATE TABLE IF NOT EXISTS event_organizer (
   id                TEXT        PRIMARY KEY,
-  "eventId"         UUID        NOT NULL REFERENCES event(id) ON DELETE CASCADE,
+  "eventId"         TEXT        NOT NULL REFERENCES event(id) ON DELETE CASCADE,
   "userId"          TEXT        NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
   role              TEXT        NOT NULL DEFAULT 'ORGANIZER' CHECK (role IN ('ORGANIZER')),
   "invitedByUserId" TEXT        REFERENCES "user"(id) ON DELETE SET NULL,
@@ -71,7 +98,7 @@ CREATE TABLE IF NOT EXISTS event_organizer (
 --tabla para cuando envien el link de invitacion 
 CREATE TABLE IF NOT EXISTS event_organizer_invitation (
   id                TEXT        PRIMARY KEY,
-  "eventId"         UUID        NOT NULL REFERENCES event(id) ON DELETE CASCADE,
+  "eventId"         TEXT        NOT NULL REFERENCES event(id) ON DELETE CASCADE,
   email             TEXT        NOT NULL,
   role              TEXT        NOT NULL DEFAULT 'ORGANIZER' CHECK (role IN ('ORGANIZER')),
   token             TEXT        NOT NULL UNIQUE,

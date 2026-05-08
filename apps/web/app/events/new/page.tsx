@@ -35,7 +35,7 @@ const setupItems = [
 ];
 
 export default function NewEventPage() {
-  const MIN_CRITERIA = 1;
+  const MIN_CRITERIA = 2;
   const MAX_CRITERIA = 6;
   const router = useRouter();
   const { mutateAsync, isPending, error } = useCreateEvent();
@@ -61,6 +61,18 @@ export default function NewEventPage() {
   const errorItems = error ? getFriendlyErrorItems(error) : [];
   const hasValidCriteriaCount =
     criteria.length >= MIN_CRITERIA && criteria.length <= MAX_CRITERIA;
+  const criteriaCountItems =
+    hasTriedSubmit && !hasValidCriteriaCount
+      ? [
+          {
+            id: "event-criteria-count-alert",
+            message: `Tienes ${criteria.length} criterio${
+              criteria.length === 1 ? "" : "s"
+            }. La cantidad permitida es de ${MIN_CRITERIA} a ${MAX_CRITERIA} criterios.`,
+            suggestion: `Ajusta la lista hasta quedar entre ${MIN_CRITERIA} y ${MAX_CRITERIA} criterios antes de guardar.`,
+          },
+        ]
+      : [];
 
   function handleAddCriterion() {
     if (criteria.length >= MAX_CRITERIA) {
@@ -134,6 +146,14 @@ export default function NewEventPage() {
 
   return (
     <main className="min-h-svh bg-[#0d1526] text-white">
+      <div className="fixed right-4 top-4 z-50 w-[min(380px,calc(100vw-2rem))]">
+        <FeedbackPanel
+          title="Cantidad de criterios no permitida"
+          items={criteriaCountItems}
+          tone="warning"
+        />
+      </div>
+
       <div className="mx-auto flex min-h-svh w-full max-w-[1440px] flex-col px-4 py-4 md:px-8 md:py-6">
         <header className="flex flex-col gap-5 rounded-[20px] border border-[#263550] bg-[#121d30] px-5 py-4 shadow-[0_22px_60px_rgba(2,8,23,0.42)] md:flex-row md:items-center md:justify-between md:px-8">
           <div className="flex items-center gap-4">
@@ -252,20 +272,6 @@ export default function NewEventPage() {
                     className="min-h-36 rounded-2xl border border-[#263550] bg-[#0d1526] px-4 py-3 text-sm text-white outline-none placeholder:text-[#66738f] focus:border-[#0595f0] focus:ring-4 focus:ring-[#0595f0]/20"
                   />
                 </div>
-
-                {/* <div className="rounded-2xl border border-dashed border-[#263550] bg-[#0d1526] p-5">
-                  <div className="flex items-start gap-3">
-                    <Sparkles className="mt-0.5 size-4 text-[#83ce00]" />
-                    <div>
-                      <p className="font-semibold text-white">Preview del flujo</p>
-                      <p className="mt-2 text-sm leading-6 text-[#a9b3c9]">
-                        Al guardar este evento, se creara con estado `OPEN` y te
-                        llevaremos directo a su dashboard para continuar con pitches,
-                        ranking y QR de votacion.
-                      </p>
-                    </div>
-                  </div>
-                </div> */}
               </div>
             </form>
 
