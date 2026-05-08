@@ -76,7 +76,8 @@ Run `just` to see all available commands:
 | `just db-down`    | Stop database containers          |
 | `just db-logs`    | View database logs                |
 | `just db-reset`   | Reset database (removes all data) |
-| `just db-migrate` | Run better-auth migrations        |
+| `just db-migrate` | Run migrations and create app tables |
+| `just db-schema`  | Create app tables only            |
 
 ### Backend Commands
 
