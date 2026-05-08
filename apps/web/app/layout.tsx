@@ -1,4 +1,5 @@
 import "@workspace/ui/globals.css";
+import { Suspense } from "react";
 import { cn } from "@workspace/ui/lib/utils";
 import { QueryProvider } from "@/components/query-provider";
 import { AuthGuard } from "@/components/auth-guard";
@@ -84,7 +85,9 @@ export default function RootLayout({
     >
       <body>
         <QueryProvider>
-          <AuthGuard>{children}</AuthGuard>
+          <Suspense fallback={<div>Loading...</div>}>
+            <AuthGuard>{children}</AuthGuard>
+          </Suspense>
         </QueryProvider>
       </body>
     </html>
