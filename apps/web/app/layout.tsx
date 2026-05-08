@@ -1,6 +1,8 @@
 import "@workspace/ui/globals.css";
+import { Suspense } from "react";
 import { cn } from "@workspace/ui/lib/utils";
 import { QueryProvider } from "@/components/query-provider";
+import { AuthGuard } from "@/components/auth-guard";
 import localFont from "next/font/local";
 
 const obvia = localFont({
@@ -82,7 +84,11 @@ export default function RootLayout({
       className={cn(obvia.variable, "font-sans antialiased")}
     >
       <body>
-        <QueryProvider>{children}</QueryProvider>
+        <QueryProvider>
+          <Suspense fallback={<div>Loading...</div>}>
+            <AuthGuard>{children}</AuthGuard>
+          </Suspense>
+        </QueryProvider>
       </body>
     </html>
   );
