@@ -5,7 +5,7 @@
   "private": true,
   "scripts": {
     "dev": "dotenv -e ../../.env -- nodemon",
-    "build": "tsc",
+    "build": "pnpm --filter shared build && pnpm --filter backend build",
     "start": "node dist/index.js",
     "lint": "eslint",
     "typecheck": "tsc --noEmit"
