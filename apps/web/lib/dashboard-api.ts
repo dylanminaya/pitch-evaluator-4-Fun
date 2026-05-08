@@ -217,3 +217,8 @@ export function acceptOrganizerInvitation(token: string) {
     body: JSON.stringify({ token }),
   });
 }
+
+
+
+
+
