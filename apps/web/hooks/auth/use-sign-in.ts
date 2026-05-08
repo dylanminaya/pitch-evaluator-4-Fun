@@ -9,7 +9,7 @@ import { signIn } from "@/lib/better-auth/auth-client";
  * Hook for sign in with React Query mutation
  * Uses Zod schema from @workspace/shared for validation
  */
-export function useSignIn() {
+export function useSignIn(redirectTo?: string) {
   const router = useRouter();
   const queryClient = useQueryClient();
 
@@ -32,7 +32,7 @@ export function useSignIn() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["session"] });
-      router.push("/events");
+      router.push(redirectTo ?? "/events");
       router.refresh();
     },
   });

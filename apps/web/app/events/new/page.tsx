@@ -1,25 +1,23 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   Check,
+  Plus,
   Settings2,
-  Sparkles,
+  // Sparkles,
   Target,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@workspace/ui/components/button";
 import { Input } from "@workspace/ui/components/input";
+import { FeedbackPanel } from "@/components/feedback-panel";
 import { useCreateEvent } from "@/hooks/dashboard";
-
-const criteria = [
-  { label: "Innovacion", weight: "25%" },
-  { label: "Viabilidad", weight: "25%" },
-  { label: "Impacto", weight: "25%" },
-  { label: "Presentacion", weight: "25%" },
-];
+import { getEventFormIssues, getFriendlyErrorItems } from "@/lib/user-feedback";
+import type { EventCriterion } from "@workspace/shared/api";
 
 const setupItems = [
   {
@@ -37,17 +35,110 @@ const setupItems = [
 ];
 
 export default function NewEventPage() {
+  const MIN_CRITERIA = 2;
+  const MAX_CRITERIA = 6;
   const router = useRouter();
   const { mutateAsync, isPending, error } = useCreateEvent();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [hasTriedSubmit, setHasTriedSubmit] = useState(false);
+  //
+  const [criteria, setCriteria] = useState<EventCriterion[]>([
+    { id: "innovation", label: "Innovacion", weight: 25, isDefault: true },
+    { id: "viability", label: "Viabilidad", weight: 25, isDefault: true },
+    { id: "impact", label: "Impacto", weight: 25, isDefault: true },
+    { id: "presentation", label: "Presentacion", weight: 25, isDefault: true },
+  ]);
+
+  const totalWeight = useMemo(
+    () => criteria.reduce((sum, criterion) => sum + criterion.weight, 0),
+    [criteria],
+  );
+  const formIssues = useMemo(
+    () => getEventFormIssues({ name, description, criteria }),
+    [criteria, description, name],
+  );
+  const errorItems = error ? getFriendlyErrorItems(error) : [];
+  const hasValidCriteriaCount =
+    criteria.length >= MIN_CRITERIA && criteria.length <= MAX_CRITERIA;
+  const criteriaCountItems =
+    hasTriedSubmit && !hasValidCriteriaCount
+      ? [
+          {
+            id: "event-criteria-count-alert",
+            message: `Tienes ${criteria.length} criterio${
+              criteria.length === 1 ? "" : "s"
+            }. La cantidad permitida es de ${MIN_CRITERIA} a ${MAX_CRITERIA} criterios.`,
+            suggestion: `Ajusta la lista hasta quedar entre ${MIN_CRITERIA} y ${MAX_CRITERIA} criterios antes de guardar.`,
+          },
+        ]
+      : [];
+
+  function handleAddCriterion() {
+    if (criteria.length >= MAX_CRITERIA) {
+      return;
+    }
+
+    setCriteria((current) => [
+      ...current,
+      {
+        id: `criterion-${crypto.randomUUID()}`,
+        label: `Criterio ${current.length + 1}`,
+        weight: 0,
+        isDefault: false,
+      },
+    ]);
+  }
+
+  function handleCriterionLabelChange(id: string, label: string) {
+    setCriteria((current) =>
+      current.map((criterion) =>
+        criterion.id === id ? { ...criterion, label } : criterion,
+      ),
+    );
+  }
+
+  function handleCriterionWeightChange(id: string, weight: number) {
+    const normalizedWeight = Number.isNaN(weight)
+      ? 0
+      : Math.min(100, Math.max(0, weight));
+
+    setCriteria((current) =>
+      current.map((criterion) =>
+        criterion.id === id
+          ? { ...criterion, weight: normalizedWeight }
+          : criterion,
+      ),
+    );
+  }
+
+  function handleRemoveCriterion(id: string) {
+    if (criteria.length <= MIN_CRITERIA) {
+      return;
+    }
+
+    setCriteria((current) => current.filter((criterion) => criterion.id !== id));
+  }
+  //
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    setHasTriedSubmit(true);
+
+    if (
+      totalWeight !== 100 ||
+      !hasValidCriteriaCount ||
+      name.trim().length < 3 ||
+      description.trim().length < 5 ||
+      formIssues.length > 0
+    ) {
+      return;
+    }
 
     const createdEvent = await mutateAsync({
       name,
       description,
+      criteria,
     });
 
     router.push(`/dashboard?eventId=${createdEvent.id}`);
@@ -55,6 +146,14 @@ export default function NewEventPage() {
 
   return (
     <main className="min-h-svh bg-[#0d1526] text-white">
+      <div className="fixed right-4 top-4 z-50 w-[min(380px,calc(100vw-2rem))]">
+        <FeedbackPanel
+          title="Cantidad de criterios no permitida"
+          items={criteriaCountItems}
+          tone="warning"
+        />
+      </div>
+
       <div className="mx-auto flex min-h-svh w-full max-w-[1440px] flex-col px-4 py-4 md:px-8 md:py-6">
         <header className="flex flex-col gap-5 rounded-[20px] border border-[#263550] bg-[#121d30] px-5 py-4 shadow-[0_22px_60px_rgba(2,8,23,0.42)] md:flex-row md:items-center md:justify-between md:px-8">
           <div className="flex items-center gap-4">
@@ -120,16 +219,23 @@ export default function NewEventPage() {
                 </p>
                 <p className="text-sm text-[#a9b3c9]">
                   Define el nombre y una descripcion clara para identificar el
-                  evento dentro del dashboard del organizer.
+                  evento dentro del dashboard del organizer. Tambien puedes
+                  ajustar el peso de cada criterio de evaluacion.
                 </p>
               </div>
 
               <div className="mt-6 flex flex-col gap-6">
-                {error && (
-                  <div className="rounded-2xl border border-[#5a2433] bg-[#2a1018] p-3 text-sm text-[#ff8cab]">
-                    {error.message}
-                  </div>
-                )}
+                <FeedbackPanel
+                  title="Revisa esto antes de crear el evento"
+                  items={hasTriedSubmit ? formIssues : []}
+                  tone="warning"
+                />
+
+                <FeedbackPanel
+                  title="No pudimos crear el evento"
+                  items={errorItems}
+                  tone="error"
+                />
 
                 <div className="flex flex-col gap-3">
                   <label
@@ -166,20 +272,6 @@ export default function NewEventPage() {
                     className="min-h-36 rounded-2xl border border-[#263550] bg-[#0d1526] px-4 py-3 text-sm text-white outline-none placeholder:text-[#66738f] focus:border-[#0595f0] focus:ring-4 focus:ring-[#0595f0]/20"
                   />
                 </div>
-
-                {/* <div className="rounded-2xl border border-dashed border-[#263550] bg-[#0d1526] p-5">
-                  <div className="flex items-start gap-3">
-                    <Sparkles className="mt-0.5 size-4 text-[#83ce00]" />
-                    <div>
-                      <p className="font-semibold text-white">Preview del flujo</p>
-                      <p className="mt-2 text-sm leading-6 text-[#a9b3c9]">
-                        Al guardar este evento, se creara con estado `OPEN` y te
-                        llevaremos directo a su dashboard para continuar con pitches,
-                        ranking y QR de votacion.
-                      </p>
-                    </div>
-                  </div>
-                </div> */}
               </div>
             </form>
 
@@ -192,24 +284,91 @@ export default function NewEventPage() {
                       Criterios de evaluacion
                     </p>
                   </div>
-                  <span className="text-xs text-[#8899aa]">Default</span>
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs text-[#8899aa]">
+                      {criteria.length}/{MAX_CRITERIA} criterios
+                    </span>
+                    <span className={`text-xs ${totalWeight === 100 ? "text-[#83ce00]" : "text-[#ff8cab]"}`}>
+                      Total {totalWeight}%
+                    </span>
+                    <Button
+                      type="button"
+                      onClick={handleAddCriterion}
+                      className="h-9 rounded-full bg-[#83ce00] px-4 text-xs font-bold italic text-[#0d1526] hover:bg-[#a7ea2e]"
+                      disabled={isPending || criteria.length >= MAX_CRITERIA}
+                    >
+                      <Plus className="size-4" />
+                      Agregar
+                    </Button>
+                  </div>
                 </div>
 
                 <div className="mt-5 flex flex-col gap-3">
                   {criteria.map((criterion) => (
                     <div
-                      key={criterion.label}
-                      className="flex items-center justify-between rounded-2xl border border-[#263550] bg-[#0d1526] px-4 py-3"
+                      key={criterion.id}
+                      className="rounded-2xl border border-[#263550] bg-[#0d1526] px-4 py-3"
                     >
-                      <span className="text-sm font-medium text-white">
-                        {criterion.label}
-                      </span>
-                      <span className="text-sm font-bold text-[#83ce00]">
-                        {criterion.weight}
-                      </span>
+                      <div className="flex items-center justify-between gap-4">
+                        <Input
+                          value={criterion.label}
+                          onChange={(event) =>
+                            handleCriterionLabelChange(criterion.id, event.target.value)
+                          }
+                          disabled={isPending}
+                          className="h-10 border-[#263550] bg-[#121d30] text-white"
+                        />
+                        <span className="text-sm font-bold text-[#83ce00]">
+                          {criterion.weight}%
+                        </span>
+                      </div>
+                      <div className="mt-3 flex items-center gap-3">
+                        <input
+                          type="range"
+                          min={0}
+                          max={100}
+                          step={5}
+                          value={criterion.weight}
+                          onChange={(event) =>
+                            handleCriterionWeightChange(
+                              criterion.id,
+                              Number(event.target.value),
+                            )
+                          }
+                          disabled={isPending}
+                          className="w-full accent-[#83ce00]"
+                        />
+                        <Input
+                          type="number"
+                          min={0}
+                          max={100}
+                          step={5}
+                          value={criterion.weight}
+                          onChange={(event) =>
+                            handleCriterionWeightChange(
+                              criterion.id,
+                              Number(event.target.value || 0),
+                            )
+                          }
+                          disabled={isPending}
+                          className="h-11 w-24 rounded-2xl border-[#263550] bg-[#121d30] px-3 text-white"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => handleRemoveCriterion(criterion.id)}
+                          disabled={isPending || criteria.length <= MIN_CRITERIA}
+                          className="h-11 rounded-2xl border-[#263550] bg-transparent px-3 text-white hover:bg-[#1a2640] hover:text-white"
+                        >
+                          <Trash2 className="size-4" />
+                        </Button>
+                      </div>
                     </div>
                   ))}
                 </div>
+                <p className="mt-4 text-xs leading-5 text-[#8899aa]">
+                  Debe haber entre {MIN_CRITERIA} y {MAX_CRITERIA} criterios. Estos porcentajes se guardan y afectan el resultado final, asi que el total debe sumar 100%.
+                </p>
               </section>
 
               <section className="rounded-[24px] border border-[#263550] bg-[#1a2640] p-6 shadow-[0_18px_45px_rgba(2,8,23,0.35)]">

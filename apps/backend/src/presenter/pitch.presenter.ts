@@ -1,37 +1,58 @@
+// Normaliza la entidad pitch para listados del dashboard.
 export const presentPitch = (pitch: {
   id: string;
   eventId: string;
   name: string;
   description: string;
+  status: "OPEN" | "CLOSED";
   color: string;
   logoUrl?: string | null;
+  presentationUrl?: string | null;
+  presentationFileName?: string | null;
   createdAt?: Date | string;
 }) => ({
   id: pitch.id,
   eventId: pitch.eventId,
   name: pitch.name,
   description: pitch.description,
+  status: pitch.status,
   color: pitch.color,
   logoUrl: pitch.logoUrl ?? null,
+  presentationUrl: pitch.presentationUrl ?? null,
+  presentationFileName: pitch.presentationFileName ?? null,
   createdAt: pitch.createdAt instanceof Date ? pitch.createdAt.toISOString() : (pitch.createdAt ?? null),
 });
 
+// Forma publica del pitch para la pantalla de voto.
 export const presentPublicPitch = (pitch: {
   id: string;
+  eventId: string;
   name: string;
   description: string;
+  pitchStatus: "OPEN" | "CLOSED";
   color: string;
   logoUrl?: string | null;
+  presentationUrl?: string | null;
+  presentationFileName?: string | null;
   eventStatus: "OPEN" | "CLOSED";
+  hasVoted?: boolean;
+  currentVote?: unknown;
 }) => ({
   id: pitch.id,
+  eventId: pitch.eventId,
   name: pitch.name,
   description: pitch.description,
+  pitchStatus: pitch.pitchStatus,
   color: pitch.color,
   logoUrl: pitch.logoUrl ?? null,
+  presentationUrl: pitch.presentationUrl ?? null,
+  presentationFileName: pitch.presentationFileName ?? null,
   eventStatus: pitch.eventStatus,
+  hasVoted: pitch.hasVoted ?? false,
+  currentVote: pitch.currentVote ?? null,
 });
 
+// Resumen detallado del pitch con promedios y conteos.
 export const presentPitchDetail = (pitch: {
   id: string;
   eventId: string;
@@ -39,6 +60,8 @@ export const presentPitchDetail = (pitch: {
   description: string;
   color: string;
   logoUrl?: string | null;
+  presentationUrl?: string | null;
+  presentationFileName?: string | null;
   votesCount: number;
   innovationAvg: number;
   viabilityAvg: number;
@@ -51,6 +74,8 @@ export const presentPitchDetail = (pitch: {
   description: pitch.description,
   color: pitch.color,
   logoUrl: pitch.logoUrl ?? null,
+  presentationUrl: pitch.presentationUrl ?? null,
+  presentationFileName: pitch.presentationFileName ?? null,
   votesCount: pitch.votesCount,
   innovationAvg: pitch.innovationAvg,
   viabilityAvg: pitch.viabilityAvg,
@@ -58,16 +83,7 @@ export const presentPitchDetail = (pitch: {
   presentationAvg: pitch.presentationAvg,
 });
 
-export const presentPitchQr = (pitch: {
-  id: string;
-  name: string;
-  publicVoteUrl: string;
-}) => ({
-  id: pitch.id,
-  name: pitch.name,
-  publicVoteUrl: pitch.publicVoteUrl,
-});
-
+// Normaliza un comentario individual.
 export const presentPitchComment = (comment: {
   id: string;
   comment: string;
@@ -75,9 +91,10 @@ export const presentPitchComment = (comment: {
 }) => ({
   id: comment.id,
   comment: comment.comment,
-  createdAt: comment.createdAt,
+  createdAt: comment.createdAt instanceof Date ? comment.createdAt.toISOString() : comment.createdAt,
 });
 
+// Agrupa el payload del resumen con la lista de comentarios.
 export const presentPitchSummary = (payload: {
   pitchId: string;
   pitchName: string;

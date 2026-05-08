@@ -1,7 +1,13 @@
 import { AuthShell } from "@/components/auth-shell";
 import { LoginForm } from "@/components/login-form";
 
-export default function Page() {
+export default async function Page({
+  searchParams,
+}: {
+  searchParams: Promise<{ redirect?: string; switchAccount?: string }>;
+}) {
+  const { redirect, switchAccount } = await searchParams;
+
   return (
     <AuthShell
       eyebrow="Acceso organizer"
@@ -11,7 +17,7 @@ export default function Page() {
       ctaLabel="Crear cuenta organizer"
       accent="Accede con tu cuenta para administrar el evento, activar el QR del pitch actual y seguir el ranking en tiempo real."
     >
-        <LoginForm />
+        <LoginForm redirectTo={redirect} forceSignOut={switchAccount === "1"} />
     </AuthShell>
   );
 }

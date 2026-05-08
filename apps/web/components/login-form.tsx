@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
 import { cn } from "@workspace/ui/lib/utils";
 import { Button } from "@workspace/ui/components/button";
@@ -18,12 +19,21 @@ import {
 } from "@workspace/ui/components/field";
 import { Input } from "@workspace/ui/components/input";
 import { useSignIn } from "@/hooks/auth";
+import { signOut } from "@/lib/better-auth/auth-client";
 
 export function LoginForm({
   className,
+  redirectTo,
+  forceSignOut = false,
   ...props
-}: React.ComponentProps<"div">) {
-  const { mutate, isPending, error } = useSignIn();
+}: React.ComponentProps<"div"> & { redirectTo?: string; forceSignOut?: boolean }) {
+  const { mutate, isPending, error } = useSignIn(redirectTo);
+
+  useEffect(() => {
+    if (!forceSignOut) return;
+
+    void signOut();
+  }, [forceSignOut]);
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -102,7 +112,10 @@ export function LoginForm({
                 </Button>
                 <FieldDescription className="pt-2 text-center text-sm text-[#8899aa]">
                   Don&apos;t have an account?{" "}
-                  <Link href="/signup" className="font-semibold text-[#83ce00] underline underline-offset-4">
+                  <Link
+                    href={redirectTo ? `/signup?redirect=${encodeURIComponent(redirectTo)}` : "/signup"}
+                    className="font-semibold text-[#83ce00] underline underline-offset-4"
+                  >
                     Sign up
                   </Link>
                 </FieldDescription>

@@ -23,6 +23,6 @@
     "@workspace/eslint-config": "workspace:*",
     "@workspace/typescript-config": "workspace:*",
     "eslint": "^9.30.1",
-    "typescript": "^5.9.3"
+    "typescript": "^6.0.0"
   }
 }

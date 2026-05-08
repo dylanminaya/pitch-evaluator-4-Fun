@@ -13,6 +13,7 @@ export async function middleware(request: NextRequest) {
 
   const isPublicRoute =
     publicRoutes.includes(pathname) ||
+    pathname.startsWith("/organizer-invitations/") ||
     pathname.startsWith("/invitation/") ||
     pathname.startsWith("/vote/");
   const isAuthRoute = authRoutes.includes(pathname);
@@ -24,6 +25,16 @@ export async function middleware(request: NextRequest) {
   }
 
   if (sessionToken && isAuthRoute) {
+    if (request.nextUrl.searchParams.get("switchAccount") === "1") {
+      return NextResponse.next();
+    }
+
+    const redirect = request.nextUrl.searchParams.get("redirect");
+
+    if (redirect?.startsWith("/")) {
+      return NextResponse.redirect(new URL(redirect, request.url));
+    }
+
     return NextResponse.redirect(new URL("/events", request.url));
   }
 

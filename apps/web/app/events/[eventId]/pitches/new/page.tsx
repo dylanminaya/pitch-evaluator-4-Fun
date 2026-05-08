@@ -1,22 +1,35 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Palette, QrCode, Sparkles } from "lucide-react";
 import { Button } from "@workspace/ui/components/button";
 import { Input } from "@workspace/ui/components/input";
+import { FeedbackPanel } from "@/components/feedback-panel";
 import { useCreatePitch } from "@/hooks/dashboard";
+import { uploadPitchPresentation } from "@/lib/dashboard-api";
+import { getFriendlyErrorItems, getPitchFormIssues } from "@/lib/user-feedback";
 
 export default function NewPitchPage() {
   const params = useParams<{ eventId: string }>();
   const router = useRouter();
   const eventId = params.eventId;
-  const { mutateAsync, isPending, error } = useCreatePitch();
+  const { mutateAsync, error } = useCreatePitch();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [color, setColor] = useState("#83CE00");
   const [logoUrl, setLogoUrl] = useState("");
+  const [presentationFile, setPresentationFile] = useState<File | null>(null);
+  const [hasTriedSubmit, setHasTriedSubmit] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<unknown>(null);
+  const isSavingRef = useRef(false);
+  const formIssues = useMemo(
+    () => getPitchFormIssues({ name, description, color, logoUrl }),
+    [color, description, logoUrl, name],
+  );
+  const errorItems = saveError || error ? getFriendlyErrorItems(saveError ?? error) : [];
 
   function handleColorTextChange(value: string) {
     const normalized = value.startsWith("#") ? value.toUpperCase() : `#${value.toUpperCase()}`;
@@ -25,18 +38,42 @@ export default function NewPitchPage() {
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    setHasTriedSubmit(true);
 
-    const createdPitch = await mutateAsync({
-      eventId,
-      name,
-      description,
-      color,
-      logoUrl: logoUrl.trim() || null,
-    });
+    if (formIssues.length > 0) {
+      return;
+    }
 
-    router.push(
-      `/dashboard?eventId=${createdPitch.eventId}&pitchId=${createdPitch.id}`,
-    );
+    if (isSavingRef.current) {
+      return;
+    }
+
+    isSavingRef.current = true;
+    setIsSaving(true);
+    setSaveError(null);
+
+    try {
+      const createdPitch = await mutateAsync({
+        eventId,
+        name,
+        description,
+        color,
+        logoUrl: logoUrl.trim() || null,
+      });
+
+      if (presentationFile) {
+        await uploadPitchPresentation(createdPitch.id, presentationFile);
+      }
+
+      router.push(
+        `/dashboard?eventId=${createdPitch.eventId}&pitchId=${createdPitch.id}`,
+      );
+    } catch (error) {
+      setSaveError(error);
+    } finally {
+      isSavingRef.current = false;
+      setIsSaving(false);
+    }
   }
 
   return (
@@ -66,9 +103,9 @@ export default function NewPitchPage() {
             form="new-pitch-form"
             type="submit"
             className="rounded-full bg-[#83ce00] text-sm font-bold italic text-[#0d1526] hover:bg-[#a7ea2e]"
-            disabled={isPending}
+            disabled={isSaving}
           >
-            {isPending ? "Guardando..." : "Guardar pitch"}
+            {isSaving ? "Guardando..." : "Guardar pitch"}
           </Button>
         </header>
 
@@ -82,18 +119,24 @@ export default function NewPitchPage() {
               <p className="text-[11px] font-bold uppercase italic tracking-[0.3em] text-[#83ce00]">
                 Informacion del pitch
               </p>
-              <p className="text-sm text-[#a9b3c9]">
+              {/* <p className="text-sm text-[#a9b3c9]">
                 Este formulario crea el pitch real en la base de datos y luego el
-                dashboard podra generar su invitacion y QR publico.
-              </p>
+                dashboard podra generar el QR publico del evento para acceder a todos los pitches.
+              </p> */}
             </div>
 
             <div className="mt-6 flex flex-col gap-6">
-              {error && (
-                <div className="rounded-2xl border border-[#5a2433] bg-[#2a1018] p-3 text-sm text-[#ff8cab]">
-                  {error.message}
-                </div>
-              )}
+              <FeedbackPanel
+                title="Revisa esto antes de guardar"
+                items={hasTriedSubmit ? formIssues : []}
+                tone="warning"
+              />
+
+              <FeedbackPanel
+                title="No pudimos guardar el pitch"
+                items={errorItems}
+                tone="error"
+              />
 
               <div className="flex flex-col gap-3">
                 <label className="text-xs font-bold uppercase italic tracking-[0.24em] text-[#8899aa]">
@@ -103,9 +146,12 @@ export default function NewPitchPage() {
                   value={name}
                   onChange={(event) => setName(event.target.value)}
                   placeholder="Ej. EcoTrack AI"
-                  disabled={isPending}
+                  disabled={isSaving}
                   className="h-12 rounded-2xl border-[#263550] bg-[#0d1526] px-4 text-white placeholder:text-[#66738f]"
                 />
+                <p className="text-xs text-[#8899aa]">
+                  El nombre del pitch debe tener entre 3 y 25 caracteres.
+                </p>
               </div>
 
               <div className="flex flex-col gap-3">
@@ -116,7 +162,7 @@ export default function NewPitchPage() {
                   value={description}
                   onChange={(event) => setDescription(event.target.value)}
                   placeholder="Describe la solucion, el problema y el valor del pitch."
-                  disabled={isPending}
+                  disabled={isSaving}
                   className="min-h-36 rounded-2xl border border-[#263550] bg-[#0d1526] px-4 py-3 text-sm text-white outline-none placeholder:text-[#66738f]"
                 />
               </div>
@@ -131,14 +177,14 @@ export default function NewPitchPage() {
                       type="color"
                       value={color}
                       onChange={(event) => setColor(event.target.value.toUpperCase())}
-                      disabled={isPending}
+                      disabled={isSaving}
                       className="h-12 w-16 cursor-pointer rounded-2xl border border-[#263550] bg-[#0d1526] p-2"
                     />
                     <Input
                       value={color}
                       onChange={(event) => handleColorTextChange(event.target.value)}
                       placeholder="#83CE00"
-                      disabled={isPending}
+                      disabled={isSaving}
                       className="h-12 rounded-2xl border-[#263550] bg-[#0d1526] px-4 text-white placeholder:text-[#66738f]"
                     />
                   </div>
@@ -154,10 +200,29 @@ export default function NewPitchPage() {
                     value={logoUrl}
                     onChange={(event) => setLogoUrl(event.target.value)}
                     placeholder="https://..."
-                    disabled={isPending}
+                    disabled={isSaving}
                     className="h-12 rounded-2xl border-[#263550] bg-[#0d1526] px-4 text-white placeholder:text-[#66738f]"
                   />
                 </div>
+              </div>
+
+              <div className="flex flex-col gap-3">
+                <label className="text-xs font-bold uppercase italic tracking-[0.24em] text-[#8899aa]">
+                  PowerPoint opcional
+                </label>
+                <p className="rounded-2xl border border-[#263550] bg-[#0d1526] px-4 py-3 text-xs leading-5 text-[#a9b3c9]">
+                  Tamano maximo permitido: 50 MB. Usa archivos .ppt o .pptx.
+                </p>
+                <Input
+                  type="file"
+                  accept=".ppt,.pptx,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation"
+                  onChange={(event) => setPresentationFile(event.target.files?.[0] ?? null)}
+                  disabled={isSaving}
+                  className="h-12 rounded-2xl border-[#263550] bg-[#0d1526] px-4 py-2 text-white file:mr-4 file:rounded-full file:border-0 file:bg-[#83ce00] file:px-4 file:py-1.5 file:text-sm file:font-bold file:text-[#0d1526]"
+                />
+                <p className="text-xs text-[#8899aa]">
+                  La presentacion se preparara como diapositivas para proyectarla en el navegador.
+                </p>
               </div>
             </div>
           </form>
@@ -179,7 +244,7 @@ export default function NewPitchPage() {
                   {name || "Nombre del pitch"}
                 </h2>
                 <p className="mt-3 text-sm leading-6 text-[#a9b3c9]">
-                  {description || "La descripcion del pitch aparecera aqui para validar el tono antes de guardarlo."}
+                  {description || "Descripcion del pitch."}
                 </p>
               </div>
             </section>
@@ -189,19 +254,16 @@ export default function NewPitchPage() {
                 <QrCode className="size-4 text-[#8899aa]" />
                 Despues de guardar
               </div>
-              {/* <div className="mt-5 flex flex-col gap-4 text-sm leading-6 text-[#a9b3c9]">
-                <p>1. El pitch se inserta realmente en la tabla `pitch`.</p>
-                <p>2. El dashboard lo toma como pitch activo para QR e invitacion.</p>
-                <p>3. La URL publica de invitacion ya podra abrir `/invitation/[pitchId]` sin 404.</p>
-              </div> */}
               <div className="mt-5 rounded-2xl border border-dashed border-[#263550] bg-[#0d1526] px-4 py-4 text-sm leading-6 text-[#a9b3c9]">
                 <div className="inline-flex items-center gap-2 font-semibold text-white">
                   <Sparkles className="size-4 text-[#83ce00]" />
                   Tip
                 </div>
                 <p className="mt-2">
-                  Usa un color hex valido como `#83CE00` o `#0595F0` para que el
-                  pitch se guarde correctamente.
+                  Usa un nombre corto y una descripcion clara: explica el problema,
+                  la solucion y el beneficio principal en una o dos frases. Asi sera
+                  mas facil identificar el pitch en el dashboard y para quienes votan
+                  por primera vez.
                 </p>
               </div>
             </section>

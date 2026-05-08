@@ -1,6 +1,5 @@
 "use client";
 
-
 import { Suspense, useMemo } from "react";
 import Image from "next/image";
 import Link from "next/link";
@@ -10,9 +9,7 @@ import {
   ArrowUpRight,
   CircleDot,
   Plus,
-  QrCode,
-  // Share2,
-  Sparkles,
+  Users,
 } from "lucide-react";
 import { Button } from "@workspace/ui/components/button";
 import { useSignOut } from "@/hooks/auth";
@@ -20,26 +17,21 @@ import {
   useEvents,
   usePitches,
   useRanking,
-  usePitchQr,
+  useEventQr,
+  useEventStats,
+  useUpdatePitchStatus,
   useUpdateEventStatus,
 } from "@/hooks/dashboard";
-//helper
-import { exportEvent, exportPitch } from "@/lib/dashboard-api";
+import type { CriterionAverage, EventCriterion } from "@workspace/shared/api";
+// Utilidad para exportar resultados del evento.
+import { exportEvent } from "@/lib/dashboard-api";
 
-const summaryBlocks = [
-  {
-    tone: "positive",
-    title: "Lo que destaca",
-    body: "El publico valoro mucho el enfoque practico de usar IA para procesos ambientales y tiempo real. Varios comentarios dicen que la solucion se siente lista para piloto.",
-  },
-  {
-    tone: "warning",
-    title: "A mejorar",
-    body: "Falto claridad en el modelo de negocio. Algunos evaluadores piden ejemplos mas concretos sobre escalabilidad y costos de implementacion.",
-  },
-] as const;
-
-
+const defaultCriteria: EventCriterion[] = [
+  { id: "innovation", label: "Innovacion", weight: 25, isDefault: true },
+  { id: "viability", label: "Viabilidad", weight: 25, isDefault: true },
+  { id: "impact", label: "Impacto", weight: 25, isDefault: true },
+  { id: "presentation", label: "Presentacion", weight: 25, isDefault: true },
+];
 
 function QrDisplay({ url }: { url?: string }) {
   if (!url) {
@@ -65,8 +57,10 @@ function DashboardPageContent() {
   const { mutate: logout, isPending } = useSignOut();
   const { mutateAsync: mutateEventStatus, isPending: isUpdatingEventStatus } =
     useUpdateEventStatus();
+  const { mutateAsync: mutatePitchStatus, isPending: isUpdatingPitchStatus } =
+    useUpdatePitchStatus();
 
-  //query
+  // Carga los datos principales del dashboard.
   const {data: events = [] } = useEvents();
   const requestedEventId = searchParams.get("eventId");
   const requestedPitchId = searchParams.get("pitchId");
@@ -76,8 +70,40 @@ function DashboardPageContent() {
     return events.find((event) => event.id === requestedEventId) ?? events[0];
   }, [events, requestedEventId]);
   const selectedEventId = selectedEvent?.id;
+  const selectedCriteria = selectedEvent?.criteria ?? defaultCriteria;
 
-  const {data: pitches = [] } = usePitches(selectedEventId);//trae pitches del eventos
+  const {data: pitches = [] } = usePitches(selectedEventId); // Lista de pitches del evento seleccionado.
+  const latestPitchId = useMemo(() => {
+    if (!pitches.length) return undefined;
+
+    const pitchesWithIndex = pitches.map((pitch, index) => ({
+      id: pitch.id,
+      index,
+      createdAtMs: pitch.createdAt ? Date.parse(pitch.createdAt) : Number.NaN,
+    }));
+
+    const latestPitch = pitchesWithIndex.reduce((latest, current) => {
+      const latestTimestamp = Number.isFinite(latest.createdAtMs) ? latest.createdAtMs : -Infinity;
+      const currentTimestamp = Number.isFinite(current.createdAtMs) ? current.createdAtMs : -Infinity;
+
+      if (currentTimestamp > latestTimestamp) {
+        return current;
+      }
+
+      if (currentTimestamp === latestTimestamp && current.index > latest.index) {
+        return current;
+      }
+
+      if (!Number.isFinite(latest.createdAtMs) && !Number.isFinite(current.createdAtMs) && current.index > latest.index) {
+        return current;
+      }
+
+      return latest;
+    });
+
+    return latestPitch.id;
+  }, [pitches]);
+
   const selectedPitch = useMemo(() => {
     if (!pitches.length) return undefined;
 
@@ -86,10 +112,12 @@ function DashboardPageContent() {
   const selectedPitchId = selectedPitch?.id;
 
   const { data: rankingData = [] } = useRanking(selectedEventId);
-  const { data: qrData } = usePitchQr(selectedPitchId);
+  const { data: eventStats } = useEventStats(selectedEventId);
+  const { data: qrData } = useEventQr(selectedEventId);
 
   const selectedPitchVotes = rankingData.find(item => item.id === selectedPitchId)?.votesCount ?? 0;
   const eventIsOpen = selectedEvent?.status === "OPEN";
+  const pitchStatusById = new Map(pitches.map((pitch) => [pitch.id, pitch.status]));
 
   async function handleToggleEventStatus() {
     if (!selectedEventId || !selectedEvent) return;
@@ -103,31 +131,19 @@ function DashboardPageContent() {
   async function handlerExportEvent() {
     if(!selectedEventId) return;
 
-    const blob = await exportEvent(selectedEventId);//pide el archivo
-    const url = URL.createObjectURL(blob);//convierte el archivo en una url
-    const link = document.createElement("a");//crear el link
-    link.href = url;//apunta al archivo
-    link.download = "event-results.csv";//nombre del archivo
-    link.click();//simula un click, se descarga
-    URL.revokeObjectURL(url)//limpiar memoria
+    const blob = await exportEvent(selectedEventId); // Solicita el archivo exportado.
+    const url = URL.createObjectURL(blob); // Crea una URL temporal para descargarlo.
+    const link = document.createElement("a"); // Prepara el enlace de descarga.
+    link.href = url; // Asigna el archivo generado.
+    link.download = "event-results.csv"; // Define el nombre del archivo.
+    link.click(); // Inicia la descarga automáticamente.
+    URL.revokeObjectURL(url); // Libera la memoria usada por la URL temporal.
   }
 
-  async function handlerExportPitch() {
-    if (!selectedPitchId) return;
-
-    const blob = await exportPitch(selectedPitchId);
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "pitch-results.csv";
-    link.click();
-    URL.revokeObjectURL(url)
-  }
-
-  //arreglo de objetos, representa una tarjeta de estadística en pantalla
+  // Tarjetas resumen que muestran las métricas principales.
   const stats = [
     {
-      label: "Pitches activos",
+      label: "Pitches",
       value: String(pitches.length),
       accent: "text-white",
     },
@@ -135,7 +151,7 @@ function DashboardPageContent() {
       label: "Votos recibidos",
       value: String(
         rankingData.reduce(
-          (sum: number, item: { votesCount: number }) => sum + item.votesCount,//suma todos los votos
+          (sum: number, item: { votesCount: number }) => sum + item.votesCount, // Acumula todos los votos registrados.
           0,
         ),
       ),
@@ -150,13 +166,16 @@ function DashboardPageContent() {
                 (sum: number, item: { scoreAvg: number }) => sum + item.scoreAvg,
                 0,
               ) / rankingData.length
-            ).toFixed(1)//deja un decimal
+            ).toFixed(1) // Muestra la media con un decimal.
           : "0.0",
       accent: "text-cyan-400",
     },
     {
       label: "Evaluadores",
-      value: "N/D",//no disponible
+      value:
+        eventStats?.evaluatorsCount === null || eventStats?.evaluatorsCount === undefined
+          ? "N/D"
+          : String(eventStats.evaluatorsCount),
       accent: "text-fuchsia-400",
     },
   ];
@@ -167,34 +186,100 @@ function DashboardPageContent() {
     "rounded-2xl border border-[#263550] bg-[#1a2640] shadow-[0_18px_45px_rgba(2,8,23,0.35)]";
   const eyebrowClass =
     "text-[10px] font-bold uppercase italic tracking-[0.32em] text-[#83ce00]";
+
+  function getCriterionAverages(item: {
+    criteriaAverages?: CriterionAverage[];
+    innovationAvg: number;
+    viabilityAvg: number;
+    impactAvg: number;
+    presentationAvg: number;
+  }) {
+    if (item.criteriaAverages?.length) {
+      return item.criteriaAverages;
+    }
+
+    const legacyAverages = new Map([
+      ["innovation", item.innovationAvg],
+      ["viability", item.viabilityAvg],
+      ["impact", item.impactAvg],
+      ["presentation", item.presentationAvg],
+    ]);
+
+    return selectedCriteria.map((criterion) => ({
+      id: criterion.id,
+      label: criterion.label,
+      weight: criterion.weight,
+      avg: legacyAverages.get(criterion.id) ?? 0,
+    }));
+  }
+
+  function getCriterionShortLabel(label: string) {
+    // Normaliza el texto para generar una abreviatura corta.
+    const words = label
+      .trim() // Elimina espacios sobrantes.
+      .split(/\s+/) // Separa el texto en palabras.
+      .filter(Boolean); // Descarta valores vacios.
+
+    // Usa un valor neutro cuando no hay texto disponible.
+    if (words.length === 0) {
+      return "---";
+    }
+
+    // Si solo hay una palabra, muestra sus primeras 4 letras.
+    if (words.length === 1) {
+      const short = words[0]!.slice(0, 4);
+      return short.charAt(0).toUpperCase() + short.slice(1).toLowerCase();
+    }
+
+    // Si hay varias palabras, usa sus iniciales.
+    return words
+      .map((word) => word.charAt(0).toUpperCase())
+      .join("")
+      .slice(0, 4);
+  }
   
   return (
     <main className="min-h-svh bg-[#0d1526] text-white">
       <div className="mx-auto flex min-h-svh w-full max-w-[1440px] flex-col gap-4 px-4 py-4 md:px-8 md:py-6">
         <header className={`${shellClass} flex flex-col gap-4 px-5 py-4 md:flex-row md:items-center md:justify-between md:px-8`}>
-          <div className="flex items-center gap-3">
-            <Image src="/logo.svg" alt="Pitch 4 Fun" width={98} height={42} className="h-10 w-auto" />
-            <div className="flex flex-col">
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-[#263550]">/</span>
-                <span className="text-xs font-bold uppercase italic tracking-[0.28em] text-[#83ce00]">
-                  Organizer Dashboard
-                </span>
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:gap-6">
+            <div className="flex items-center gap-3">
+              <Link
+                href={`/events`}
+                className="inline-flex items-center gap-2 text-sm font-semibold text-[#8899aa] transition hover:text-white"
+              >
+                <ArrowLeft className="size-4" />
+                <span>Volver al dashboard</span>
+              </Link>
+
+              <div className="hidden h-8 w-px rounded-full bg-[#263550] md:block" />
+
+              <div className="flex items-center gap-3">
+                <Image src="/logo.svg" alt="Pitch 4 Fun" width={98} height={42} className="h-10 w-auto" />
+                <div className="flex flex-col">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-[#263550]">/</span>
+                    <span className="text-xs font-bold uppercase italic tracking-[0.28em] text-[#83ce00]">
+                      Organizer Dashboard
+                    </span>
+                  </div>
+                  <span className="text-sm text-[#8899aa]">
+                    {selectedEvent?.name ?? "Sin eventos"}
+                  </span>
+                </div>
               </div>
-              <span className="text-sm text-[#8899aa]">
-                {selectedEvent?.name ?? "Sin eventos"}
-              </span>
             </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            <Link href="/events">
+            <Link href={selectedEventId ? `/events/${selectedEventId}/team` : "#"}>
               <Button
                 variant="outline"
+                disabled={!selectedEventId}
                 className="rounded-full border-[#263550] bg-[#0d1526] text-white hover:bg-[#1a2640] hover:text-white"
               >
-                <ArrowLeft className="size-4" />
-                Volver a eventos
+                <Users className="size-4" />
+                Equipo
               </Button>
             </Link>
             <div
@@ -239,17 +324,17 @@ function DashboardPageContent() {
         <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
           <div className="flex min-w-0 flex-col gap-4">
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-              {/*recorre cada elemento de cada arreglo */}
+              {/* Renderiza una tarjeta por cada metrica. */}
               {stats.map((stat) => ( 
                 <article
                   key={stat.label}
                   className={`${panelClass} px-5 py-5`}
                 >
                   <p className="text-[10px] font-bold uppercase italic tracking-[0.3em] text-[#8899aa]">
-                    {stat.label} {/*mostrar nombre*/}
+                    {stat.label} {/* Nombre de la metrica. */}
                   </p>
                   <p className={`mt-3 text-4xl font-extrabold tracking-tight ${stat.accent}`}>
-                    {stat.value}{/*mostrar valor*/}
+                    {stat.value}{/* Valor principal de la metrica. */}
                   </p>
                 </article>
               ))}
@@ -276,47 +361,107 @@ function DashboardPageContent() {
                     <tr className="border-b border-[#263550] bg-[#0d1526] text-[10px] uppercase tracking-[0.24em] text-[#8899aa]">
                       <th className="px-4 py-3 font-medium">#</th>
                       <th className="px-4 py-3 font-medium">Proyecto</th>
-                      <th className="px-4 py-3 font-medium">Inn</th>
-                      <th className="px-4 py-3 font-medium">Via</th>
-                      <th className="px-4 py-3 font-medium">Imp</th>
-                      <th className="px-4 py-3 font-medium">Pres</th>
+                      <th className="px-4 py-3 font-medium">Estado</th>
+                      {selectedCriteria.map((criterion) => (
+                        <th
+                          key={criterion.id}
+                          className="px-4 py-3 font-medium"
+                          title={criterion.label}
+                        >
+                          {getCriterionShortLabel(criterion.label)}
+                        </th>
+                      ))}
                       <th className="px-4 py-3 font-medium text-right">Total</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {rankingData.map((item, index) => (
+                    {rankingData.map((item, index) => {
+                      const pitchStatus = pitchStatusById.get(item.id) ?? "OPEN";
+                      const nextStatus = pitchStatus === "OPEN" ? "CLOSED" : "OPEN";
+                      const criterionAverages = getCriterionAverages(item);
+                      const isLatestPitch = item.id === latestPitchId;
+                      const rowClassName = index === 0
+                        ? "bg-[linear-gradient(90deg,rgba(131,206,0,0.1),rgba(13,21,38,0.08))]"
+                        : isLatestPitch
+                          ? "border-b border-[#1c5f8d] bg-[linear-gradient(90deg,rgba(5,149,240,0.16),rgba(13,21,38,0.04))]"
+                          : "border-b border-[#263550]";
+
+                      return (
                       <tr
                         key={item.id}
-                        className={`text-sm text-[#d7d8e5] last:border-b-0 ${
-                          index === 0
-                            ? "bg-[linear-gradient(90deg,rgba(131,206,0,0.1),rgba(13,21,38,0.08))]"
-                            : "border-b border-[#263550]"
-                        }`}
+                        className={`text-sm text-[#d7d8e5] last:border-b-0 ${rowClassName}`}
                       >
-                        <td className={`px-4 py-4 text-xs font-bold ${index === 0 ? "text-[#83ce00]" : "text-[#8c8da4]"}`}>
-                          {String(index + 1).padStart(2, "0")} {/*muestra el numero de posicion */}
+                        <td className={`px-4 py-4 text-xs font-bold ${
+                          index === 0 ? "text-[#83ce00]" : isLatestPitch ? "text-[#00f0ff]" : "text-[#8c8da4]"
+                        }`}>
+                          {String(index + 1).padStart(2, "0")} {/* Posicion actual en el ranking. */}
                         </td>
                         <td className="px-4 py-4">
                           <div className="flex items-center gap-3">
                             <span
                               className={`h-2 w-2 rounded-full ${
-                                index === 0 ? "bg-[#ccff00]" : "bg-[#53546a]"//resaltar ganador
+                                index === 0 ? "bg-[#ccff00]" : isLatestPitch ? "bg-[#0595f0]" : "bg-[#53546a]" // Destaca al lider y al pitch mas reciente.
                               }`} 
                             />
-                            <span className={index === 0 ? "font-semibold text-[#f8ffcf]" : "font-semibold"}>
-                              {item.name} {/*nombre del proyecto */}
-                            </span>
+                            {selectedEventId ? (
+                              <Link
+                                href={`/events/${selectedEventId}/pitches/${item.id}/edit`}
+                                className={`font-semibold transition ${
+                                  index === 0
+                                    ? "text-[#f8ffcf] hover:text-[#83ce00]"
+                                    : isLatestPitch
+                                      ? "text-[#7fd4ff] hover:text-[#00f0ff]"
+                                      : "hover:text-[#83ce00]"
+                                }`}
+                              >
+                                {item.name}
+                              </Link>
+                            ) : (
+                              <span
+                                className={`font-semibold ${
+                                  index === 0 ? "text-[#f8ffcf]" : isLatestPitch ? "text-[#7fd4ff]" : ""
+                                }`}
+                              >
+                                {item.name}
+                              </span>
+                            )}
+                            {/* {isLatestPitch ? (
+                              <span className="rounded-full border border-[#0595f0] bg-[#0595f0]/10 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-[#7fd4ff]">
+                                Ultimo
+                              </span>
+                            ) : null} */}
                           </div>
-                        </td>{/*muestra las puntuaciones en cada categoria */}
-                        <td className="px-4 py-4 text-[#9da0bc]">{item.innovationAvg}</td>
-                        <td className="px-4 py-4 text-[#9da0bc]">{item.viabilityAvg}</td>
-                        <td className="px-4 py-4 text-[#9da0bc]">{item.impactAvg}</td>
-                        <td className="px-4 py-4 text-[#9da0bc]">{item.presentationAvg}</td>
+                        </td>{/* Muestra el estado actual del pitch. */}
+                        <td className="px-4 py-4">
+                          <Button
+                            type="button"
+                            disabled={isUpdatingPitchStatus}
+                            onClick={() =>
+                              mutatePitchStatus({
+                                pitchId: item.id,
+                                status: nextStatus,
+                              })
+                            }
+                            className={`rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.2em] ${
+                              pitchStatus === "OPEN"
+                                ? "bg-[#13210a] text-[#83ce00] hover:bg-[#1a2b0e]"
+                                : "bg-[#2a1018] text-[#ff8cab] hover:bg-[#3a1522]"
+                            }`}
+                          >
+                            {pitchStatus === "OPEN" ? "Activado" : "Cerrado"}
+                          </Button>
+                        </td>
+                        {criterionAverages.map((criterion) => (
+                          <td key={`${item.id}-${criterion.id}`} className="px-4 py-4 text-[#9da0bc]">
+                            {criterion.avg}
+                          </td>
+                        ))}
                         <td className="px-4 py-4 text-right font-semibold text-[#ccff00]">
-                          {item.scoreAvg} {/*puntaje final */}
+                          {item.scoreAvg} {/* Puntaje total del pitch. */}
                         </td>
                       </tr>
-                    ))}
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -328,9 +473,9 @@ function DashboardPageContent() {
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <p className={eyebrowClass}>
-                    Codigo QR activo
+                    Codigo QR del evento
                   </p>
-                  <h2 className="mt-2 text-xl font-semibold tracking-tight">{qrData?.name ?? selectedPitch?.name ?? "Sin pitch seleccionado"}</h2>
+                  <h2 className="mt-2 text-xl font-semibold tracking-tight">{qrData?.name ?? selectedEvent?.name ?? "Sin evento seleccionado"}</h2>
                 </div>
                 <Link href={selectedEventId ? `/events/${selectedEventId}/pitches/new` : "#"}>
                   <Button
@@ -349,8 +494,19 @@ function DashboardPageContent() {
               </div>
 
               <p className="mt-4 text-center text-xs text-[#8899aa]">
-                escanea para abrir el formulario de voto
+                escanea para ver todos los pitches del evento
               </p>
+
+              <div className="mt-4 flex flex-col gap-2 text-sm text-[#8899aa]">
+                <p className="flex items-center gap-2">
+                  <span className="h-2.5 w-2.5 rounded-full bg-[#83ce00]" />
+                  Mas votos.
+                </p>
+                <p className="flex items-center gap-2">
+                  <span className="h-2.5 w-2.5 rounded-full bg-[#0595f0]" />
+                  Pitch reciente.
+                </p>
+              </div>
 
               {qrData?.publicVoteUrl && (
                 <div className="mt-4 rounded-2xl border border-[#263550] bg-[#0d1526] p-4">
@@ -376,13 +532,36 @@ function DashboardPageContent() {
                     <p className="text-2xl font-semibold text-[#ccff00]">{selectedPitchVotes}</p>
                     <p className="text-xs text-[#97a093]">votos recibidos</p>
                   </div>
-                  {/*boton descarga los datos del pitch */}
-                  <Button className="rounded-full bg-[#83ce00] px-5 text-[#0d1526] hover:bg-[#a7ea2e]"
-                    onClick={handlerExportPitch}
-                    disabled={!selectedPitchId}//si desactiva si no hay pitch seleccionado
+                  <Link
+                    href={selectedEventId ? `/events/${selectedEventId}/exports` : "#"}
+                    aria-disabled={!selectedEventId}
+                    className={!selectedEventId ? "pointer-events-none opacity-40" : ""}
                   >
-                    Export pitch
-                  </Button>
+                    <Button
+                      className="rounded-full bg-[#83ce00] px-5 text-[#0d1526] hover:bg-[#a7ea2e]"
+                      disabled={!selectedEventId}
+                    >
+                      Exportar pitches
+                    </Button>
+                  </Link>
+                </div>
+
+                <div className="mt-4 flex justify-end">
+                  <Link
+                    href={
+                      selectedEventId && selectedPitchId
+                        ? `/events/${selectedEventId}/pitches/${selectedPitchId}/edit`
+                        : "#"
+                    }
+                  >
+                    {/* <Button
+                      variant="outline"
+                      disabled={!selectedEventId || !selectedPitchId}
+                      className="rounded-full border-[#263550] bg-transparent text-white hover:bg-[#1a2640] hover:text-white"
+                    >
+                      Editar pitch
+                    </Button> */}
+                  </Link>
                 </div>
               </div>
 
@@ -394,44 +573,17 @@ function DashboardPageContent() {
                 >
                   <ArrowUpRight className="size-4" />
                 </button>
-                <button className="rounded-full border border-[#263550] p-2 transition hover:bg-[#0d1526]">
+                {/* <Link
+                  href={selectedEventId ? `/events/${selectedEventId}/exports` : "#"}
+                  aria-disabled={!selectedEventId}
+                  className={`rounded-full border border-[#263550] p-2 transition hover:bg-[#0d1526] ${
+                    !selectedEventId ? "pointer-events-none opacity-40" : ""
+                  }`}
+                >
                   <ArrowUpRight className="size-4" />
-                </button>
+                </Link> */}
               </div>
             </section>
-
-            {/* <section className={`${panelClass} flex flex-1 flex-col p-5`}>
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="size-4 text-[#d06bff]" />
-                  <p className="text-[11px] font-bold uppercase italic tracking-[0.24em] text-[#a88cc8]">
-                    Resumen IA
-                  </p>
-                </div>
-                <span className="rounded-full bg-[#2b1836] px-2.5 py-1 text-[10px] uppercase tracking-[0.22em] text-[#d06bff]">
-                  Beta
-                </span>
-              </div>
-
-              <div className="mt-4 flex flex-col gap-4">
-                {summaryBlocks.map((block) => (
-                  <article
-                    key={block.title}
-                    className="rounded-2xl border border-[#263550] bg-[#0d1526] p-4"
-                  >
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={`h-2 w-2 rounded-full ${
-                          block.tone === "positive" ? "bg-[#ccff00]" : "bg-[#ff4c83]"
-                        }`}
-                      />
-                      <h3 className={`text-sm font-semibold ${block.tone === "positive" ? "text-[#ccff00]" : "text-[#ff4c83]"}`}>{block.title}</h3>
-                    </div>
-                    <p className="mt-3 text-sm leading-6 text-[#aeb0c4]">{block.body}</p>
-                  </article>
-                ))}
-              </div>
-            </section> */}
           </aside>
         </section>
       </div>
