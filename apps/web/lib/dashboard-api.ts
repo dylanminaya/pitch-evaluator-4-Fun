@@ -199,6 +199,12 @@ export function getEventOrganizers(eventId: string) {
   );
 }
 
+export function removeOrganizer(eventId: string, organizerId: string) {
+  return apiFetchVoid(`/api/event/${eventId}/organizers/${organizerId}`, {
+    method: "DELETE",
+  });
+}
+
 export function getOrganizerInvitationByToken(token: string) {
   return apiFetch<OrganizerInvitationDetail>(
     `/api/organizer-invitations/${token}`,

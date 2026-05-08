@@ -319,6 +319,52 @@ eventRouter.get("/:eventId/organizers", async (req, res) => {
   }
 });
 
+// Remueve un co-organizer del evento.
+eventRouter.delete("/:eventId/organizers/:organizerId", async (req, res) => {
+  const session = await requireSession(req, res);
+
+  if (!session) {
+    return;
+  }
+
+  const canManage = await canManageEvent(session.user.id, req.params.eventId);
+
+  if (!canManage) {
+    return res.status(403).json({ message: "Forbidden" });
+  }
+
+  // No permitir remover el owner del evento.
+  if (req.params.organizerId === `${req.params.eventId}-owner`) {
+    return res.status(400).json({ message: "Cannot remove the event owner" });
+  }
+
+  try {
+    const result = await db.query(
+      `
+        DELETE FROM event_organizer
+        WHERE id = $1
+          AND "eventId" = $2
+        RETURNING id
+      `,
+      [req.params.organizerId, req.params.eventId],
+    );
+
+    if ((result.rowCount ?? 0) === 0) {
+      return res.status(404).json({ message: "Organizer not found" });
+    }
+
+    return res.status(204).send();
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      message:
+        env.NODE_ENV === "development" && error instanceof Error
+          ? `Failed to remove organizer: ${error.message}`
+          : "Failed to remove organizer",
+    });
+  }
+});
+
 // Carga una invitacion publica a partir del token del correo.
 organizerInvitationRouter.get("/:token", async (req, res) => {
   try {

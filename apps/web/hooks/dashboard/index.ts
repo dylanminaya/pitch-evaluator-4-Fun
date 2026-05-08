@@ -16,6 +16,7 @@ export { useUpdatePitchStatus } from "./use-update-pitch-status";
 export { useEventOrganizers } from "./use-event-organizers";
 export { useCreateOrganizerInvitation } from "./use-create-organizer-invitation";
 export { useCancelOrganizerInvitation } from "./use-cancel-organizer-invitation";
+export { useRemoveOrganizer } from "./use-remove-organizer";
 export { useOrganizerInvitations } from "./use-organizer-invitations";
 export { useOrganizerInvitation } from "./use-organizer-invitation";
 export { useAcceptOrganizerInvitation } from "./use-accept-organizer-invitation";
