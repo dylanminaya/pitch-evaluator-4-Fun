@@ -7,22 +7,18 @@
       "inputs": [
         "$TURBO_DEFAULT$",
         ".env*",
-        {
-          "env": [
-            "FRONTEND_URL",
-            "POSTGRES_USER",
-            "POSTGRES_PASSWORD",
-            "POSTGRES_DB",
-            "POSTGRES_PORT",
-            "PGADMIN_EMAIL",
-            "PGADMIN_PASSWORD",
-            "PGADMIN_PORT",
-            "MASTER_PASSWORD",
-            "DATABASE_URL",
-            "BETTER_AUTH_SECRET",
-            "BETTER_AUTH_URL"
-          ]
-        }
+        "env:FRONTEND_URL",
+        "env:POSTGRES_USER",
+        "env:POSTGRES_PASSWORD",
+        "env:POSTGRES_DB",
+        "env:POSTGRES_PORT",
+        "env:PGADMIN_EMAIL",
+        "env:PGADMIN_PASSWORD",
+        "env:PGADMIN_PORT",
+        "env:MASTER_PASSWORD",
+        "env:DATABASE_URL",
+        "env:BETTER_AUTH_SECRET",
+        "env:BETTER_AUTH_URL"
       ],
       "outputs": [".next/**", "!.next/cache/**"]
     },
