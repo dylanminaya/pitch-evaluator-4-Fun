@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { type LoginRequest, loginRequestSchema } from "@workspace/shared/api";
 import { signIn } from "@/lib/better-auth/auth-client";
@@ -11,7 +11,6 @@ import { signIn } from "@/lib/better-auth/auth-client";
  */
 export function useSignIn(redirectTo?: string) {
   const router = useRouter();
-  const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (data: LoginRequest) => {
@@ -31,9 +30,7 @@ export function useSignIn(redirectTo?: string) {
       return result.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["session"] });
       router.push(redirectTo ?? "/events");
-      router.refresh();
     },
   });
 }
