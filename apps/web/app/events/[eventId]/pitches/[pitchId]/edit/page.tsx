@@ -220,14 +220,14 @@ function EditPitchForm({
 
               <div className="flex flex-col gap-3">
                 <label className="text-xs font-bold uppercase italic tracking-[0.24em] text-[#8899aa]">
-                  PowerPoint opcional
+                  Presentación opcional
                 </label>
                 <p className="rounded-2xl border border-[#263550] bg-[#0d1526] px-4 py-3 text-xs leading-5 text-[#a9b3c9]">
-                  Tamano maximo permitido: 50 MB. Usa archivos .ppt o .pptx.
+                  Tamano maximo permitido: 50 MB. Usa archivos .ppt, .pptx o .pdf.
                 </p>
                 <Input
                   type="file"
-                  accept=".ppt,.pptx,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation"
+                  accept=".ppt,.pptx,.pdf,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/pdf"
                   onChange={(event) => setPresentationFile(event.target.files?.[0] ?? null)}
                   disabled={isSaving}
                   className="h-12 rounded-2xl border-[#263550] bg-[#0d1526] px-4 py-2 text-white file:mr-4 file:rounded-full file:border-0 file:bg-[#83ce00] file:px-4 file:py-1.5 file:text-sm file:font-bold file:text-[#0d1526]"

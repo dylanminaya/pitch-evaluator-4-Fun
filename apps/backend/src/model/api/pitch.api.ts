@@ -7,6 +7,9 @@ import { access, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { isAbsolute, join } from "node:path";
 import { z } from "zod";
+import JSZip from "jszip";
+import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
+import { XMLParser } from "fast-xml-parser";
 import { requireSession } from "../../auth.js";
 import { db } from "../../db.js";
 import {
@@ -34,6 +37,7 @@ export const pitchRouter: Router = Router();
 const POWERPOINT_CONTENT_TYPES = new Set([
   "application/vnd.ms-powerpoint",
   "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "application/pdf",
 ]);
 
 const presentationUpload = express.raw({
@@ -41,6 +45,7 @@ const presentationUpload = express.raw({
   type: [
     "application/vnd.ms-powerpoint",
     "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    "application/pdf",
     "application/octet-stream",
   ],
 });
@@ -108,6 +113,12 @@ class MissingBinaryError extends Error {
   }
 }
 
+type PresentationPdfMethod = "auto" | "libreoffice" | "purejs";
+
+const PRESENTATION_PDF_METHOD: PresentationPdfMethod = (
+  (process.env.PRESENTATION_PDF_METHOD ?? "auto").toLowerCase() as PresentationPdfMethod
+);
+
 async function resolveSystemCommand(envVarName: string, fallbackNames: string[]) {
   const candidates = [] as string[];
 
@@ -130,6 +141,119 @@ async function resolveSystemCommand(envVarName: string, fallbackNames: string[])
   }
 
   throw new MissingBinaryError(candidates);
+}
+
+async function convertPresentationBufferToPdfWithLibreOffice(
+  buffer: Buffer,
+  fileName: string,
+  contentType: string,
+) {
+  const workDir = await mkdtemp(join(tmpdir(), "pitch-presentation-"));
+  const extension = getPresentationExtension(fileName, contentType);
+  const inputPath = join(workDir, `presentation.${extension}`);
+  const outputPath = join(workDir, "presentation.pdf");
+
+  try {
+    await writeFile(inputPath, buffer);
+    const libreofficeCommand = await resolveSystemCommand("LIBREOFFICE_BINARY", [
+      "libreoffice",
+      "soffice",
+    ]);
+
+    await runProcess(
+      libreofficeCommand,
+      [
+        "--headless",
+        "--convert-to",
+        "pdf",
+        "--outdir",
+        workDir,
+        inputPath,
+      ],
+      60000,
+    );
+
+    return await readFile(outputPath);
+  } finally {
+    rm(workDir, { recursive: true, force: true }).catch(() => undefined);
+  }
+}
+
+function extractTextFromNode(node: unknown): string[] {
+  if (node == null) {
+    return [];
+  }
+
+  if (Array.isArray(node)) {
+    return node.flatMap(extractTextFromNode);
+  }
+
+  if (typeof node !== "object") {
+    return [];
+  }
+
+  return Object.entries(node).flatMap(([key, value]) => {
+    if (key === "a:t" && typeof value === "string") {
+      return [value];
+    }
+
+    return extractTextFromNode(value);
+  });
+}
+
+async function convertPptxBufferToPdfPureJs(buffer: Buffer) {
+  const zip = await JSZip.loadAsync(buffer);
+  const slidePaths = Object.keys(zip.files)
+    .filter((name) => /^ppt\/slides\/slide\d+\.xml$/.test(name))
+    .sort((a, b) => {
+      const aNum = Number(a.match(/slide(\d+)\.xml$/)?.[1] ?? 0);
+      const bNum = Number(b.match(/slide(\d+)\.xml$/)?.[1] ?? 0);
+      return aNum - bNum;
+    });
+
+  if (slidePaths.length === 0) {
+    throw new Error("No slide files found in PPTX.");
+  }
+
+  const pdfDoc = await PDFDocument.create();
+  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  const parser = new XMLParser({
+    ignoreAttributes: false,
+    attributeNamePrefix: "",
+    ignoreDeclaration: true,
+    parseTagValue: false,
+  });
+
+  for (const slidePath of slidePaths) {
+    const file = zip.file(slidePath);
+
+    if (!file) {
+      continue;
+    }
+
+    const slideXml = await file.async("string");
+    const slideJson = parser.parse(slideXml);
+    const slideText = extractTextFromNode(slideJson).join("\n\n");
+
+    const page = pdfDoc.addPage([1123.2, 794.88]);
+    const { width, height } = page.getSize();
+    const margin = 40;
+    const fontSize = 18;
+    const lineHeight = fontSize * 1.3;
+    const wrappedText = slideText || "(Empty slide)";
+
+    page.drawText(wrappedText, {
+      x: margin,
+      y: height - margin - fontSize,
+      size: fontSize,
+      font,
+      color: rgb(0, 0, 0),
+      maxWidth: width - margin * 2,
+      lineHeight,
+    });
+  }
+
+  return Buffer.from(await pdfDoc.save());
 }
 
 // Detecta errores de Postgres por codigo para aplicar fallbacks de schema.
@@ -172,12 +296,20 @@ function getPowerPointContentType(fileName: string, rawContentType: string | und
     return "application/vnd.ms-powerpoint";
   }
 
+  if (lowerFileName.endsWith(".pdf")) {
+    return "application/pdf";
+  }
+
   return null;
 }
 
 function getPresentationExtension(fileName: string, contentType: string) {
   const lowerFileName = fileName.toLowerCase();
   const lowerContentType = contentType.toLowerCase();
+
+  if (lowerFileName.endsWith(".pdf") || lowerContentType === "application/pdf") {
+    return "pdf";
+  }
 
   if (lowerFileName.endsWith(".pptx") || lowerContentType.includes("presentationml")) {
     return "pptx";
@@ -231,47 +363,38 @@ async function convertPresentationBufferToPdf(
   fileName: string,
   contentType: string,
 ) {
-  const workDir = await mkdtemp(join(tmpdir(), "pitch-presentation-"));
   const extension = getPresentationExtension(fileName, contentType);
-  const inputPath = join(workDir, `presentation.${extension}`);
-  const outputPath = join(workDir, "presentation.pdf");
 
-  try {
-    await writeFile(inputPath, buffer);
-    let libreofficeCommand: string;
+  if (extension === "pdf") {
+    return buffer;
+  }
 
-    try {
-      libreofficeCommand = await resolveSystemCommand("LIBREOFFICE_BINARY", [
-        "libreoffice",
-        "soffice",
-      ]);
-    } catch (error) {
-      if (error instanceof MissingBinaryError) {
-        throw new Error(
-          "LibreOffice binary not found. Install LibreOffice and make sure `libreoffice` or `soffice` is available on PATH, or set LIBREOFFICE_BINARY."
-        );
-      }
-
-      throw error;
+  if (PRESENTATION_PDF_METHOD === "purejs") {
+    if (extension !== "pptx") {
+      throw new Error(
+        "Pure JS converter only supports .pptx files. Use LibreOffice for .ppt files."
+      );
     }
 
-    await runProcess(
-      libreofficeCommand,
-      [
-        "--headless",
-        "--convert-to",
-        "pdf",
-        "--outdir",
-        workDir,
-        inputPath,
-      ],
-      60000,
-    );
-
-    return await readFile(outputPath);
-  } finally {
-    rm(workDir, { recursive: true, force: true }).catch(() => undefined);
+    return convertPptxBufferToPdfPureJs(buffer);
   }
+
+  if (PRESENTATION_PDF_METHOD === "libreoffice") {
+    return convertPresentationBufferToPdfWithLibreOffice(buffer, fileName, contentType);
+  }
+
+  if (extension === "pptx") {
+    try {
+      return await convertPresentationBufferToPdfWithLibreOffice(buffer, fileName, contentType);
+    } catch (error) {
+      if (error instanceof MissingBinaryError) {
+        return convertPptxBufferToPdfPureJs(buffer);
+      }
+      throw error;
+    }
+  }
+
+  return convertPresentationBufferToPdfWithLibreOffice(buffer, fileName, contentType);
 }
 
 function getPresentationVersion(pitchId: string) {
@@ -733,7 +856,7 @@ pitchRouter.post("/:pitchId/presentation", presentationUpload, async (req, res) 
 
     if (!contentType) {
       return res.status(400).json({
-        message: "Only .ppt and .pptx presentation files are supported",
+        message: "Only .ppt, .pptx and .pdf presentation files are supported",
       });
     }
 
