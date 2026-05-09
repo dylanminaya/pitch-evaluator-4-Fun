@@ -19,7 +19,7 @@ export async function apiFetch<T>(path: string, init?:RequestInit): Promise<T> {
         throw new Error(errorBody?.message ?? "Request failed");
     }
 
-    return res.json() as Promise<T>;//convierte a json
+    return res.json() as Promise<T>;
 }
 
 export async function apiFetchBlob(path: string, init?: RequestInit): Promise<Blob> {
