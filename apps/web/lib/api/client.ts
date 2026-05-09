@@ -7,10 +7,10 @@ const { NEXT_PUBLIC_API_URL } = validateClientEnv();
 export async function apiFetch<T>(path: string, init?:RequestInit): Promise<T> {
     const res = await fetch(`${NEXT_PUBLIC_API_URL}${path}`, {
         ...init,
-        credentials: "include",//hace que se envien cookies
+        credentials: "include",
         headers: {
             "Content-Type": "application/json",
-            ...(init?.headers ?? {})//si el usuario mandar headers extra, agregalo
+            ...(init?.headers ?? {})
         },
     });
 
