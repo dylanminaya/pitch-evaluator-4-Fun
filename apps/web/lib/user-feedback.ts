@@ -306,18 +306,18 @@ export function getFriendlyErrorItems(error: unknown): FeedbackItem[] {
     return [
       createItem(
         "friendly-presentation-prepare",
-        "No pudimos preparar el PowerPoint para proyectarlo.",
-        "El pitch quedo guardado. Prueba subir de nuevo el .ppt o .pptx desde editar pitch.",
+        "No pudimos preparar la presentación para proyectarla.",
+        "El pitch quedó guardado. Prueba subir de nuevo un .ppt, .pptx o .pdf desde editar pitch.",
       ),
     ];
   }
 
-  if (normalized.includes("only .ppt and .pptx")) {
+  if (normalized.includes("only .ppt, .pptx and .pdf")) {
     return [
       createItem(
         "friendly-presentation-format",
-        "El archivo seleccionado no parece ser un PowerPoint valido.",
-        "Sube un archivo con extension .ppt o .pptx.",
+        "El archivo seleccionado no parece ser una presentación válida.",
+        "Sube un archivo con extensión .ppt, .pptx o .pdf.",
       ),
     ];
   }
