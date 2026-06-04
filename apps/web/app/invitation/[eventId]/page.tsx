@@ -3,20 +3,23 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
-import { CalendarDays, Clock3, MapPin, Users } from "lucide-react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { CalendarDays, CheckCircle2, Circle, Clock3, MapPin, Users } from "lucide-react";
 import { Button } from "@workspace/ui/components/button";
-import { usePublicEventInvitation } from "@/hooks/dashboard";
+import { usePublicEventInvitation, usePublicPitch } from "@/hooks/dashboard";
 import { useSession } from "@/lib/better-auth/auth-client";
 import {
   ArrowLeft,
 } from "lucide-react";
+import type { PublicEventInvitation } from "@workspace/shared/api";
 
 const evaluatorEmailStorageKey = "pitch-evaluator-email";
+type InvitationPitch = PublicEventInvitation["pitches"][number];
 
 export default function EventInvitationPage() {
   const params = useParams<{ eventId: string }>();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const eventId = params.eventId;
   const { data: invitation, isLoading, error } = usePublicEventInvitation(eventId);
   const { data: sessionData, isPending: isLoadingSession } = useSession();
@@ -30,9 +33,26 @@ export default function EventInvitationPage() {
   const effectiveEvaluatorEmail = isChangingEmail
     ? null
     : evaluatorEmail || sessionUserEmail;
-  const evaluatorEmailQuery = effectiveEvaluatorEmail
-    ? `?evaluatorEmail=${encodeURIComponent(effectiveEvaluatorEmail)}`
-    : "";
+  const votedPitchIds = new Set(
+    (searchParams.get("votedPitchIds") ?? "")
+      .split(",")
+      .map((pitchId) => pitchId.trim())
+      .filter(Boolean),
+  );
+  const evaluatorEmailQuery = (() => {
+    const query = new URLSearchParams();
+
+    if (effectiveEvaluatorEmail) {
+      query.set("evaluatorEmail", effectiveEvaluatorEmail);
+    }
+
+    if (votedPitchIds.size > 0) {
+      query.set("votedPitchIds", Array.from(votedPitchIds).join(","));
+    }
+
+    const queryString = query.toString();
+    return queryString ? `?${queryString}` : "";
+  })();
 
   useEffect(() => {
     if (isLoadingSession) {
@@ -220,8 +240,19 @@ export default function EventInvitationPage() {
               </div>
             </div>
 
-            <div className="mt-6 rounded-2xl border border-dashed border-[#263550] bg-[#0d1526] px-4 py-4 text-sm leading-6 text-[#a9b3c9]">
-              Selecciona el pitch que quieras revisar. {/* poner una descripcion util */}
+            <div className="mt-6 grid gap-3 rounded-2xl border border-dashed border-[#263550] bg-[#0d1526] px-4 py-4 text-sm leading-6 text-[#a9b3c9] md:grid-cols-3">
+              <span className="inline-flex items-center gap-2">
+                <CheckCircle2 className="size-4 text-[#83ce00]" />
+                Ya votado
+              </span>
+              <span className="inline-flex items-center gap-2">
+                <Clock3 className="size-4 text-[#ffd166]" />
+                Disponible para votar ahora
+              </span>
+              <span className="inline-flex items-center gap-2">
+                <Circle className="size-4 text-white" />
+                Pendiente de votar
+              </span>
             </div>
 
             <div className="mt-6 grid gap-4 md:grid-cols-2">
@@ -230,61 +261,88 @@ export default function EventInvitationPage() {
                   Este evento todavia no tiene pitches publicados.
                 </div>
               ) : (
-                invitation.pitches.map((pitch) => {
-                  const canOpenPitch = votingOpen && pitch.status === "OPEN";
-
-                  return (
-                    <article
-                      key={pitch.id}
-                      className="rounded-2xl border border-[#263550] bg-[#0d1526] p-5"
-                    >
-                      <div
-                        className={`inline-flex rounded-full px-3 py-1 text-[11px] font-bold uppercase italic tracking-[0.24em] ${
-                          pitch.status === "OPEN"
-                            ? "text-[#83ce00]"
-                            : "text-[#ff6b6b]"
-                        }`}
-                        style={{
-                          backgroundColor:
-                            pitch.status === "OPEN"
-                              ? `${pitch.color}22`
-                              : "#ff6b6b22",
-                        }}
-                      >
-                        {pitch.status === "OPEN" ? "Disponible" : "Cerrado"}
-                      </div>
-                      <h2 className="mt-4 text-xl font-bold text-white">{pitch.name}</h2>
-                      <p
-                        className="mt-3 text-sm leading-6 text-[#a9b3c9]"
-                        style={{
-                          display: "-webkit-box",
-                          WebkitLineClamp: 2,
-                          WebkitBoxOrient: "vertical",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "normal",
-                        }}
-                      >
-                        {pitch.description}
-                      </p>
-                      <div className="mt-5">
-                        <Link href={canOpenPitch ? `/vote/${pitch.id}${evaluatorEmailQuery}` : "#"} aria-disabled={!canOpenPitch}>
-                          <Button
-                            className="h-11 w-full rounded-full bg-[#83ce00] text-sm font-bold italic text-[#0d1526] hover:bg-[#a7ea2e]"
-                            disabled={!canOpenPitch}
-                          >
-                            Ver pitch
-                          </Button>
-                        </Link>
-                      </div>
-                    </article>
-                  );
-                })
+                invitation.pitches.map((pitch) => (
+                  <InvitationPitchCard
+                    key={pitch.id}
+                    pitch={pitch}
+                    votingOpen={votingOpen}
+                    evaluatorEmail={effectiveEvaluatorEmail}
+                    evaluatorEmailQuery={evaluatorEmailQuery}
+                    wasVotedInCurrentFlow={votedPitchIds.has(pitch.id)}
+                  />
+                ))
               )}
             </div>
           </div>
         </section>
       </div>
     </main>
+  );
+}
+
+function InvitationPitchCard({
+  pitch,
+  votingOpen,
+  evaluatorEmail,
+  evaluatorEmailQuery,
+  wasVotedInCurrentFlow,
+}: {
+  pitch: InvitationPitch;
+  votingOpen: boolean;
+  evaluatorEmail: string;
+  evaluatorEmailQuery: string;
+  wasVotedInCurrentFlow: boolean;
+}) {
+  const { data: publicPitch } = usePublicPitch(pitch.id, evaluatorEmail);
+  const currentEventIsOpen = publicPitch ? publicPitch.eventStatus === "OPEN" : votingOpen;
+  const currentPitchIsOpen = publicPitch ? publicPitch.pitchStatus === "OPEN" : pitch.status === "OPEN";
+  const canOpenPitch = currentEventIsOpen && currentPitchIsOpen;
+  const isVoted = wasVotedInCurrentFlow || Boolean(publicPitch?.hasVoted);
+  const statusLabel = isVoted
+    ? "Ya votado"
+    : canOpenPitch
+      ? "Disponible para votar ahora"
+      : "Pendiente de votar";
+  const StatusIcon = isVoted ? CheckCircle2 : canOpenPitch ? Clock3 : Circle;
+  const statusClass = isVoted
+    ? "border-[#2f5f24] bg-[#112714] text-[#a7ea2e]"
+    : canOpenPitch
+      ? "border-[#6b5522] bg-[#2a230d] text-[#ffd166]"
+      : "border-white/30 bg-white/10 text-white";
+  const canViewPitch = canOpenPitch;
+
+  return (
+    <article className="rounded-2xl border border-[#263550] bg-[#0d1526] p-5">
+      <div
+        className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-bold uppercase italic tracking-[0.18em] ${statusClass}`}
+      >
+        <StatusIcon className="size-4" />
+        {statusLabel}
+      </div>
+      <h2 className="mt-4 text-xl font-bold text-white">{pitch.name}</h2>
+      <p
+        className="mt-3 text-sm leading-6 text-[#a9b3c9]"
+        style={{
+          display: "-webkit-box",
+          WebkitLineClamp: 2,
+          WebkitBoxOrient: "vertical",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "normal",
+        }}
+      >
+        {pitch.description}
+      </p>
+      <div className="mt-5">
+        <Link href={canViewPitch ? `/vote/${pitch.id}${evaluatorEmailQuery}` : "#"} aria-disabled={!canViewPitch}>
+          <Button
+            className="h-11 w-full rounded-full bg-[#83ce00] text-sm font-bold italic text-[#0d1526] hover:bg-[#a7ea2e]"
+            disabled={!canViewPitch}
+          >
+            {canOpenPitch ? (isVoted ? "Ver voto" : "Votar ahora") : "Pitch cerrado"}
+          </Button>
+        </Link>
+      </div>
+    </article>
   );
 }

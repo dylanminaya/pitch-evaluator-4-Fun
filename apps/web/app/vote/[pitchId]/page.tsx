@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { CheckCircle2, Sparkles, Star } from "lucide-react";
 import { Button } from "@workspace/ui/components/button";
 import { usePublicPitch, useSubmitPublicVote } from "@/hooks/dashboard";
@@ -14,6 +14,7 @@ const evaluatorEmailStorageKey = "pitch-evaluator-email";
 export default function VotingScreenPage() {
   const params = useParams<{ pitchId: string }>();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const pitchId = params.pitchId;
   const [emailInput, setEmailInput] = useState("");
   const [evaluatorEmail, setEvaluatorEmail] = useState<string | null>(null);
@@ -138,7 +139,7 @@ export default function VotingScreenPage() {
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (isVotingClosed || hasAlreadyVoted) {
+    if (!pitch || isVotingClosed || hasAlreadyVoted) {
       return;
     }
 
@@ -161,7 +162,21 @@ export default function VotingScreenPage() {
     window.localStorage.setItem(evaluatorEmailStorageKey, normalizedEmail);
     setEvaluatorEmail(normalizedEmail);
     setIsChangingEmail(false);
-    router.replace(`/vote/${pitchId}?evaluatorEmail=${encodeURIComponent(normalizedEmail)}`);
+
+    const votedPitchIds = new Set(
+      (searchParams.get("votedPitchIds") ?? "")
+        .split(",")
+        .map((storedPitchId) => storedPitchId.trim())
+        .filter(Boolean),
+    );
+    votedPitchIds.add(pitchId);
+
+    const query = new URLSearchParams({
+      evaluatorEmail: normalizedEmail,
+      votedPitchIds: Array.from(votedPitchIds).join(","),
+    });
+
+    router.replace(`/invitation/${pitch.eventId}?${query.toString()}`);
   }
 
   if (isLoadingSession && isLoading) {
@@ -379,11 +394,19 @@ export default function VotingScreenPage() {
                 type="button"
                 variant="outline"
                 onClick={() => {
-                  const query = effectiveEvaluatorEmail
-                    ? `?evaluatorEmail=${encodeURIComponent(effectiveEvaluatorEmail)}`
-                    : "";
+                  const query = new URLSearchParams();
+                  const votedPitchIds = searchParams.get("votedPitchIds");
 
-                  router.push(`/invitation/${pitch.eventId}${query}`);
+                  if (effectiveEvaluatorEmail) {
+                    query.set("evaluatorEmail", effectiveEvaluatorEmail);
+                  }
+
+                  if (votedPitchIds) {
+                    query.set("votedPitchIds", votedPitchIds);
+                  }
+
+                  const queryString = query.toString();
+                  router.push(`/invitation/${pitch.eventId}${queryString ? `?${queryString}` : ""}`);
                 }}
                 className="h-12 rounded-full border-[#263550] bg-transparent px-6 text-sm font-bold text-white hover:bg-[#1a2640] hover:text-white"
               >
