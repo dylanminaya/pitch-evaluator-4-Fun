@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
+  Activity,
   ArrowLeft,
   ArrowUpRight,
   CircleDot,
@@ -272,6 +273,16 @@ function DashboardPageContent() {
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
+            <Link href={selectedEventId ? `/events/${selectedEventId}/live` : "#"}>
+              <Button
+                variant="outline"
+                disabled={!selectedEventId}
+                className="rounded-full border-[#263550] bg-[#0d1526] text-white hover:bg-[#1a2640] hover:text-white"
+              >
+                <Activity className="size-4" />
+                Panel en vivo
+              </Button>
+            </Link>
             <Link href={selectedEventId ? `/events/${selectedEventId}/team` : "#"}>
               <Button
                 variant="outline"
