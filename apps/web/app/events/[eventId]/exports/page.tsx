@@ -9,7 +9,10 @@ import {
   Download,
   FileDown,
   Files,
+  Mail,
   SquareStack,
+  UsersRound,
+  X,
 } from "lucide-react";
 import { Button } from "@workspace/ui/components/button";
 import { FeedbackPanel } from "@/components/feedback-panel";
@@ -142,6 +145,11 @@ export default function EventExportsPage() {
   const [isExportingPitchId, setIsExportingPitchId] = useState<string | null>(null);
   const [isExportingSelection, setIsExportingSelection] = useState(false);
   const [exportError, setExportError] = useState<Error | null>(null);
+  const [participantPitchId, setParticipantPitchId] = useState<string | null>(null);
+  const [participantVotes, setParticipantVotes] = useState<DashboardVote[]>([]);
+  const [isLoadingParticipantVotes, setIsLoadingParticipantVotes] = useState(false);
+  const [participantVotesError, setParticipantVotesError] = useState<Error | null>(null);
+  const [showParticipantEmails, setShowParticipantEmails] = useState(false);
 
   const selectedEvent = useMemo(
     () => events.find((event) => event.id === eventId),
@@ -194,6 +202,64 @@ export default function EventExportsPage() {
     rankingRowsByCreatedAt.length > 0 && selectedPitchIds.length === rankingRowsByCreatedAt.length;
 
   const selectedRows = rankingRowsByCreatedAt.filter((row) => selectedPitchIds.includes(row.id));
+  const participantPitch = rankingRowsByCreatedAt.find((row) => row.id === participantPitchId);
+  const participantEmails = participantVotes
+    .map((vote) => vote.evaluatorEmail?.trim())
+    .filter((email): email is string => Boolean(email));
+  const participantCount = participantVotes.length || participantPitch?.votesCount || 0;
+
+  useEffect(() => {
+    setParticipantPitchId((current) => {
+      if (current && selectedPitchIds.includes(current)) {
+        return current;
+      }
+
+      return selectedPitchIds.at(-1) ?? null;
+    });
+  }, [selectedPitchIds]);
+
+  useEffect(() => {
+    if (!participantPitchId) {
+      setParticipantVotes([]);
+      setParticipantVotesError(null);
+      setShowParticipantEmails(false);
+      return;
+    }
+
+    let isCurrent = true;
+
+    async function loadParticipantVotes() {
+      try {
+        setParticipantVotesError(null);
+        setIsLoadingParticipantVotes(true);
+        const votes = await getVotes(participantPitchId!);
+
+        if (isCurrent) {
+          setParticipantVotes(votes);
+        }
+      } catch (error) {
+        if (isCurrent) {
+          setParticipantVotesError(
+            error instanceof Error ? error : new Error("Failed to load voters"),
+          );
+        }
+      } finally {
+        if (isCurrent) {
+          setIsLoadingParticipantVotes(false);
+        }
+      }
+    }
+
+    void loadParticipantVotes();
+    const intervalId = window.setInterval(() => {
+      void loadParticipantVotes();
+    }, 5000);
+
+    return () => {
+      isCurrent = false;
+      window.clearInterval(intervalId);
+    };
+  }, [participantPitchId]);
 
   function togglePitchSelection(pitchId: string) {
     setSelectedPitchIds((current) =>
@@ -201,10 +267,17 @@ export default function EventExportsPage() {
         ? current.filter((currentPitchId) => currentPitchId !== pitchId)
         : [...current, pitchId],
     );
+
+    if (!selectedPitchIds.includes(pitchId)) {
+      setParticipantPitchId(pitchId);
+      setShowParticipantEmails(false);
+    }
   }
 
   function toggleSelectAll() {
     setSelectedPitchIds(allSelected ? [] : rankingRowsByCreatedAt.map((row) => row.id));
+    setParticipantPitchId(allSelected ? null : (rankingRowsByCreatedAt.at(-1)?.id ?? null));
+    setShowParticipantEmails(false);
   }
 
   function getVoteScore(vote: DashboardVote | undefined, criterionId: string) {
@@ -407,6 +480,55 @@ export default function EventExportsPage() {
                     {selectedPitchIds.length}
                   </p>
                 </div>
+                <div className="rounded-2xl border border-[#263550] bg-[#0d1526] px-4 py-3">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-[#8899aa]">
+                    Votadores del pitch
+                  </p>
+                  {participantPitch ? (
+                    <div className="mt-3 space-y-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-bold text-white">
+                            {participantPitch.name}
+                          </p>
+                          <p className="mt-1 text-xs text-[#8899aa]">
+                            {isLoadingParticipantVotes ? "Actualizando..." : "En tiempo real"}
+                          </p>
+                        </div>
+                        <div className="inline-flex items-center gap-2 rounded-full border border-[#263550] bg-[#121d30] px-3 py-1 text-lg font-black text-[#83ce00]">
+                          <UsersRound className="size-4" />
+                          {participantCount}
+                        </div>
+                      </div>
+
+                      <Button
+                        type="button"
+                        onClick={() => setShowParticipantEmails((current) => !current)}
+                        disabled={participantCount === 0 && participantEmails.length === 0}
+                        className="w-full justify-between rounded-full bg-[#83ce00] text-xs font-bold italic text-[#0d1526] hover:bg-[#a7ea2e]"
+                      >
+                        <span>{showParticipantEmails ? "Ocultar Gmail" : "Ver Gmail"}</span>
+                        <Mail className="size-4" />
+                      </Button>
+
+                      {participantVotesError ? (
+                        <p className="text-xs text-[#ff8cab]">
+                          No pudimos cargar los Gmail de este pitch.
+                        </p>
+                      ) : null}
+
+                      {showParticipantEmails ? (
+                        <p className="text-xs text-[#8899aa]">
+                          La lista esta abierta en una ventana flotante.
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <p className="mt-3 text-xs leading-5 text-[#8899aa]">
+                      Selecciona un pitch del ranking para ver sus votadores.
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -582,6 +704,68 @@ export default function EventExportsPage() {
           </section>
         </section>
       </div>
+
+      {showParticipantEmails && participantPitch ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-[#020817]/75 px-4 py-6 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="participant-emails-title"
+          onClick={() => setShowParticipantEmails(false)}
+        >
+          <div
+            className="flex max-h-[min(720px,88vh)] w-full max-w-xl flex-col overflow-hidden rounded-[24px] border border-[#263550] bg-[#121d30] shadow-[0_24px_80px_rgba(2,8,23,0.55)]"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-4 border-b border-[#263550] px-5 py-4">
+              <div className="min-w-0">
+                <p className="text-[11px] font-bold uppercase italic tracking-[0.3em] text-[#83ce00]">
+                  Gmail de votadores
+                </p>
+                <h2
+                  id="participant-emails-title"
+                  className="mt-2 truncate text-xl font-black text-white"
+                >
+                  {participantPitch.name}
+                </h2>
+                <p className="mt-1 text-sm text-[#a9b3c9]">
+                  {participantCount} votadores registrados
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowParticipantEmails(false)}
+                className="inline-flex size-10 shrink-0 items-center justify-center rounded-full border border-[#263550] bg-[#0d1526] text-white transition hover:bg-[#1a2640]"
+                aria-label="Cerrar lista de Gmail"
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+              {participantEmails.length === 0 ? (
+                <p className="rounded-2xl border border-[#263550] bg-[#0d1526] px-4 py-3 text-sm text-[#8899aa]">
+                  Todavia no hay Gmail registrados para este pitch.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {participantEmails.map((email, index) => (
+                    <div
+                      key={`${email}-${index}`}
+                      className="flex items-center gap-3 rounded-2xl border border-[#263550] bg-[#0d1526] px-4 py-3 text-sm text-white"
+                    >
+                      <span className="inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-[#1a2640] text-xs font-black text-[#83ce00]">
+                        {index + 1}
+                      </span>
+                      <span className="min-w-0 break-all">{email}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
     </main>
   );
 }
