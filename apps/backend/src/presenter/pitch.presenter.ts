@@ -87,10 +87,12 @@ export const presentPitchDetail = (pitch: {
 export const presentPitchComment = (comment: {
   id: string;
   comment: string;
+  commentType?: "OPINION" | "ACTIVADOR" | null;
   createdAt: Date | string;
 }) => ({
   id: comment.id,
   comment: comment.comment,
+  commentType: comment.commentType ?? "OPINION",
   createdAt: comment.createdAt instanceof Date ? comment.createdAt.toISOString() : comment.createdAt,
 });
 
@@ -102,6 +104,7 @@ export const presentPitchSummary = (payload: {
   comments: Array<{
     id: string;
     comment: string;
+    commentType?: "OPINION" | "ACTIVADOR" | null;
     createdAt: Date | string;
   }>;
   summary: string | null;

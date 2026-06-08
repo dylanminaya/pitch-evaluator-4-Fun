@@ -1014,20 +1014,21 @@ pitchRouter.get("/public/:pitchId", async (req, res) => {
         const existingVoteResult = await db.query(
           `
             SELECT
-              id,
-              "pitchId",
-              "evaluatorId",
-              "evaluatorEmail",
-              "criteriaScores",
-              innovation,
-              viability,
-              impact,
-              presentation,
-              comment,
-              "createdAt"
-            FROM vote
-            WHERE "pitchId" = $1
-              AND "evaluatorEmail" = $2
+              v.id,
+              v."pitchId",
+              v."evaluatorId",
+              v."evaluatorEmail",
+              v."criteriaScores",
+              v.innovation,
+              v.viability,
+              v.impact,
+              v.presentation,
+              v.comment,
+              COALESCE(to_jsonb(v) ->> 'commentType', 'OPINION') AS "commentType",
+              v."createdAt"
+            FROM vote v
+            WHERE v."pitchId" = $1
+              AND v."evaluatorEmail" = $2
             LIMIT 1
           `,
           [req.params.pitchId, evaluatorEmail],
@@ -1045,19 +1046,20 @@ pitchRouter.get("/public/:pitchId", async (req, res) => {
         const existingVoteResult = await db.query(
           `
             SELECT
-              id,
-              "pitchId",
-              "evaluatorId",
-              "evaluatorId" AS "evaluatorEmail",
-              innovation,
-              viability,
-              impact,
-              presentation,
-              comment,
-              "createdAt"
-            FROM vote
-            WHERE "pitchId" = $1
-              AND "evaluatorId" = $2
+              v.id,
+              v."pitchId",
+              v."evaluatorId",
+              v."evaluatorId" AS "evaluatorEmail",
+              v.innovation,
+              v.viability,
+              v.impact,
+              v.presentation,
+              v.comment,
+              COALESCE(to_jsonb(v) ->> 'commentType', 'OPINION') AS "commentType",
+              v."createdAt"
+            FROM vote v
+            WHERE v."pitchId" = $1
+              AND v."evaluatorId" = $2
             LIMIT 1
           `,
           [req.params.pitchId, evaluatorEmail],
@@ -1293,6 +1295,7 @@ pitchRouter.get("/comments", async (req, res) => {
       `SELECT
         v.id,
         v.comment,
+        COALESCE(to_jsonb(v) ->> 'commentType', 'OPINION') AS "commentType",
         v."createdAt"
       FROM vote v
       WHERE v."pitchId" = $1
@@ -1405,6 +1408,7 @@ pitchRouter.post("/:pitchId/summary", async (req, res) => {
       SELECT
         v.id,
         v.comment,
+        COALESCE(to_jsonb(v) ->> 'commentType', 'OPINION') AS "commentType",
         v."createdAt"
       FROM vote v
       WHERE v."pitchId" = $1
@@ -1495,7 +1499,8 @@ pitchRouter.get("/:pitchId/export", async (req, res) => {
           v.viability,
           v.impact,
           v.presentation,
-          v.comment
+          v.comment,
+          COALESCE(to_jsonb(v) ->> 'commentType', 'OPINION') AS "commentType"
         FROM pitch p
         INNER JOIN event e ON e.id = p."eventId"
         INNER JOIN pitch_stats ps ON ps.id = p.id
@@ -1592,6 +1597,7 @@ pitchRouter.get("/:pitchId/export", async (req, res) => {
       ...eventCriteria.map((criterion) => criterion.label),
       ...eventCriteria.map((criterion) => `${criterion.label} Promedio`),
       "Comentario",
+      "Tipo comentario",
       "descripcion",
     ]
       .map((value) => escapeCsvValue(value))
@@ -1599,6 +1605,7 @@ pitchRouter.get("/:pitchId/export", async (req, res) => {
 
     const csvRows = detailResult.rows.map((row) => {
       const voteAverage = getVoteAverage(row);
+      const commentTypeLabel = row.commentType === "ACTIVADOR" ? "Activador" : "Opinion";
 
       return [
         escapeCsvValue(row.name),
@@ -1611,7 +1618,8 @@ pitchRouter.get("/:pitchId/export", async (req, res) => {
         row.scoreAvg,
         ...eventCriteria.map((criterion) => getVoteScore(row, criterion.id)),
         ...eventCriteria.map((criterion) => getAverageScore(row, criterion.id)),
-        escapeCsvValue(row.comment),
+        escapeCsvValue(row.comment ? `${commentTypeLabel}: "${row.comment}"` : ""),
+        escapeCsvValue(commentTypeLabel),
         escapeCsvValue(row.description),
       ].join(",")
     })

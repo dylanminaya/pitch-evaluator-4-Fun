@@ -10,6 +10,7 @@ import { useSession } from "@/lib/better-auth/auth-client";
 import type { EventCriterion } from "@workspace/shared/api";
 
 const evaluatorEmailStorageKey = "pitch-evaluator-email";
+type CommentType = "OPINION" | "ACTIVADOR";
 
 export default function VotingScreenPage() {
   const params = useParams<{ pitchId: string }>();
@@ -31,6 +32,7 @@ export default function VotingScreenPage() {
   const { mutateAsync: submitVote, isPending, isSuccess, error: voteError } =
     useSubmitPublicVote();
   const [commentDraft, setCommentDraft] = useState<string | null>(null);
+  const [commentTypeDraft, setCommentTypeDraft] = useState<CommentType | null>(null);
   const [scoreDrafts, setScoreDrafts] = useState<Record<string, number>>({});
 
   const criteria: EventCriterion[] = useMemo(() => pitch?.criteria ?? [], [pitch?.criteria]);
@@ -82,6 +84,7 @@ export default function VotingScreenPage() {
     setEvaluatorEmail(normalizedEmail);
     setIsChangingEmail(false);
     setCommentDraft(null);
+    setCommentTypeDraft(null);
     setScoreDrafts({});
     router.replace(`/vote/${pitchId}?evaluatorEmail=${encodeURIComponent(normalizedEmail)}`);
   }
@@ -95,6 +98,7 @@ export default function VotingScreenPage() {
     setEmailInput("");
     setIsChangingEmail(true);
     setCommentDraft(null);
+    setCommentTypeDraft(null);
     setScoreDrafts({});
     router.replace(`/vote/${pitchId}`);
   }
@@ -128,6 +132,10 @@ export default function VotingScreenPage() {
     return scoreDrafts[criterionId] ?? getSavedScore(criterionId);
   }
 
+  function getSelectedCommentType(): CommentType {
+    return commentTypeDraft ?? pitch?.currentVote?.commentType ?? "OPINION";
+  }
+
   function getRatingLabel(value?: number) {
     if (!value) {
       return "Sin evaluar";
@@ -157,6 +165,7 @@ export default function VotingScreenPage() {
         score: getSelectedScore(criterion.id) ?? 3,
       })),
       comment: (commentDraft ?? pitch?.currentVote?.comment ?? "").trim() || null,
+      commentType: getSelectedCommentType(),
     });
 
     window.localStorage.setItem(evaluatorEmailStorageKey, normalizedEmail);
@@ -358,12 +367,33 @@ export default function VotingScreenPage() {
             </div>
 
             <section className="rounded-[24px] border border-[#263550] bg-[#1a2640] p-6 shadow-[0_18px_45px_rgba(2,8,23,0.35)]">
-              <label
-                htmlFor="comment"
-                className="text-[11px] font-bold uppercase italic tracking-[0.24em] text-[#8899aa]"
-              >
-                Comentario opcional
-              </label>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <label
+                  htmlFor="comment"
+                  className="text-[11px] font-bold uppercase italic tracking-[0.24em] text-[#8899aa]"
+                >
+                  Comentario opcional
+                </label>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setCommentTypeDraft((current) =>
+                      (current ?? pitch.currentVote?.commentType ?? "OPINION") === "OPINION"
+                        ? "ACTIVADOR"
+                        : "OPINION",
+                    )
+                  }
+                  disabled={!canEditVote}
+                  className={`h-9 rounded-full border px-4 text-xs font-black uppercase tracking-[0.16em] transition disabled:cursor-not-allowed disabled:opacity-70 ${
+                    getSelectedCommentType() === "ACTIVADOR"
+                      ? "border-[#00f0ff]/70 bg-[#00f0ff] text-[#0d1526] hover:bg-white"
+                      : "border-[#83ce00]/70 bg-[#83ce00] text-[#0d1526] hover:bg-[#a7ea2e]"
+                  }`}
+                  aria-label="Cambiar tipo de comentario"
+                >
+                  {getSelectedCommentType() === "ACTIVADOR" ? "Activador" : "Opinion"}
+                </button>
+              </div>
               <textarea
                 id="comment"
                 value={commentDraft ?? pitch.currentVote?.comment ?? ""}

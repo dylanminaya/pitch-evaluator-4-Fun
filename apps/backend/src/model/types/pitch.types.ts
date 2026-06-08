@@ -47,6 +47,7 @@ export type PitchDetail = {
 export type PitchComment = {
   id: string;
   comment: string;
+  commentType?: "OPINION" | "ACTIVADOR" | null;
   createdAt: Date;
 };
 

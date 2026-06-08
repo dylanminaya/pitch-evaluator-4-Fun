@@ -64,6 +64,7 @@ voteRouter.get("/", async (req, res) => {
           v.impact,
           v.presentation,
           v.comment,
+          COALESCE(to_jsonb(v) ->> 'commentType', 'OPINION') AS "commentType",
           v."createdAt"
         FROM vote v
         WHERE v."pitchId" = $1
@@ -96,6 +97,7 @@ voteRouter.post("/", async (req, res) => {
     evaluatorEmail,
     criteriaScores,
     comment,
+    commentType,
   } = parsed.data;
 
   try {
@@ -209,9 +211,10 @@ voteRouter.post("/", async (req, res) => {
               impact,
               presentation,
               comment,
+              "commentType",
               "createdAt"
             )
-            VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7, $8, $9, $10, NOW())
+            VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7, $8, $9, $10, $11, NOW())
             RETURNING
               id,
               "pitchId",
@@ -223,6 +226,7 @@ voteRouter.post("/", async (req, res) => {
               impact,
               presentation,
               comment,
+              "commentType",
               "createdAt"
           `,
           [
@@ -236,6 +240,7 @@ voteRouter.post("/", async (req, res) => {
             impact,
             presentation,
             comment ?? null,
+            commentType,
           ],
         );
       } catch (error) {

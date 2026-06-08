@@ -129,6 +129,7 @@ export const dashboardPitchDetailSchema = z.object({
 export const dashboardPitchCommentSchema = z.object({
   id: z.string(),
   comment: z.string(),
+  commentType: z.enum(["OPINION", "ACTIVADOR"]).default("OPINION"),
   createdAt: z.string(),
 });
 
@@ -143,6 +144,7 @@ export const dashboardVoteSchema = z.object({
   impact: z.number(),
   presentation: z.number(),
   comment: z.string().nullable(),
+  commentType: z.enum(["OPINION", "ACTIVADOR"]).default("OPINION"),
   createdAt: z.string().nullable(),
 });
 
@@ -245,6 +247,7 @@ export const createPublicVoteSchema = z.object({
   evaluatorId: z.string().nullable().optional(),
   criteriaScores: voteCriteriaScoresSchema,
   comment: z.string().max(500).optional().nullable(),
+  commentType: z.enum(["OPINION", "ACTIVADOR"]).optional().default("OPINION"),
 });
 
 

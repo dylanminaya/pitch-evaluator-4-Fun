@@ -354,6 +354,7 @@ export default function EventExportsPage() {
       ...selectedCriteria.map((criterion) => criterion.label),
       ...selectedCriteria.map((criterion) => `${criterion.label} Promedio`),
       "Comentario",
+      "Tipo comentario",
       "descripcion",
     ];
 
@@ -372,7 +373,10 @@ export default function EventExportsPage() {
         (criterion) =>
           row.criterionAverages.find((item) => item.id === criterion.id)?.avg ?? 0,
       ),
-      row.vote?.comment ?? "",
+      row.vote?.comment
+        ? `${row.vote.commentType === "ACTIVADOR" ? "Activador" : "Opinion"}: "${row.vote.comment}"`
+        : "",
+      row.vote?.commentType === "ACTIVADOR" ? "Activador" : "Opinion",
       row.description,
     ]);
 

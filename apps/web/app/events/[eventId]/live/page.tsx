@@ -55,6 +55,7 @@ type LiveComment = {
   pitchId: string;
   pitchName: string;
   comment: string;
+  commentType: "OPINION" | "ACTIVADOR";
   createdAt: string;
 };
 
@@ -71,6 +72,10 @@ function formatTime(value: string | null) {
     hour: "2-digit",
     minute: "2-digit",
   }).format(parsed);
+}
+
+function getCommentTypeLabel(commentType: LiveComment["commentType"]) {
+  return commentType === "ACTIVADOR" ? "Activador" : "Opinion";
 }
 
 function getTopTriggers(comments: LiveComment[]) {
@@ -134,6 +139,7 @@ export default function EventLivePage() {
             pitchId: pitch.id,
             pitchName: pitch.name,
             comment: item.comment,
+            commentType: item.commentType,
             createdAt: item.createdAt,
           }));
       })
@@ -151,8 +157,10 @@ export default function EventLivePage() {
     expectedVotes > 0
       ? Math.min(100, (totalVotes / expectedVotes) * 100)
       : null;
-  const topTriggers = getTopTriggers(comments);
+  const activatorComments = comments.filter((item) => item.commentType === "ACTIVADOR");
+  const topTriggers = getTopTriggers(activatorComments);
   const highlightedComments = comments
+    .filter((item) => item.commentType === "OPINION")
     .filter((item) => item.comment.length >= 24)
     .slice(0, 4);
   const trendMaxVotes = Math.max(1, ...ranking.map((item) => item.votesCount));
@@ -526,7 +534,7 @@ export default function EventLivePage() {
                             {item.pitchName}
                           </p>
                           <p className="mt-2 text-sm leading-6 text-[#c9ccdc]">
-                            {item.comment}
+                            {`${getCommentTypeLabel(item.commentType)}: "${item.comment}"`}
                           </p>
                         </div>
                       ))
@@ -567,7 +575,7 @@ export default function EventLivePage() {
                         </span>
                       </div>
                       <p className="mt-2 text-sm leading-6 text-[#c9ccdc]">
-                        {item.comment}
+                        {`${getCommentTypeLabel(item.commentType)}: "${item.comment}"`}
                       </p>
                     </article>
                   ))

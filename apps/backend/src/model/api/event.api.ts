@@ -385,7 +385,8 @@ eventRouter.get("/:eventId/export", async (req, res) => {
         v.viability,
         v.impact,
         v.presentation,
-        v.comment
+        v.comment,
+        COALESCE(to_jsonb(v) ->> 'commentType', 'OPINION') AS "commentType"
         FROM pitch p
         INNER JOIN pitch_stats ps ON ps.id = p.id
         LEFT JOIN vote v ON v."pitchId" = p.id
@@ -486,6 +487,7 @@ eventRouter.get("/:eventId/export", async (req, res) => {
       ...eventCriteria.map((criterion) => criterion.label),
       ...eventCriteria.map((criterion) => `${criterion.label} Promedio`),
       "Comentario",
+      "Tipo comentario",
       "descripcion",
     ]
       .map((value) => escapeCsvValue(value))
@@ -494,6 +496,7 @@ eventRouter.get("/:eventId/export", async (req, res) => {
     // Filas del CSV.
     const csvRows = result.rows.map((row) => {
       const voteAverage = getVoteAverage(row);
+      const commentTypeLabel = row.commentType === "ACTIVADOR" ? "Activador" : "Opinion";
 
       return [
         pitchPositions.get(String(row.pitchid ?? row.pitchId)) ?? "",
@@ -507,7 +510,8 @@ eventRouter.get("/:eventId/export", async (req, res) => {
         row.scoreAvg,
         ...eventCriteria.map((criterion) => getVoteScore(row, criterion.id)),
         ...eventCriteria.map((criterion) => getAverageScore(row, criterion.id)),
-        escapeCsvValue(row.comment),
+        escapeCsvValue(row.comment ? `${commentTypeLabel}: "${row.comment}"` : ""),
+        escapeCsvValue(commentTypeLabel),
         escapeCsvValue(row.pitchDescription),
       ].join(",");
     });
