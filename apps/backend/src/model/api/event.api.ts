@@ -16,6 +16,8 @@ import { validateServerEnv } from "@workspace/shared/env/server";
 import {
   buildCriteriaAveragesSql,
   buildWeightedScoreSql,
+  formatCriterionLabel,
+  getTopWeightedCriterionIds,
   normalizeEventCriteria,
 } from "../criteria.js";
 
@@ -400,6 +402,7 @@ eventRouter.get("/:eventId/export", async (req, res) => {
       `"${String(value ?? "").replace(/"/g, '""')}"`;
 
     const eventCriteria = normalizeEventCriteria(eventResult.rows[0].criteria);
+    const topCriterionIds = getTopWeightedCriterionIds(eventCriteria);
 
     const getVoteScore = (row: Record<string, unknown>, criterionId: string) => {
       const scores = Array.isArray(row.criteriaScores) ? row.criteriaScores : [];
@@ -484,8 +487,13 @@ eventRouter.get("/:eventId/export", async (req, res) => {
       "Total AVG",
       "porcentaje",
       "promedio",
-      ...eventCriteria.map((criterion) => criterion.label),
-      ...eventCriteria.map((criterion) => `${criterion.label} Promedio`),
+      ...eventCriteria.map((criterion) =>
+        formatCriterionLabel(criterion, topCriterionIds),
+      ),
+      ...eventCriteria.map(
+        (criterion) =>
+          `${formatCriterionLabel(criterion, topCriterionIds)} Promedio`,
+      ),
       "Comentario",
       "Tipo comentario",
       "descripcion",

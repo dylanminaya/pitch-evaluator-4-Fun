@@ -18,6 +18,10 @@ import { Button } from "@workspace/ui/components/button";
 import { FeedbackPanel } from "@/components/feedback-panel";
 import { useEvents, usePitches, useRanking } from "@/hooks/dashboard";
 import { exportPitch, getVotes } from "@/lib/dashboard-api";
+import {
+  formatCriterionLabel,
+  getTopWeightedCriterionIds,
+} from "@/lib/criteria-highlights";
 import { getFriendlyErrorItems } from "@/lib/user-feedback";
 import type {
   CriterionAverage,
@@ -157,6 +161,10 @@ export default function EventExportsPage() {
   );
 
   const selectedCriteria = selectedEvent?.criteria ?? defaultCriteria;
+  const topCriterionIds = useMemo(
+    () => getTopWeightedCriterionIds(selectedCriteria),
+    [selectedCriteria],
+  );
   const pitchStatusById = useMemo(
     () => new Map(pitches.map((pitch) => [pitch.id, pitch.status])),
     [pitches],
@@ -351,8 +359,13 @@ export default function EventExportsPage() {
       "Total AVG",
       "porcentaje",
       "promedio",
-      ...selectedCriteria.map((criterion) => criterion.label),
-      ...selectedCriteria.map((criterion) => `${criterion.label} Promedio`),
+      ...selectedCriteria.map((criterion) =>
+        formatCriterionLabel(criterion, topCriterionIds),
+      ),
+      ...selectedCriteria.map(
+        (criterion) =>
+          `${formatCriterionLabel(criterion, topCriterionIds)} Promedio`,
+      ),
       "Comentario",
       "Tipo comentario",
       "descripcion",

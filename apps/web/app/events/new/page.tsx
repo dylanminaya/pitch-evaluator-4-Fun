@@ -16,6 +16,7 @@ import { Button } from "@workspace/ui/components/button";
 import { Input } from "@workspace/ui/components/input";
 import { FeedbackPanel } from "@/components/feedback-panel";
 import { useCreateEvent } from "@/hooks/dashboard";
+import { getTopWeightedCriterionIds } from "@/lib/criteria-highlights";
 import { getEventFormIssues, getFriendlyErrorItems } from "@/lib/user-feedback";
 import type { EventCriterion } from "@workspace/shared/api";
 
@@ -57,6 +58,10 @@ export default function NewEventPage() {
   const formIssues = useMemo(
     () => getEventFormIssues({ name, description, criteria }),
     [criteria, description, name],
+  );
+  const topCriterionIds = useMemo(
+    () => getTopWeightedCriterionIds(criteria),
+    [criteria],
   );
   const errorItems = error ? getFriendlyErrorItems(error) : [];
   const hasValidCriteriaCount =
@@ -304,7 +309,10 @@ export default function NewEventPage() {
                 </div>
 
                 <div className="mt-5 flex flex-col gap-3">
-                  {criteria.map((criterion) => (
+                  {criteria.map((criterion) => {
+                    const isTopCriterion = topCriterionIds.has(criterion.id);
+
+                    return (
                     <div
                       key={criterion.id}
                       className="rounded-2xl border border-[#263550] bg-[#0d1526] px-4 py-3"
@@ -318,7 +326,12 @@ export default function NewEventPage() {
                           disabled={isPending}
                           className="h-10 border-[#263550] bg-[#121d30] text-white"
                         />
-                        <span className="text-sm font-bold text-[#83ce00]">
+                        <span className="flex shrink-0 items-center gap-2 text-sm font-bold text-[#83ce00]">
+                          {isTopCriterion ? (
+                            <span aria-label="Criterio con mayor porcentaje" role="img">
+                              🏆
+                            </span>
+                          ) : null}
                           {criterion.weight}%
                         </span>
                       </div>
@@ -364,7 +377,8 @@ export default function NewEventPage() {
                         </Button>
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
                 <p className="mt-4 text-xs leading-5 text-[#8899aa]">
                   Debe haber entre {MIN_CRITERIA} y {MAX_CRITERIA} criterios. Estos porcentajes se guardan y afectan el resultado final, asi que el total debe sumar 100%.

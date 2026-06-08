@@ -23,6 +23,10 @@ import {
   useUpdatePitchStatus,
   useUpdateEventStatus,
 } from "@/hooks/dashboard";
+import {
+  formatCriterionLabel,
+  getTopWeightedCriterionIds,
+} from "@/lib/criteria-highlights";
 import type { CriterionAverage, EventCriterion } from "@workspace/shared/api";
 // Utilidad para exportar resultados del evento.
 import { exportEvent } from "@/lib/dashboard-api";
@@ -72,6 +76,10 @@ function DashboardPageContent() {
   }, [events, requestedEventId]);
   const selectedEventId = selectedEvent?.id;
   const selectedCriteria = selectedEvent?.criteria ?? defaultCriteria;
+  const topCriterionIds = useMemo(
+    () => getTopWeightedCriterionIds(selectedCriteria),
+    [selectedCriteria],
+  );
 
   const {data: pitches = [] } = usePitches(selectedEventId); // Lista de pitches del evento seleccionado.
   const latestPitchId = useMemo(() => {
@@ -377,9 +385,16 @@ function DashboardPageContent() {
                         <th
                           key={criterion.id}
                           className="px-4 py-3 font-medium"
-                          title={criterion.label}
+                          title={formatCriterionLabel(criterion, topCriterionIds)}
                         >
-                          {getCriterionShortLabel(criterion.label)}
+                          <span className="inline-flex items-center gap-1">
+                            {topCriterionIds.has(criterion.id) ? (
+                              <span aria-label="Criterio con mayor porcentaje" role="img">
+                                🏆
+                              </span>
+                            ) : null}
+                            {getCriterionShortLabel(criterion.label)}
+                          </span>
                         </th>
                       ))}
                       <th className="px-4 py-3 font-medium text-right">Total</th>

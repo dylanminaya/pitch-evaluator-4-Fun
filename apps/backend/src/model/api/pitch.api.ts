@@ -21,6 +21,8 @@ import { canManageEvent, getEventIdForPitch } from "../event.permissions.js";
 import {
   buildCriteriaAveragesSql,
   buildWeightedScoreSql,
+  formatCriterionLabel,
+  getTopWeightedCriterionIds,
   normalizeEventCriteria,
 } from "../criteria.js";
 import { validateServerEnv } from "@workspace/shared/env/server";
@@ -1521,6 +1523,7 @@ pitchRouter.get("/:pitchId/export", async (req, res) => {
       `"${String(value ?? "").replace(/"/g, '""')}"`;
 
     const eventCriteria = normalizeEventCriteria(pitch.criteria);
+    const topCriterionIds = getTopWeightedCriterionIds(eventCriteria);
 
     const getVoteScore = (row: Record<string, unknown>, criterionId: string) => {
       const scores = Array.isArray(row.criteriaScores) ? row.criteriaScores : [];
@@ -1594,8 +1597,13 @@ pitchRouter.get("/:pitchId/export", async (req, res) => {
       "Total AVG",
       "porcentaje",
       "promedio",
-      ...eventCriteria.map((criterion) => criterion.label),
-      ...eventCriteria.map((criterion) => `${criterion.label} Promedio`),
+      ...eventCriteria.map((criterion) =>
+        formatCriterionLabel(criterion, topCriterionIds),
+      ),
+      ...eventCriteria.map(
+        (criterion) =>
+          `${formatCriterionLabel(criterion, topCriterionIds)} Promedio`,
+      ),
       "Comentario",
       "Tipo comentario",
       "descripcion",

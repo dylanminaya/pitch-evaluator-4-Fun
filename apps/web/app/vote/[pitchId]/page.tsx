@@ -7,6 +7,7 @@ import { CheckCircle2, Sparkles, Star } from "lucide-react";
 import { Button } from "@workspace/ui/components/button";
 import { usePublicPitch, useSubmitPublicVote } from "@/hooks/dashboard";
 import { useSession } from "@/lib/better-auth/auth-client";
+import { getTopWeightedCriterionIds } from "@/lib/criteria-highlights";
 import type { EventCriterion } from "@workspace/shared/api";
 
 const evaluatorEmailStorageKey = "pitch-evaluator-email";
@@ -36,6 +37,10 @@ export default function VotingScreenPage() {
   const [scoreDrafts, setScoreDrafts] = useState<Record<string, number>>({});
 
   const criteria: EventCriterion[] = useMemo(() => pitch?.criteria ?? [], [pitch?.criteria]);
+  const topCriterionIds = useMemo(
+    () => getTopWeightedCriterionIds(criteria),
+    [criteria],
+  );
   const hasAlreadyVoted = Boolean(pitch?.hasVoted);
   const hasSavedVote = hasAlreadyVoted || isSuccess;
   const isVotingClosed = pitch?.eventStatus !== "OPEN" || pitch?.pitchStatus !== "OPEN";
@@ -318,7 +323,10 @@ export default function VotingScreenPage() {
 
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             <div className="grid gap-4 md:grid-cols-2">
-              {criteria.map((criterion) => (
+              {criteria.map((criterion) => {
+                const isTopCriterion = topCriterionIds.has(criterion.id);
+
+                return (
                 <section
                   key={criterion.id}
                   className="rounded-[24px] border border-[#263550] bg-[#1a2640] p-6 shadow-[0_18px_45px_rgba(2,8,23,0.35)]"
@@ -326,6 +334,11 @@ export default function VotingScreenPage() {
                   <div className="flex items-center justify-between gap-3">
                     <div className="inline-flex items-center gap-2 text-[11px] font-bold uppercase italic tracking-[0.24em] text-[#83ce00]">
                       <Sparkles className="size-4 text-[#8899aa]" />
+                      {isTopCriterion ? (
+                        <span aria-label="Criterio con mayor porcentaje" role="img">
+                          🏆
+                        </span>
+                      ) : null}
                       {criterion.label}
                     </div>
                     <div className="flex items-center gap-3">
@@ -363,7 +376,8 @@ export default function VotingScreenPage() {
                     })}
                   </div>
                 </section>
-              ))}
+                );
+              })}
             </div>
 
             <section className="rounded-[24px] border border-[#263550] bg-[#1a2640] p-6 shadow-[0_18px_45px_rgba(2,8,23,0.35)]">
