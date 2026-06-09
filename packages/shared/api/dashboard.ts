@@ -172,6 +172,7 @@ export const publicEventInvitationSchema = z.object({
       presentationUrl: z.string().nullable(),
       presentationFileName: z.string().nullable(),
       status: z.enum(["OPEN", "CLOSED"]),
+      createdAt: z.string().nullable(),
     }),
   ),
 });

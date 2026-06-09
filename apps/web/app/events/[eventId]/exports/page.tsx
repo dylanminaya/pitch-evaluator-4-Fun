@@ -5,11 +5,14 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft,
+  ArrowDown,
+  ArrowUp,
   ArrowUpRight,
   Download,
   FileDown,
   Files,
   Mail,
+  Search,
   SquareStack,
   UsersRound,
   X,
@@ -34,6 +37,17 @@ const defaultCriteria: EventCriterion[] = [
   { id: "viability", label: "Viabilidad", weight: 25, isDefault: true },
   { id: "impact", label: "Impacto", weight: 25, isDefault: true },
   { id: "presentation", label: "Presentacion", weight: 25, isDefault: true },
+];
+
+type SortDirection = "asc" | "desc";
+type PitchSortField = "name" | "score" | "presentationOrder" | "votes" | "createdAt";
+
+const pitchSortOptions: Array<{ value: PitchSortField; label: string }> = [
+  { value: "name", label: "Nombre" },
+  { value: "score", label: "Puntuacion total" },
+  { value: "presentationOrder", label: "Orden presentacion" },
+  { value: "votes", label: "Numero de votos" },
+  { value: "createdAt", label: "Fecha/hora" },
 ];
 
 function formatPercentage(scoreAvg: number) {
@@ -154,6 +168,9 @@ export default function EventExportsPage() {
   const [isLoadingParticipantVotes, setIsLoadingParticipantVotes] = useState(false);
   const [participantVotesError, setParticipantVotesError] = useState<Error | null>(null);
   const [showParticipantEmails, setShowParticipantEmails] = useState(false);
+  const [rankingSearch, setRankingSearch] = useState("");
+  const [rankingSortField, setRankingSortField] = useState<PitchSortField>("createdAt");
+  const [rankingSortDirection, setRankingSortDirection] = useState<SortDirection>("desc");
 
   const selectedEvent = useMemo(
     () => events.find((event) => event.id === eventId),
@@ -179,26 +196,57 @@ export default function EventExportsPage() {
     [pitches],
   );
 
-  const rankingRowsByCreatedAt = useMemo(() => {
-    return [...rankingRows].sort((left, right) => {
-      const leftCreatedAt = Date.parse(pitchesById.get(left.id)?.createdAt ?? "");
-      const rightCreatedAt = Date.parse(pitchesById.get(right.id)?.createdAt ?? "");
+  const pitchOrderById = useMemo(() => {
+    return new Map(pitches.map((pitch, index) => [pitch.id, index + 1]));
+  }, [pitches]);
 
-      if (Number.isFinite(rightCreatedAt) && Number.isFinite(leftCreatedAt)) {
-        return rightCreatedAt - leftCreatedAt;
-      }
+  const visibleRankingRows = useMemo(() => {
+    const normalizedSearch = rankingSearch.trim().toLowerCase();
 
-      if (Number.isFinite(rightCreatedAt)) {
-        return 1;
-      }
+    return [...rankingRows]
+      .filter((row) => {
+        if (!normalizedSearch) return true;
 
-      if (Number.isFinite(leftCreatedAt)) {
-        return -1;
-      }
+        return `${row.name} ${row.description ?? ""}`
+          .toLowerCase()
+          .includes(normalizedSearch);
+      })
+      .sort((left, right) => {
+        const directionMultiplier = rankingSortDirection === "asc" ? 1 : -1;
+        let comparison = 0;
 
-      return left.name.localeCompare(right.name);
-    });
-  }, [pitchesById, rankingRows]);
+        if (rankingSortField === "name") {
+          comparison = left.name.localeCompare(right.name);
+        } else if (rankingSortField === "score") {
+          comparison = left.scoreAvg - right.scoreAvg;
+        } else if (rankingSortField === "presentationOrder") {
+          comparison =
+            (pitchOrderById.get(left.id) ?? Number.MAX_SAFE_INTEGER) -
+            (pitchOrderById.get(right.id) ?? Number.MAX_SAFE_INTEGER);
+        } else if (rankingSortField === "votes") {
+          comparison = left.votesCount - right.votesCount;
+        } else {
+          const leftCreatedAt = Date.parse(pitchesById.get(left.id)?.createdAt ?? "");
+          const rightCreatedAt = Date.parse(pitchesById.get(right.id)?.createdAt ?? "");
+          comparison =
+            (Number.isFinite(leftCreatedAt) ? leftCreatedAt : 0) -
+            (Number.isFinite(rightCreatedAt) ? rightCreatedAt : 0);
+        }
+
+        if (comparison === 0) {
+          comparison = left.name.localeCompare(right.name);
+        }
+
+        return comparison * directionMultiplier;
+      });
+  }, [
+    pitchesById,
+    pitchOrderById,
+    rankingRows,
+    rankingSearch,
+    rankingSortDirection,
+    rankingSortField,
+  ]);
 
   useEffect(() => {
     setSelectedPitchIds((current) =>
@@ -207,10 +255,13 @@ export default function EventExportsPage() {
   }, [rankingRows]);
 
   const allSelected =
-    rankingRowsByCreatedAt.length > 0 && selectedPitchIds.length === rankingRowsByCreatedAt.length;
+    visibleRankingRows.length > 0 &&
+    visibleRankingRows.every((row) => selectedPitchIds.includes(row.id));
 
-  const selectedRows = rankingRowsByCreatedAt.filter((row) => selectedPitchIds.includes(row.id));
-  const participantPitch = rankingRowsByCreatedAt.find((row) => row.id === participantPitchId);
+  const selectedRows = visibleRankingRows.filter((row) => selectedPitchIds.includes(row.id));
+  const participantPitch =
+    visibleRankingRows.find((row) => row.id === participantPitchId) ??
+    rankingRows.find((row) => row.id === participantPitchId);
   const participantEmails = participantVotes
     .map((vote) => vote.evaluatorEmail?.trim())
     .filter((email): email is string => Boolean(email));
@@ -283,8 +334,8 @@ export default function EventExportsPage() {
   }
 
   function toggleSelectAll() {
-    setSelectedPitchIds(allSelected ? [] : rankingRowsByCreatedAt.map((row) => row.id));
-    setParticipantPitchId(allSelected ? null : (rankingRowsByCreatedAt.at(-1)?.id ?? null));
+    setSelectedPitchIds(allSelected ? [] : visibleRankingRows.map((row) => row.id));
+    setParticipantPitchId(allSelected ? null : (visibleRankingRows.at(-1)?.id ?? null));
     setShowParticipantEmails(false);
   }
 
@@ -465,7 +516,7 @@ export default function EventExportsPage() {
                 Centro de exportacion
               </span>
               <span className="text-sm text-[#a9b3c9]">
-                Exporta uno, varios o todos los pitches del evento ordenados por porcentaje.
+                Exporta uno, varios o todos los pitches del evento.
               </span>
             </div>
           </div>
@@ -583,7 +634,7 @@ export default function EventExportsPage() {
               </div>
 
               <div className="mt-5 rounded-2xl border border-dashed border-[#263550] bg-[#0d1526] px-4 py-4 text-sm leading-6 text-[#a9b3c9]">
-                El archivo combinado sale ordenado por porcentaje, del pitch con mejor resultado al mas bajo.
+                Usa el buscador y la ordenacion para preparar la vista antes de exportar.
               </div>
             </div>
           </aside>
@@ -599,15 +650,64 @@ export default function EventExportsPage() {
                 </p>
               </div>
 
-              <label className="inline-flex items-center gap-3 rounded-full border border-[#263550] bg-[#0d1526] px-4 py-2 text-sm text-white">
-                <input
-                  type="checkbox"
-                  checked={allSelected}
-                  onChange={toggleSelectAll}
-                  className="size-4 accent-[#83ce00]"
-                />
-                Seleccionar todos
-              </label>
+              <div className="flex flex-col gap-2 md:flex-row md:items-center">
+                <label className="flex h-10 min-w-0 items-center gap-2 rounded-full border border-[#263550] bg-[#0d1526] px-3 text-sm text-[#a9b3c9] md:w-60">
+                  <Search className="size-4 shrink-0 text-[#83ce00]" />
+                  <input
+                    type="search"
+                    value={rankingSearch}
+                    onChange={(event) => setRankingSearch(event.target.value)}
+                    placeholder="Buscar pitch"
+                    className="min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-[#5f6b82]"
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setRankingSortDirection((current) =>
+                      current === "asc" ? "desc" : "asc",
+                    )
+                  }
+                  className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#263550] bg-[#0d1526] text-[#ccff00] transition hover:bg-[#1a2640]"
+                  aria-label={
+                    rankingSortDirection === "asc"
+                      ? "Orden ascendente"
+                      : "Orden descendente"
+                  }
+                  title={
+                    rankingSortDirection === "asc" ? "Ascendente" : "Descendente"
+                  }
+                >
+                  {rankingSortDirection === "asc" ? (
+                    <ArrowUp className="size-4" />
+                  ) : (
+                    <ArrowDown className="size-4" />
+                  )}
+                </button>
+                <select
+                  value={rankingSortField}
+                  onChange={(event) =>
+                    setRankingSortField(event.target.value as PitchSortField)
+                  }
+                  className="h-10 rounded-full border border-[#2a4a2a] bg-[#0a1a0a] px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#ccff00] outline-none"
+                  aria-label="Campo de ordenacion"
+                >
+                  {pitchSortOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                <label className="inline-flex h-10 items-center gap-3 rounded-full border border-[#263550] bg-[#0d1526] px-4 text-sm text-white">
+                  <input
+                    type="checkbox"
+                    checked={allSelected}
+                    onChange={toggleSelectAll}
+                    className="size-4 accent-[#83ce00]"
+                  />
+                  Seleccionar todos
+                </label>
+              </div>
             </div>
 
             {isLoading ? (
@@ -615,6 +715,10 @@ export default function EventExportsPage() {
             ) : rankingRows.length === 0 ? (
               <div className="px-5 py-10 text-sm text-[#8899aa]">
                 Este evento todavia no tiene pitches para exportar.
+              </div>
+            ) : visibleRankingRows.length === 0 ? (
+              <div className="px-5 py-10 text-sm text-[#8899aa]">
+                No hay pitches que coincidan con la busqueda.
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -631,7 +735,7 @@ export default function EventExportsPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {rankingRowsByCreatedAt.map((row, index) => {
+                    {visibleRankingRows.map((row, index) => {
                       const isSelected = selectedPitchIds.includes(row.id);
 
                       return (

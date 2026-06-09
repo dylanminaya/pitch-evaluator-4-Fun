@@ -1,15 +1,18 @@
 "use client";
 
-import { Suspense, useMemo } from "react";
+import { Suspense, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
   Activity,
   ArrowLeft,
+  ArrowDown,
+  ArrowUp,
   ArrowUpRight,
   CircleDot,
   Plus,
+  Search,
   Users,
 } from "lucide-react";
 import { Button } from "@workspace/ui/components/button";
@@ -38,6 +41,17 @@ const defaultCriteria: EventCriterion[] = [
   { id: "presentation", label: "Presentacion", weight: 25, isDefault: true },
 ];
 
+type SortDirection = "asc" | "desc";
+type PitchSortField = "name" | "score" | "presentationOrder" | "votes" | "createdAt";
+
+const pitchSortOptions: Array<{ value: PitchSortField; label: string }> = [
+  { value: "name", label: "Nombre" },
+  { value: "score", label: "Puntuacion total" },
+  { value: "presentationOrder", label: "Orden presentacion" },
+  { value: "votes", label: "Numero de votos" },
+  { value: "createdAt", label: "Fecha/hora" },
+];
+
 function QrDisplay({ url }: { url?: string }) {
   if (!url) {
     return (
@@ -59,6 +73,9 @@ function QrDisplay({ url }: { url?: string }) {
 
 function DashboardPageContent() {
   const searchParams = useSearchParams();
+  const [rankingSearch, setRankingSearch] = useState("");
+  const [rankingSortField, setRankingSortField] = useState<PitchSortField>("score");
+  const [rankingSortDirection, setRankingSortDirection] = useState<SortDirection>("desc");
   const { mutate: logout, isPending } = useSignOut();
   const { mutateAsync: mutateEventStatus, isPending: isUpdatingEventStatus } =
     useUpdateEventStatus();
@@ -127,6 +144,66 @@ function DashboardPageContent() {
   const selectedPitchVotes = rankingData.find(item => item.id === selectedPitchId)?.votesCount ?? 0;
   const eventIsOpen = selectedEvent?.status === "OPEN";
   const pitchStatusById = new Map(pitches.map((pitch) => [pitch.id, pitch.status]));
+  const pitchMetaById = useMemo(() => {
+    return new Map(
+      pitches.map((pitch, index) => [
+        pitch.id,
+        {
+          createdAt: pitch.createdAt,
+          presentationOrder: index + 1,
+        },
+      ]),
+    );
+  }, [pitches]);
+
+  const visibleRankingData = useMemo(() => {
+    const normalizedSearch = rankingSearch.trim().toLowerCase();
+
+    return [...rankingData]
+      .filter((item) => {
+        if (!normalizedSearch) return true;
+
+        return `${item.name} ${item.description ?? ""}`
+          .toLowerCase()
+          .includes(normalizedSearch);
+      })
+      .sort((left, right) => {
+        const directionMultiplier = rankingSortDirection === "asc" ? 1 : -1;
+        const leftMeta = pitchMetaById.get(left.id);
+        const rightMeta = pitchMetaById.get(right.id);
+        let comparison = 0;
+
+        if (rankingSortField === "name") {
+          comparison = left.name.localeCompare(right.name);
+        } else if (rankingSortField === "score") {
+          comparison = left.scoreAvg - right.scoreAvg;
+        } else if (rankingSortField === "presentationOrder") {
+          comparison =
+            (leftMeta?.presentationOrder ?? Number.MAX_SAFE_INTEGER) -
+            (rightMeta?.presentationOrder ?? Number.MAX_SAFE_INTEGER);
+        } else if (rankingSortField === "votes") {
+          comparison = left.votesCount - right.votesCount;
+        } else {
+          const leftTime = Date.parse(leftMeta?.createdAt ?? "");
+          const rightTime = Date.parse(rightMeta?.createdAt ?? "");
+          comparison =
+            (Number.isFinite(leftTime) ? leftTime : 0) -
+            (Number.isFinite(rightTime) ? rightTime : 0);
+        }
+
+        if (comparison === 0) {
+          comparison = left.name.localeCompare(right.name);
+        }
+
+        return comparison * directionMultiplier;
+      });
+  }, [
+    pitchMetaById,
+    rankingData,
+    rankingSearch,
+    rankingSortDirection,
+    rankingSortField,
+  ]);
 
   async function handleToggleEventStatus() {
     if (!selectedEventId || !selectedEvent) return;
@@ -360,7 +437,7 @@ function DashboardPageContent() {
             </div>
 
             <section className={`${panelClass} min-w-0 overflow-hidden`}>
-              <div className="flex items-center justify-between border-b border-[#263550] bg-[#0d1526] px-5 py-4">
+              <div className="flex flex-col gap-4 border-b border-[#263550] bg-[#0d1526] px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
                 <div>
                   <p className={eyebrowClass}>
                     Ranking en vivo
@@ -369,8 +446,56 @@ function DashboardPageContent() {
                     Tabla proyectable para moderacion y jurado.
                   </p>
                 </div>
-                <div className="rounded-full border border-[#2a4a2a] bg-[#0a1a0a] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-[#ccff00]">
-                  Actualizado
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <label className="flex h-10 min-w-0 items-center gap-2 rounded-full border border-[#263550] bg-[#121d30] px-3 text-sm text-[#a9b3c9] sm:w-64">
+                    <Search className="size-4 shrink-0 text-[#83ce00]" />
+                    <input
+                      type="search"
+                      value={rankingSearch}
+                      onChange={(event) => setRankingSearch(event.target.value)}
+                      placeholder="Buscar pitch"
+                      className="min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-[#5f6b82]"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setRankingSortDirection((current) =>
+                        current === "asc" ? "desc" : "asc",
+                      )
+                    }
+                    className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#263550] bg-[#121d30] text-[#ccff00] transition hover:bg-[#1a2640]"
+                    aria-label={
+                      rankingSortDirection === "asc"
+                        ? "Orden ascendente"
+                        : "Orden descendente"
+                    }
+                    title={
+                      rankingSortDirection === "asc"
+                        ? "Ascendente"
+                        : "Descendente"
+                    }
+                  >
+                    {rankingSortDirection === "asc" ? (
+                      <ArrowUp className="size-4" />
+                    ) : (
+                      <ArrowDown className="size-4" />
+                    )}
+                  </button>
+                  <select
+                    value={rankingSortField}
+                    onChange={(event) =>
+                      setRankingSortField(event.target.value as PitchSortField)
+                    }
+                    className="h-10 rounded-full border border-[#2a4a2a] bg-[#0a1a0a] px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#ccff00] outline-none"
+                    aria-label="Campo de ordenacion"
+                  >
+                    {pitchSortOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
@@ -401,7 +526,7 @@ function DashboardPageContent() {
                     </tr>
                   </thead>
                   <tbody>
-                    {rankingData.map((item, index) => {
+                    {visibleRankingData.map((item, index) => {
                       const pitchStatus = pitchStatusById.get(item.id) ?? "OPEN";
                       const nextStatus = pitchStatus === "OPEN" ? "CLOSED" : "OPEN";
                       const criterionAverages = getCriterionAverages(item);

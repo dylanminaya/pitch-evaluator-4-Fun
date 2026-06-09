@@ -2,19 +2,35 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { CalendarDays, CheckCircle2, Circle, Clock3, MapPin, Users } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowLeft,
+  ArrowUp,
+  CalendarDays,
+  CheckCircle2,
+  Circle,
+  Clock3,
+  MapPin,
+  Search,
+  Users,
+} from "lucide-react";
 import { Button } from "@workspace/ui/components/button";
 import { usePublicEventInvitation, usePublicPitch } from "@/hooks/dashboard";
 import { useSession } from "@/lib/better-auth/auth-client";
-import {
-  ArrowLeft,
-} from "lucide-react";
 import type { PublicEventInvitation } from "@workspace/shared/api";
 
 const evaluatorEmailStorageKey = "pitch-evaluator-email";
 type InvitationPitch = PublicEventInvitation["pitches"][number];
+type SortDirection = "asc" | "desc";
+type InvitationSortField = "name" | "presentationOrder" | "createdAt";
+
+const invitationSortOptions: Array<{ value: InvitationSortField; label: string }> = [
+  { value: "name", label: "Nombre" },
+  { value: "presentationOrder", label: "Orden presentacion" },
+  { value: "createdAt", label: "Fecha/hora" },
+];
 
 export default function EventInvitationPage() {
   const params = useParams<{ eventId: string }>();
@@ -26,6 +42,11 @@ export default function EventInvitationPage() {
   const [emailInput, setEmailInput] = useState("");
   const [evaluatorEmail, setEvaluatorEmail] = useState<string | null>(null);
   const [isChangingEmail, setIsChangingEmail] = useState(false);
+  const [pitchSearch, setPitchSearch] = useState("");
+  const [pitchSortField, setPitchSortField] =
+    useState<InvitationSortField>("presentationOrder");
+  const [pitchSortDirection, setPitchSortDirection] =
+    useState<SortDirection>("asc");
   const sessionUserEmail =
     sessionData?.user && typeof sessionData.user === "object" && "email" in sessionData.user
       ? String(sessionData.user.email ?? "").trim().toLowerCase()
@@ -53,6 +74,50 @@ export default function EventInvitationPage() {
     const queryString = query.toString();
     return queryString ? `?${queryString}` : "";
   })();
+  const visiblePitches = useMemo(() => {
+    const normalizedSearch = pitchSearch.trim().toLowerCase();
+
+    return (invitation?.pitches ?? [])
+      .map((pitch, index) => ({
+        pitch,
+        presentationOrder: index + 1,
+      }))
+      .filter(({ pitch }) => {
+        if (!normalizedSearch) return true;
+
+        return `${pitch.name} ${pitch.description ?? ""}`
+          .toLowerCase()
+          .includes(normalizedSearch);
+      })
+      .sort((left, right) => {
+        const directionMultiplier = pitchSortDirection === "asc" ? 1 : -1;
+        let comparison = 0;
+
+        if (pitchSortField === "name") {
+          comparison = left.pitch.name.localeCompare(right.pitch.name);
+        } else if (pitchSortField === "presentationOrder") {
+          comparison = left.presentationOrder - right.presentationOrder;
+        } else {
+          const leftTime = Date.parse(left.pitch.createdAt ?? "");
+          const rightTime = Date.parse(right.pitch.createdAt ?? "");
+          comparison =
+            (Number.isFinite(leftTime) ? leftTime : 0) -
+            (Number.isFinite(rightTime) ? rightTime : 0);
+        }
+
+        if (comparison === 0) {
+          comparison = left.pitch.name.localeCompare(right.pitch.name);
+        }
+
+        return comparison * directionMultiplier;
+      })
+      .map(({ pitch }) => pitch);
+  }, [
+    invitation?.pitches,
+    pitchSearch,
+    pitchSortDirection,
+    pitchSortField,
+  ]);
 
   useEffect(() => {
     if (isLoadingSession) {
@@ -255,13 +320,67 @@ export default function EventInvitationPage() {
               </span>
             </div>
 
+            <div className="mt-6 flex flex-col gap-2 rounded-2xl border border-[#263550] bg-[#0d1526] p-3 md:flex-row md:items-center">
+              <div className="flex min-w-0 items-center gap-2 md:flex-1">
+                <label className="flex h-11 min-w-0 flex-1 items-center gap-2 rounded-full border border-[#263550] bg-[#121d30] px-3 text-sm text-[#a9b3c9]">
+                  <Search className="size-4 shrink-0 text-[#83ce00]" />
+                  <input
+                    type="search"
+                    value={pitchSearch}
+                    onChange={(event) => setPitchSearch(event.target.value)}
+                    placeholder="Buscar pitch"
+                    className="min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-[#5f6b82]"
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setPitchSortDirection((current) =>
+                      current === "asc" ? "desc" : "asc",
+                    )
+                  }
+                  className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[#263550] bg-[#121d30] text-[#ccff00] transition hover:bg-[#1a2640]"
+                  aria-label={
+                    pitchSortDirection === "asc"
+                      ? "Orden ascendente"
+                      : "Orden descendente"
+                  }
+                  title={pitchSortDirection === "asc" ? "Ascendente" : "Descendente"}
+                >
+                  {pitchSortDirection === "asc" ? (
+                    <ArrowUp className="size-4" />
+                  ) : (
+                    <ArrowDown className="size-4" />
+                  )}
+                </button>
+              </div>
+              <select
+                value={pitchSortField}
+                onChange={(event) =>
+                  setPitchSortField(event.target.value as InvitationSortField)
+                }
+                className="h-11 rounded-full border border-[#2a4a2a] bg-[#0a1a0a] px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#ccff00] outline-none"
+                aria-label="Campo de ordenacion"
+              >
+                {invitationSortOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             <div className="mt-6 grid gap-4 md:grid-cols-2">
               {invitation.pitches.length === 0 ? (
                 <div className="rounded-2xl border border-[#263550] bg-[#0d1526] px-4 py-6 text-sm text-[#8899aa]">
                   Este evento todavia no tiene pitches publicados.
                 </div>
+              ) : visiblePitches.length === 0 ? (
+                <div className="rounded-2xl border border-[#263550] bg-[#0d1526] px-4 py-6 text-sm text-[#8899aa]">
+                  No hay pitches que coincidan con la busqueda.
+                </div>
               ) : (
-                invitation.pitches.map((pitch) => (
+                visiblePitches.map((pitch) => (
                   <InvitationPitchCard
                     key={pitch.id}
                     pitch={pitch}

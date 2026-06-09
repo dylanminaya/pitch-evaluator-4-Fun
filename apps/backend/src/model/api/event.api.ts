@@ -60,7 +60,8 @@ eventRouter.get("/public/:eventId", async (req, res) => {
           p."logoUrl",
           p."presentationUrl",
           p."presentationFileName",
-          p.status
+          p.status,
+          p."createdAt"
         FROM pitch p
         WHERE p."eventId" = $1
         ORDER BY p."createdAt" DESC
@@ -84,6 +85,7 @@ eventRouter.get("/public/:eventId", async (req, res) => {
           presentationUrl: pitch.presentationUrl ?? null,
           presentationFileName: pitch.presentationFileName ?? null,
           status: pitch.status,
+          createdAt: pitch.createdAt instanceof Date ? pitch.createdAt.toISOString() : (pitch.createdAt ?? null),
         })),
       }),
     );
