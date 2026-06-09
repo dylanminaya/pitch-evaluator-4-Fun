@@ -249,7 +249,7 @@ voteRouter.post("/", async (req, res) => {
         }
 
         try {
-          // Fallback para bases viejas sin `criteriaScores`.
+          // Fallback para bases viejas sin `commentType`.
           result = await db.query(
             `
               INSERT INTO vote (
@@ -257,6 +257,7 @@ voteRouter.post("/", async (req, res) => {
                 "pitchId",
                 "evaluatorId",
                 "evaluatorEmail",
+                "criteriaScores",
                 innovation,
                 viability,
                 impact,
@@ -264,12 +265,13 @@ voteRouter.post("/", async (req, res) => {
                 comment,
                 "createdAt"
               )
-              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
+              VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7, $8, $9, $10, NOW())
               RETURNING
                 id,
                 "pitchId",
                 "evaluatorId",
                 "evaluatorEmail",
+                "criteriaScores",
                 innovation,
                 viability,
                 impact,
@@ -282,6 +284,7 @@ voteRouter.post("/", async (req, res) => {
               pitchId,
               evaluatorId ?? null,
               evaluatorEmail,
+              JSON.stringify(criteriaScores),
               innovation,
               viability,
               impact,
