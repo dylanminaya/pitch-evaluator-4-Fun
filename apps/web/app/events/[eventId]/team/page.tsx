@@ -13,11 +13,17 @@ import {
   useOrganizerInvitations,
   useRemoveOrganizer,
 } from "@/hooks/dashboard";
+import { useSession } from "@/lib/better-auth/auth-client";
 
 export default function EventTeamPage() {
   const params = useParams<{ eventId: string }>();
   const eventId = params.eventId;
   const [email, setEmail] = useState("");
+  const { data: sessionData } = useSession();
+  const currentUserId =
+    sessionData?.user && typeof sessionData.user === "object" && "id" in sessionData.user
+      ? String(sessionData.user.id ?? "")
+      : null;
   const { mutateAsync, isPending, error } = useCreateOrganizerInvitation();
   const {
     mutateAsync: cancelInvitation,
@@ -143,41 +149,47 @@ export default function EventTeamPage() {
                     No hay organizadores cargados.
                   </div>
                 ) : (
-                  organizers.map((organizer) => (
-                    <article
-                      key={organizer.id}
-                      className="rounded-2xl border border-[#263550] bg-[#0d1526] px-4 py-4"
-                    >
-                      <div className="flex items-center justify-between gap-4">
-                        <div>
-                          <p className="text-sm font-semibold text-white">
-                            {organizer.name ?? organizer.email}
-                          </p>
-                          <p className="mt-1 text-xs text-[#8899aa]">
-                            {organizer.email}
-                          </p>
-                        </div>
+                  organizers.map((organizer) => {
+                    const isEventOwner = organizer.id.includes("-owner");
+                    const isCurrentUser = currentUserId !== null && organizer.userId === currentUserId;
+                    const canRemoveOrganizer = !isEventOwner && !isCurrentUser;
 
-                        <div className="flex items-center gap-2">
-                          <div className="rounded-full border border-[#263550] bg-[#121d30] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-[#83ce00]">
-                            {organizer.role}
+                    return (
+                      <article
+                        key={organizer.id}
+                        className="rounded-2xl border border-[#263550] bg-[#0d1526] px-4 py-4"
+                      >
+                        <div className="flex items-center justify-between gap-4">
+                          <div>
+                            <p className="text-sm font-semibold text-white">
+                              {organizer.name ?? organizer.email}
+                            </p>
+                            <p className="mt-1 text-xs text-[#8899aa]">
+                              {organizer.email}
+                            </p>
                           </div>
 
-                          {!organizer.id.includes('-owner') && (
-                            <Button
-                              type="button"
-                              variant="outline"
-                              disabled={isRemovingOrganizer}
-                              onClick={() => handleRemoveOrganizer(organizer.id)}
-                              className="rounded-full border-[#5a2433] bg-transparent px-3 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-[#ff8cab] hover:bg-[#2a1018] hover:text-[#ffb5c7]"
-                            >
-                              {isRemovingOrganizer ? "Sacando..." : "Sacar"}
-                            </Button>
-                          )}
+                          <div className="flex items-center gap-2">
+                            <div className="rounded-full border border-[#263550] bg-[#121d30] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-[#83ce00]">
+                              {organizer.role}
+                            </div>
+
+                            {canRemoveOrganizer && (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                disabled={isRemovingOrganizer}
+                                onClick={() => handleRemoveOrganizer(organizer.id)}
+                                className="rounded-full border-[#5a2433] bg-transparent px-3 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-[#ff8cab] hover:bg-[#2a1018] hover:text-[#ffb5c7]"
+                              >
+                                {isRemovingOrganizer ? "Sacando..." : "Sacar"}
+                              </Button>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    </article>
-                  ))
+                      </article>
+                    );
+                  })
                 )}
               </div>
             </section>
