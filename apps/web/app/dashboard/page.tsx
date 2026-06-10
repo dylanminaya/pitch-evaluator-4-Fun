@@ -11,6 +11,7 @@ import {
   ArrowUp,
   ArrowUpRight,
   CircleDot,
+  LogOut,
   Plus,
   Search,
   Users,
@@ -358,6 +359,16 @@ function DashboardPageContent() {
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
+            <div
+              className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] ${
+                eventIsOpen
+                  ? "border-[#263550] bg-[#0d1526] text-[#83ce00]"
+                  : "border-[#263550] bg-[#0d1526] text-[#8899aa]"
+              }`}
+            >
+              <CircleDot className="size-3 fill-current" />
+              {eventIsOpen ? "En vivo" : "Cerrado"}
+            </div>
             <Link href={selectedEventId ? `/events/${selectedEventId}/live` : "#"}>
               <Button
                 variant="outline"
@@ -378,16 +389,6 @@ function DashboardPageContent() {
                 Equipo
               </Button>
             </Link>
-            <div
-              className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] ${
-                eventIsOpen
-                  ? "border-[#263550] bg-[#0d1526] text-[#83ce00]"
-                  : "border-[#263550] bg-[#0d1526] text-[#8899aa]"
-              }`}
-            >
-              <CircleDot className="size-3 fill-current" />
-              {eventIsOpen ? "En vivo" : "Cerrado"}
-            </div>
 
             <Button
               type="button"
@@ -408,11 +409,14 @@ function DashboardPageContent() {
 
             <Button
               variant="outline"
-              className="rounded-full border-[#263550] bg-[#0d1526] text-white hover:bg-[#1a2640] hover:text-white"
+              size="icon"
+              className="rounded-2xl w-12 border-[#263550] bg-[#0d1526] text-white hover:bg-[#1a2640] hover:text-white"
               onClick={() => logout()}
               disabled={isPending}
+              aria-label={isPending ? "Cerrando sesion" : "Cerrar sesion"}
+              title={isPending ? "Cerrando sesion" : "Cerrar sesion"}
             >
-              {isPending ? "Cerrando..." : "Cerrar sesion"}
+              <LogOut className="size-4" />
             </Button>
           </div>
         </header>

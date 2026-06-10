@@ -7,6 +7,7 @@ import {
   ArrowUpRight,
   CalendarDays,
   CircleDot,
+  LogOut,
   Trash2,
   Plus,
   Search,
@@ -119,11 +120,14 @@ export default function EventsPage() {
             </Link>
             <Button
               variant="outline"
-              className="rounded-full border-[#263550] bg-[#0d1526] text-white hover:bg-[#1a2640] hover:text-white"
+              size="icon"
+              className="rounded-2xl w-12 border-[#263550] bg-[#0d1526] text-white hover:bg-[#1a2640] hover:text-white"
               onClick={() => logout()}
               disabled={isSigningOut}
+              aria-label={isSigningOut ? "Cerrando sesion" : "Cerrar sesion"}
+              title={isSigningOut ? "Cerrando sesion" : "Cerrar sesion"}
             >
-              {isSigningOut ? "Cerrando..." : "Cerrar sesion"}
+              <LogOut className="size-4" />
             </Button>
           </div>
         </header>
