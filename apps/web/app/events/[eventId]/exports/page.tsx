@@ -163,7 +163,6 @@ export default function EventExportsPage() {
   const [isExportingPitchId, setIsExportingPitchId] = useState<string | null>(null);
   const [isExportingSelection, setIsExportingSelection] = useState(false);
   const [exportError, setExportError] = useState<Error | null>(null);
-  const [participantPitchId, setParticipantPitchId] = useState<string | null>(null);
   const [participantVotes, setParticipantVotes] = useState<DashboardVote[]>([]);
   const [isLoadingParticipantVotes, setIsLoadingParticipantVotes] = useState(false);
   const [participantVotesError, setParticipantVotesError] = useState<Error | null>(null);
@@ -259,26 +258,43 @@ export default function EventExportsPage() {
     visibleRankingRows.every((row) => selectedPitchIds.includes(row.id));
 
   const selectedRows = visibleRankingRows.filter((row) => selectedPitchIds.includes(row.id));
-  const participantPitch =
-    visibleRankingRows.find((row) => row.id === participantPitchId) ??
-    rankingRows.find((row) => row.id === participantPitchId);
-  const participantEmails = participantVotes
-    .map((vote) => vote.evaluatorEmail?.trim())
-    .filter((email): email is string => Boolean(email));
-  const participantCount = participantVotes.length || participantPitch?.votesCount || 0;
+  const selectedParticipantRows = useMemo(
+    () =>
+      selectedPitchIds
+        .map((pitchId) => rankingRows.find((row) => row.id === pitchId))
+        .filter((row): row is RankingRow => Boolean(row)),
+    [rankingRows, selectedPitchIds],
+  );
+  const selectedParticipantPitchIdsKey = selectedParticipantRows
+    .map((row) => row.id)
+    .join("|");
+  const participantTitle =
+    selectedParticipantRows.length === 1
+      ? (selectedParticipantRows[0]?.name ?? "Pitch seleccionado")
+      : `${selectedParticipantRows.length} pitches seleccionados`;
+  const participantEmails = Array.from(
+    participantVotes.reduce((emailsByKey, vote) => {
+      const email = vote.evaluatorEmail?.trim();
 
-  useEffect(() => {
-    setParticipantPitchId((current) => {
-      if (current && selectedPitchIds.includes(current)) {
-        return current;
+      if (!email) return emailsByKey;
+
+      const key = email.toLowerCase();
+
+      if (!emailsByKey.has(key)) {
+        emailsByKey.set(key, email);
       }
 
-      return selectedPitchIds.at(-1) ?? null;
-    });
-  }, [selectedPitchIds]);
+      return emailsByKey;
+    }, new Map<string, string>()).values(),
+  );
+  const participantCount = participantEmails.length;
 
   useEffect(() => {
-    if (!participantPitchId) {
+    const pitchIds = selectedParticipantPitchIdsKey
+      ? selectedParticipantPitchIdsKey.split("|")
+      : [];
+
+    if (pitchIds.length === 0) {
       setParticipantVotes([]);
       setParticipantVotesError(null);
       setShowParticipantEmails(false);
@@ -291,10 +307,12 @@ export default function EventExportsPage() {
       try {
         setParticipantVotesError(null);
         setIsLoadingParticipantVotes(true);
-        const votes = await getVotes(participantPitchId!);
+        const votesByPitch = await Promise.all(
+          pitchIds.map((pitchId) => getVotes(pitchId)),
+        );
 
         if (isCurrent) {
-          setParticipantVotes(votes);
+          setParticipantVotes(votesByPitch.flat());
         }
       } catch (error) {
         if (isCurrent) {
@@ -318,7 +336,7 @@ export default function EventExportsPage() {
       isCurrent = false;
       window.clearInterval(intervalId);
     };
-  }, [participantPitchId]);
+  }, [selectedParticipantPitchIdsKey]);
 
   function togglePitchSelection(pitchId: string) {
     setSelectedPitchIds((current) =>
@@ -328,14 +346,12 @@ export default function EventExportsPage() {
     );
 
     if (!selectedPitchIds.includes(pitchId)) {
-      setParticipantPitchId(pitchId);
       setShowParticipantEmails(false);
     }
   }
 
   function toggleSelectAll() {
     setSelectedPitchIds(allSelected ? [] : visibleRankingRows.map((row) => row.id));
-    setParticipantPitchId(allSelected ? null : (visibleRankingRows.at(-1)?.id ?? null));
     setShowParticipantEmails(false);
   }
 
@@ -550,14 +566,14 @@ export default function EventExportsPage() {
                 </div>
                 <div className="rounded-2xl border border-[#263550] bg-[#0d1526] px-4 py-3">
                   <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-[#8899aa]">
-                    Votadores del pitch
+                    Gmail de votadores
                   </p>
-                  {participantPitch ? (
+                  {selectedParticipantRows.length > 0 ? (
                     <div className="mt-3 space-y-3">
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <p className="truncate text-sm font-bold text-white">
-                            {participantPitch.name}
+                            {participantTitle}
                           </p>
                           <p className="mt-1 text-xs text-[#8899aa]">
                             {isLoadingParticipantVotes ? "Actualizando..." : "En tiempo real"}
@@ -572,7 +588,7 @@ export default function EventExportsPage() {
                       <Button
                         type="button"
                         onClick={() => setShowParticipantEmails((current) => !current)}
-                        disabled={participantCount === 0 && participantEmails.length === 0}
+                        disabled={participantCount === 0}
                         className="w-full justify-between rounded-full bg-[#83ce00] text-xs font-bold italic text-[#0d1526] hover:bg-[#a7ea2e]"
                       >
                         <span>{showParticipantEmails ? "Ocultar Gmail" : "Ver Gmail"}</span>
@@ -581,7 +597,7 @@ export default function EventExportsPage() {
 
                       {participantVotesError ? (
                         <p className="text-xs text-[#ff8cab]">
-                          No pudimos cargar los Gmail de este pitch.
+                          No pudimos cargar los Gmail de la seleccion.
                         </p>
                       ) : null}
 
@@ -593,7 +609,7 @@ export default function EventExportsPage() {
                     </div>
                   ) : (
                     <p className="mt-3 text-xs leading-5 text-[#8899aa]">
-                      Selecciona un pitch del ranking para ver sus votadores.
+                      Selecciona uno o varios pitches del ranking para ver sus votadores.
                     </p>
                   )}
                 </div>
@@ -826,7 +842,7 @@ export default function EventExportsPage() {
         </section>
       </div>
 
-      {showParticipantEmails && participantPitch ? (
+      {showParticipantEmails && selectedParticipantRows.length > 0 ? (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-[#020817]/75 px-4 py-6 backdrop-blur-sm"
           role="dialog"
@@ -847,10 +863,10 @@ export default function EventExportsPage() {
                   id="participant-emails-title"
                   className="mt-2 truncate text-xl font-black text-white"
                 >
-                  {participantPitch.name}
+                  {participantTitle}
                 </h2>
                 <p className="mt-1 text-sm text-[#a9b3c9]">
-                  {participantCount} votadores registrados
+                  {participantCount} Gmail registrados
                 </p>
               </div>
               <button
@@ -866,7 +882,7 @@ export default function EventExportsPage() {
             <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
               {participantEmails.length === 0 ? (
                 <p className="rounded-2xl border border-[#263550] bg-[#0d1526] px-4 py-3 text-sm text-[#8899aa]">
-                  Todavia no hay Gmail registrados para este pitch.
+                  Todavia no hay Gmail registrados para la seleccion.
                 </p>
               ) : (
                 <div className="space-y-2">
