@@ -16,17 +16,18 @@ import { Button } from "@workspace/ui/components/button";
 import { Input } from "@workspace/ui/components/input";
 import { FeedbackPanel } from "@/components/feedback-panel";
 import { useCreateEvent } from "@/hooks/dashboard";
+import { getTrophyCriterionIds } from "@/lib/criteria-highlights";
 import { getEventFormIssues, getFriendlyErrorItems } from "@/lib/user-feedback";
 import type { EventCriterion } from "@workspace/shared/api";
 
 const setupItems = [
   {
     title: "Votacion anonima",
-    description: "El publico vota sin exponer su identidad en pantalla.",
+    description: "El público vota sin exponer su identidad en pantalla.",
   },
   {
     title: "Comentarios",
-    description: "Habilita observaciones para enriquecer la evaluacion.",
+    description: "Habilita observaciones para enriquecer la evaluación.",
   },
   {
     title: "Ranking en vivo",
@@ -44,10 +45,10 @@ export default function NewEventPage() {
   const [hasTriedSubmit, setHasTriedSubmit] = useState(false);
   //
   const [criteria, setCriteria] = useState<EventCriterion[]>([
-    { id: "innovation", label: "Innovacion", weight: 25, isDefault: true },
-    { id: "viability", label: "Viabilidad", weight: 25, isDefault: true },
-    { id: "impact", label: "Impacto", weight: 25, isDefault: true },
-    { id: "presentation", label: "Presentacion", weight: 25, isDefault: true },
+    { id: "innovation", label: "Innovación", weight: 25, isDefault: true, hasTrophy: false },
+    { id: "viability", label: "Viabilidad", weight: 25, isDefault: true, hasTrophy: false },
+    { id: "impact", label: "Impacto", weight: 25, isDefault: true, hasTrophy: false },
+    { id: "presentation", label: "Presentación", weight: 25, isDefault: true, hasTrophy: false },
   ]);
 
   const totalWeight = useMemo(
@@ -58,6 +59,13 @@ export default function NewEventPage() {
     () => getEventFormIssues({ name, description, criteria }),
     [criteria, description, name],
   );
+  const trophyCriterionIds = useMemo(
+    () => getTrophyCriterionIds(criteria),
+    [criteria],
+  );
+  const selectedTrophyCriteriaCount = criteria.filter(
+    (criterion) => criterion.hasTrophy,
+  ).length;
   const errorItems = error ? getFriendlyErrorItems(error) : [];
   const hasValidCriteriaCount =
     criteria.length >= MIN_CRITERIA && criteria.length <= MAX_CRITERIA;
@@ -86,6 +94,7 @@ export default function NewEventPage() {
         label: `Criterio ${current.length + 1}`,
         weight: 0,
         isDefault: false,
+        hasTrophy: false,
       },
     ]);
   }
@@ -110,6 +119,21 @@ export default function NewEventPage() {
           : criterion,
       ),
     );
+  }
+
+  function handleCriterionTrophyChange(id: string) {
+    setCriteria((current) => {
+      const selectedCount = current.filter(
+        (criterion) => criterion.hasTrophy,
+      ).length;
+
+      return current.map((criterion) => {
+        if (criterion.id !== id) return criterion;
+        if (!criterion.hasTrophy && selectedCount >= 2) return criterion;
+
+        return { ...criterion, hasTrophy: !criterion.hasTrophy };
+      });
+    });
   }
 
   function handleRemoveCriterion(id: string) {
@@ -203,7 +227,7 @@ export default function NewEventPage() {
             <p className="mt-2 max-w-2xl text-sm leading-6 text-[#a9b3c9]">
               Esta pantalla toma como referencia el flujo de `Desktop - Event Creation`
               de `pencil.pen`: formulario principal a la izquierda y resumen de
-              criterios/configuracion a la derecha.
+              criterios/configuración a la derecha.
             </p>
           </div>
 
@@ -215,12 +239,12 @@ export default function NewEventPage() {
             >
               <div className="flex flex-col gap-2 border-b border-[#263550] pb-5">
                 <p className="text-[11px] font-bold uppercase italic tracking-[0.3em] text-[#83ce00]">
-                  Informacion del evento
+                  Información del evento
                 </p>
                 <p className="text-sm text-[#a9b3c9]">
-                  Define el nombre y una descripcion clara para identificar el
-                  evento dentro del dashboard del organizer. Tambien puedes
-                  ajustar el peso de cada criterio de evaluacion.
+                  Define el nombre y una descripción clara para identificar el
+                  evento dentro del panel del organizador. También puedes
+                  ajustar el peso de cada criterio de evaluación.
                 </p>
               </div>
 
@@ -260,7 +284,7 @@ export default function NewEventPage() {
                     htmlFor="event-description"
                     className="text-xs font-bold uppercase italic tracking-[0.24em] text-[#8899aa]"
                   >
-                    Descripcion
+                    Descripción
                   </label>
                   <textarea
                     id="event-description"
@@ -281,12 +305,15 @@ export default function NewEventPage() {
                   <div className="inline-flex items-center gap-2">
                     <Target className="size-4 text-[#a855f7]" />
                     <p className="text-[11px] font-bold uppercase italic tracking-[0.24em] text-[#a88cc8]">
-                      Criterios de evaluacion
+                      Criterios de evaluación
                     </p>
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="text-xs text-[#8899aa]">
                       {criteria.length}/{MAX_CRITERIA} criterios
+                    </span>
+                    <span className="text-xs text-[#f4c400]">
+                      🏆 {selectedTrophyCriteriaCount || trophyCriterionIds.size}/2
                     </span>
                     <span className={`text-xs ${totalWeight === 100 ? "text-[#83ce00]" : "text-[#ff8cab]"}`}>
                       Total {totalWeight}%
@@ -304,7 +331,11 @@ export default function NewEventPage() {
                 </div>
 
                 <div className="mt-5 flex flex-col gap-3">
-                  {criteria.map((criterion) => (
+                  {criteria.map((criterion) => {
+                    const isTrophyCriterion = trophyCriterionIds.has(criterion.id);
+                    const isSelectedTrophyCriterion = Boolean(criterion.hasTrophy);
+
+                    return (
                     <div
                       key={criterion.id}
                       className="rounded-2xl border border-[#263550] bg-[#0d1526] px-4 py-3"
@@ -318,7 +349,37 @@ export default function NewEventPage() {
                           disabled={isPending}
                           className="h-10 border-[#263550] bg-[#121d30] text-white"
                         />
-                        <span className="text-sm font-bold text-[#83ce00]">
+                        <button
+                          type="button"
+                          onClick={() => handleCriterionTrophyChange(criterion.id)}
+                          disabled={
+                            isPending ||
+                            (!isSelectedTrophyCriterion &&
+                              selectedTrophyCriteriaCount >= 2)
+                          }
+                          className={`inline-flex size-10 shrink-0 items-center justify-center rounded-xl border text-lg transition disabled:cursor-not-allowed disabled:opacity-35 ${
+                            isTrophyCriterion
+                              ? "border-[#f4c400] bg-[#f4c400]/15"
+                              : "border-[#263550] bg-[#121d30] grayscale hover:border-[#f4c400] hover:grayscale-0"
+                          }`}
+                          aria-label={
+                            isSelectedTrophyCriterion
+                              ? `Quitar trofeo de ${criterion.label}`
+                              : `Asignar trofeo a ${criterion.label}`
+                          }
+                          title={
+                            isSelectedTrophyCriterion
+                              ? "Quitar trofeo"
+                              : selectedTrophyCriteriaCount >= 2
+                                ? "Máximo 2 criterios con trofeo"
+                                : isTrophyCriterion
+                                  ? "Trofeo automatico por porcentaje"
+                                  : "Asignar trofeo"
+                          }
+                        >
+                          🏆
+                        </button>
+                        <span className="flex shrink-0 items-center gap-2 text-sm font-bold text-[#83ce00]">
                           {criterion.weight}%
                         </span>
                       </div>
@@ -364,10 +425,11 @@ export default function NewEventPage() {
                         </Button>
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
                 <p className="mt-4 text-xs leading-5 text-[#8899aa]">
-                  Debe haber entre {MIN_CRITERIA} y {MAX_CRITERIA} criterios. Estos porcentajes se guardan y afectan el resultado final, asi que el total debe sumar 100%.
+                  Debe haber entre {MIN_CRITERIA} y {MAX_CRITERIA} criterios. Estos porcentajes se guardan y afectan el resultado final, así que el total debe sumar 100%.
                 </p>
               </section>
 
@@ -375,7 +437,7 @@ export default function NewEventPage() {
                 <div className="inline-flex items-center gap-2">
                   <Settings2 className="size-4 text-[#ff2d78]" />
                   <p className="text-[11px] font-bold uppercase italic tracking-[0.24em] text-[#ff7aaa]">
-                    Configuracion
+                    Configuración
                   </p>
                 </div>
 

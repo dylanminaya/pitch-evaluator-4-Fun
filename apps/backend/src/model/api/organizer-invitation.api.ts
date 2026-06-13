@@ -27,7 +27,7 @@ import { Router } from "express";
 const env = validateServerEnv();
 export const organizerInvitationRouter: Router = Router();
 
-// Crea una invitacion para otro organizer dentro de un evento.
+// Crea una invitación para otro organizador dentro de un evento.
 eventRouter.post("/:eventId/organizer-invitations", async (req, res) => {
   const session = await requireSession(req, res);
 
@@ -53,7 +53,7 @@ eventRouter.post("/:eventId/organizer-invitations", async (req, res) => {
   const { email, role } = parsed.data;
 
   try {
-    // Verifica que el evento exista antes de crear la invitacion.
+    // Verifica que el evento exista antes de crear la invitación.
     const eventResult = await db.query(
       `
         SELECT id, name
@@ -90,7 +90,7 @@ eventRouter.post("/:eventId/organizer-invitations", async (req, res) => {
     const invitationId = randomUUID();
     const token = randomUUID();
 
-    // Guarda la invitacion y el token que viajara en el correo.
+    // Guarda la invitación y el token que viajará en el correo.
     const result = await db.query(
       `
         INSERT INTO event_organizer_invitation (
@@ -126,11 +126,11 @@ eventRouter.post("/:eventId/organizer-invitations", async (req, res) => {
       ],
     );
 
-    // Link que abre la pagina publica de aceptacion en el frontend.
+    // Enlace que abre la página pública de aceptación en el frontend.
     const inviteUrl = `${env.FRONTEND_URL}/organizer-invitations/${token}`;
 
     try {
-      // El correo falla sin romper la creacion de la invitacion.
+      // El correo puede fallar sin interrumpir la creación de la invitación.
       await sendOrganizerInvitationEmail({
         to: email,
         eventName: eventResult.rows[0].name,
@@ -208,7 +208,7 @@ eventRouter.get("/:eventId/organizer-invitations", async (req, res) => {
   }
 });
 
-// Cancela una invitacion pendiente del evento.
+// Cancela una invitación pendiente del evento.
 eventRouter.post(
   "/:eventId/organizer-invitations/:invitationId/cancel",
   async (req, res) => {
@@ -365,7 +365,7 @@ eventRouter.delete("/:eventId/organizers/:organizerId", async (req, res) => {
   }
 });
 
-// Carga una invitacion publica a partir del token del correo.
+// Carga una invitación pública a partir del token del correo.
 organizerInvitationRouter.get("/:token", async (req, res) => {
   try {
     const result = await db.query(
@@ -433,7 +433,7 @@ organizerInvitationRouter.get("/:token", async (req, res) => {
   }
 });
 
-// Convierte una invitacion pendiente en acceso real al evento.
+// Convierte una invitación pendiente en acceso real al evento.
 organizerInvitationRouter.post("/accept", async (req, res) => {
   const session = await requireSession(req, res);
 
@@ -450,13 +450,13 @@ organizerInvitationRouter.post("/accept", async (req, res) => {
     });
   }
 
-  // Se usa transaccion porque aqui se escriben varias tablas relacionadas.
+  // Se usa una transacción porque aquí se escriben varias tablas relacionadas.
   const client = await db.connect();
 
   try {
     await client.query("BEGIN");
 
-    // Busca la invitacion exacta usando el token.
+    // Busca la invitación exacta usando el token.
     const invitationResult = await client.query(
       `
         SELECT
@@ -484,7 +484,7 @@ organizerInvitationRouter.post("/accept", async (req, res) => {
         ? invitation.expiresAt
         : new Date(invitation.expiresAt);
 
-    // Solo se puede aceptar una invitacion pendiente.
+    // Solo se puede aceptar una invitación pendiente.
     if (invitation.status !== "PENDING") {
       await client.query("ROLLBACK");
       return res.status(409).json({ message: "Invitation is no longer pending" });
@@ -531,7 +531,7 @@ organizerInvitationRouter.post("/accept", async (req, res) => {
       [invitation.eventId, session.user.id],
     );
 
-    // Evita duplicar membresia si ya era owner o ya era organizer.
+    // Evita duplicar la membresía si ya era propietario u organizador.
     if ((existingMembership.rowCount ?? 0) === 0 && (ownerMembership.rowCount ?? 0) === 0) {
       await client.query(
         `
@@ -549,7 +549,7 @@ organizerInvitationRouter.post("/accept", async (req, res) => {
       );
     }
 
-    // Marca la invitacion como aceptada y guarda quien la acepto.
+    // Marca la invitación como aceptada y guarda quién la aceptó.
     await client.query(
       `
         UPDATE event_organizer_invitation

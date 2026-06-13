@@ -16,20 +16,22 @@ import { validateServerEnv } from "@workspace/shared/env/server";
 import {
   buildCriteriaAveragesSql,
   buildWeightedScoreSql,
+  formatCriterionLabel,
+  getTrophyCriterionIds,
   normalizeEventCriteria,
 } from "../criteria.js";
 
 
 export const eventRouter: Router = Router();
 
-// Detecta errores de Postgres por codigo para aplicar fallbacks de schema.
+// Detecta errores de Postgres por código para aplicar alternativas de esquema.
 const hasPgErrorCode = (error: unknown, code: string) =>
   typeof error === "object" &&
   error !== null &&
   "code" in error &&
   error.code === code;
 
-// Devuelve la vista publica del evento usada por el link/QR de invitacion general.
+// Devuelve la vista pública del evento usada por el enlace o QR de invitación general.
 eventRouter.get("/public/:eventId", async (req, res) => {
   try {
     const eventResult = await db.query(
@@ -58,7 +60,8 @@ eventRouter.get("/public/:eventId", async (req, res) => {
           p."logoUrl",
           p."presentationUrl",
           p."presentationFileName",
-          p.status
+          p.status,
+          p."createdAt"
         FROM pitch p
         WHERE p."eventId" = $1
         ORDER BY p."createdAt" DESC
@@ -82,6 +85,7 @@ eventRouter.get("/public/:eventId", async (req, res) => {
           presentationUrl: pitch.presentationUrl ?? null,
           presentationFileName: pitch.presentationFileName ?? null,
           status: pitch.status,
+          createdAt: pitch.createdAt instanceof Date ? pitch.createdAt.toISOString() : (pitch.createdAt ?? null),
         })),
       }),
     );
@@ -196,7 +200,7 @@ eventRouter.post("/", async (req, res) => {
     let result;
 
     try {
-      // Intenta insertar tambien los criterios si la DB ya tiene esa columna.
+      // Intenta insertar también los criterios si la base de datos ya tiene esa columna.
       result = await db.query(
         `
           INSERT INTO event (id, name, description, status, criteria, "createdAt", "organizerId")
@@ -206,7 +210,7 @@ eventRouter.post("/", async (req, res) => {
         [eventId, name, description, "OPEN", JSON.stringify(criteria), session.user.id],
       );
     } catch (error) {
-      // Fallback para bases viejas que todavia no tienen `criteria`.
+      // Alternativa para bases antiguas que todavía no tienen `criteria`.
       if (!hasPgErrorCode(error, "42703")) {
         throw error;
       }
@@ -385,7 +389,8 @@ eventRouter.get("/:eventId/export", async (req, res) => {
         v.viability,
         v.impact,
         v.presentation,
-        v.comment
+        v.comment,
+        COALESCE(to_jsonb(v) ->> 'commentType', 'OPINION') AS "commentType"
         FROM pitch p
         INNER JOIN pitch_stats ps ON ps.id = p.id
         LEFT JOIN vote v ON v."pitchId" = p.id
@@ -399,6 +404,7 @@ eventRouter.get("/:eventId/export", async (req, res) => {
       `"${String(value ?? "").replace(/"/g, '""')}"`;
 
     const eventCriteria = normalizeEventCriteria(eventResult.rows[0].criteria);
+    const trophyCriterionIds = getTrophyCriterionIds(eventCriteria);
 
     const getVoteScore = (row: Record<string, unknown>, criterionId: string) => {
       const scores = Array.isArray(row.criteriaScores) ? row.criteriaScores : [];
@@ -483,10 +489,16 @@ eventRouter.get("/:eventId/export", async (req, res) => {
       "Total AVG",
       "porcentaje",
       "promedio",
-      ...eventCriteria.map((criterion) => criterion.label),
-      ...eventCriteria.map((criterion) => `${criterion.label} Promedio`),
+      ...eventCriteria.map((criterion) =>
+        formatCriterionLabel(criterion, trophyCriterionIds),
+      ),
+      ...eventCriteria.map(
+        (criterion) =>
+          `${formatCriterionLabel(criterion, trophyCriterionIds)} Promedio`,
+      ),
       "Comentario",
-      "descripcion",
+      "Tipo comentario",
+      "descripción",
     ]
       .map((value) => escapeCsvValue(value))
       .join(",");
@@ -494,6 +506,7 @@ eventRouter.get("/:eventId/export", async (req, res) => {
     // Filas del CSV.
     const csvRows = result.rows.map((row) => {
       const voteAverage = getVoteAverage(row);
+      const commentTypeLabel = row.commentType === "ACTIVADOR" ? "Activador" : "Opinión";
 
       return [
         pitchPositions.get(String(row.pitchid ?? row.pitchId)) ?? "",
@@ -507,7 +520,8 @@ eventRouter.get("/:eventId/export", async (req, res) => {
         row.scoreAvg,
         ...eventCriteria.map((criterion) => getVoteScore(row, criterion.id)),
         ...eventCriteria.map((criterion) => getAverageScore(row, criterion.id)),
-        escapeCsvValue(row.comment),
+        escapeCsvValue(row.comment ? `${commentTypeLabel}: "${row.comment}"` : ""),
+        escapeCsvValue(commentTypeLabel),
         escapeCsvValue(row.pitchDescription),
       ].join(",");
     });
@@ -535,7 +549,7 @@ eventRouter.get("/:eventId/export", async (req, res) => {
   }
 });
 
-// Devuelve metricas agregadas del evento para el dashboard.
+// Devuelve métricas agregadas del evento para el dashboard.
 eventRouter.get("/:eventId/stats", async (req, res) => {
   const session = await requireSession(req, res);
 
@@ -580,7 +594,7 @@ eventRouter.get("/:eventId/stats", async (req, res) => {
 // Variables usadas para construir URLs publicas.
 const env = validateServerEnv()
 
-// Devuelve la URL publica del evento para generar QR.
+// Devuelve la URL pública del evento para generar el QR.
 eventRouter.get("/:eventId/qr", async (req, res) => {
   const session = await requireSession(req, res)
 

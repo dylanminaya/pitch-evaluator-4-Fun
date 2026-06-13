@@ -91,7 +91,7 @@ export default function OrganizerInvitationPage() {
   if (isLoading) {
     return (
       <main className="flex min-h-svh items-center justify-center bg-[#0d1526] text-[#8899aa]">
-        Cargando invitacion...
+        Cargando invitación...
       </main>
     );
   }
@@ -99,7 +99,7 @@ export default function OrganizerInvitationPage() {
   if (error || !invitation) {
     return (
       <main className="flex min-h-svh items-center justify-center bg-[#0d1526] px-6 text-center text-[#8899aa]">
-        No pudimos cargar esta invitacion.
+        No pudimos cargar esta invitación.
       </main>
     );
   }
@@ -116,7 +116,7 @@ export default function OrganizerInvitationPage() {
               <span>PITCH 4 FUN</span>
             </div>
             <h1 className="mt-4 text-3xl font-black tracking-tight text-white">
-              Invitacion para colaborar
+              Invitación para colaborar
             </h1>
             <p className="mt-3 text-sm leading-6 text-[#a9b3c9]">
               Te invitaron a formar parte del equipo organizador de un evento.
@@ -156,7 +156,7 @@ export default function OrganizerInvitationPage() {
             </div>
 
             <div className="mt-6 rounded-2xl border border-dashed border-[#263550] bg-[#0d1526] px-4 py-4 text-sm leading-6 text-[#a9b3c9]">
-              Al aceptar, tu cuenta tendra acceso al equipo organizador del evento con el rol{" "}
+              Al aceptar, tu cuenta tendrá acceso al equipo organizador del evento con el rol{" "}
               <span className="font-semibold text-white">{invitation.role}</span>.
             </div>
 
@@ -174,7 +174,7 @@ export default function OrganizerInvitationPage() {
                     onClick={goToLogin}
                     className="h-12 flex-1 rounded-full bg-[#83ce00] text-sm font-bold italic text-[#0d1526] hover:bg-[#a7ea2e]"
                   >
-                    Aceptar invitacion
+                    Aceptar invitación
                   </Button>
                   <Button
                     type="button"
@@ -187,7 +187,7 @@ export default function OrganizerInvitationPage() {
                 </div>
               ) : !emailMatchesSession ? (
                 <div className="mt-6 rounded-2xl border border-[#5a2433] bg-[#2a1018] px-4 py-4 text-sm text-[#ff8cab]">
-                  Esta invitacion ya fue aceptada. Entra con{" "}
+                  Esta invitación ya fue aceptada. Entra con{" "}
                   <span className="font-semibold">{invitation.email}</span> para abrir el dashboard.
                 </div>
               ) : (
@@ -211,11 +211,11 @@ export default function OrganizerInvitationPage() {
               )
             ) : !isPending ? (
               <div className="mt-6 rounded-2xl border border-[#263550] bg-[#0d1526] px-4 py-4 text-sm text-[#a9b3c9]">
-                Esta invitacion ya no esta disponible para aceptar.
+                Esta invitación ya no está disponible para aceptar.
               </div>
             ) : isLoadingSession ? (
               <div className="mt-6 rounded-2xl border border-[#263550] bg-[#0d1526] px-4 py-4 text-sm text-[#a9b3c9]">
-                Revisando tu sesion...
+                Revisando tu sesión...
               </div>
             ) : !sessionData ? (
               <div className="mt-6 flex gap-3">
@@ -224,7 +224,7 @@ export default function OrganizerInvitationPage() {
                   onClick={goToLogin}
                   className="h-12 flex-1 rounded-full bg-[#83ce00] text-sm font-bold italic text-[#0d1526] hover:bg-[#a7ea2e]"
                 >
-                  Aceptar invitacion
+                  Aceptar invitación
                 </Button>
                 <Button
                   type="button"
@@ -238,7 +238,7 @@ export default function OrganizerInvitationPage() {
             ) : !emailMatchesSession ? (
               <div className="mt-6 space-y-4">
                 <div className="rounded-2xl border border-[#5a2433] bg-[#2a1018] px-4 py-4 text-sm text-[#ff8cab]">
-                  Tu sesion actual no coincide con el email invitado. Debes entrar con{" "}
+                  Tu sesión actual no coincide con el email invitado. Debes entrar con{" "}
                   <span className="font-semibold">{invitation.email}</span>.
                 </div>
                 <div className="flex gap-3">
@@ -247,7 +247,7 @@ export default function OrganizerInvitationPage() {
                     onClick={goToLogin}
                     className="h-12 flex-1 rounded-full bg-[#ff8cab] text-sm font-bold italic text-[#0d1526] transition-colors hover:bg-[#ffb5c7]"
                   >
-                    Cambiar sesion
+                    Cambiar sesión
                   </Button>
                   <Button
                     type="button"
@@ -267,7 +267,7 @@ export default function OrganizerInvitationPage() {
                   disabled={isAccepting}
                   className="h-12 flex-1 rounded-full bg-[#83ce00] text-sm font-bold italic text-[#0d1526] hover:bg-[#a7ea2e]"
                 >
-                  {isAccepting ? "Aceptando..." : "Aceptar invitacion"}
+                  {isAccepting ? "Aceptando..." : "Aceptar invitación"}
                 </Button>
                 <Button
                   type="button"

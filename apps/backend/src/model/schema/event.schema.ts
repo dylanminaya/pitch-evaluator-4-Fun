@@ -15,6 +15,13 @@ const criteriaSchema = z
       });
     }
 
+    if (criteria.filter((criterion) => criterion.hasTrophy).length > 2) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "No more than 2 criteria can have trophies",
+      });
+    }
+
     const ids = new Set<string>();
 
     for (const criterion of criteria) {
@@ -61,7 +68,7 @@ export const createEventSchema = z.object({
   criteria: criteriaSchema,
 })
 
-// Payload minimo para abrir o cerrar un evento.
+// Datos mínimos para abrir o cerrar un evento.
 export const updateEventStatusSchema = z.object({
   status: eventStatusSchema,
 }); 
@@ -69,7 +76,7 @@ export const updateEventStatusSchema = z.object({
 // Rol permitido para organizers invitados.
 export const organizerRoleSchema = z.enum(["ORGANIZER"]);
 
-// Estados posibles de una invitacion de organizer.
+// Estados posibles de una invitación de organizador.
 export const invitationStatusSchema = z.enum([
   "PENDING",
   "ACCEPTED",
@@ -77,13 +84,13 @@ export const invitationStatusSchema = z.enum([
   "EXPIRED",
 ])
 
-// Payload para crear una invitacion de organizer.
+// Datos para crear una invitación de organizador.
 export const createEventOrganizerInvitationSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
   role: organizerRoleSchema.default("ORGANIZER"),
 })
 
-// Payload para aceptar una invitacion por token.
+// Datos para aceptar una invitación mediante un token.
 export const acceptEventOrganizerInvitationSchema = z.object({
   token: z.string().min(1, "Invitation token is required")
 })

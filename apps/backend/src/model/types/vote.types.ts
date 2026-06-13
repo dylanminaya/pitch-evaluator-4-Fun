@@ -9,6 +9,7 @@ export type Vote = {
   impact: number;
   presentation: number;
   comment?: string | null;
+  commentType?: "OPINION" | "ACTIVADOR" | null;
   createdAt: Date;
 };
 

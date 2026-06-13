@@ -5,6 +5,7 @@ export const eventCriterionSchema = z.object({
   label: z.string().min(1),
   weight: z.number().int().min(0).max(100),
   isDefault: z.boolean().optional(),
+  hasTrophy: z.boolean().optional(),
 });
 
 export const voteCriterionScoreSchema = z.object({
@@ -30,6 +31,13 @@ const criteriaArraySchema = z
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: "Criteria weights must add up to 100%",
+      });
+    }
+
+    if (criteria.filter((criterion) => criterion.hasTrophy).length > 2) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "No more than 2 criteria can have trophies",
       });
     }
 
@@ -115,21 +123,34 @@ export const dashboardPitchDetailSchema = z.object({
   eventId: z.string(),
   name: z.string(),
   description: z.string(),
+  status: z.enum(["OPEN", "CLOSED"]),
   color: z.string(),
   logoUrl: z.string().nullable(),
   presentationUrl: z.string().nullable(),
   presentationFileName: z.string().nullable(),
+  createdAt: z.string().nullable(),
   votesCount: z.number(),
   innovationAvg: z.number(),
   viabilityAvg: z.number(),
   impactAvg: z.number(),
   presentationAvg: z.number(),
+  scoreAvg: z.number(),
+  criteriaAverages: z.array(criterionAverageSchema),
 });
 
 export const dashboardPitchCommentSchema = z.object({
   id: z.string(),
   comment: z.string(),
+  commentType: z.enum(["OPINION", "ACTIVADOR"]).default("OPINION"),
   createdAt: z.string(),
+});
+
+export const paginatedPitchCommentsSchema = z.object({
+  comments: z.array(dashboardPitchCommentSchema),
+  total: z.number().int().nonnegative(),
+  page: z.number().int().positive(),
+  pageSize: z.number().int().positive(),
+  totalPages: z.number().int().nonnegative(),
 });
 
 export const dashboardVoteSchema = z.object({
@@ -143,6 +164,7 @@ export const dashboardVoteSchema = z.object({
   impact: z.number(),
   presentation: z.number(),
   comment: z.string().nullable(),
+  commentType: z.enum(["OPINION", "ACTIVADOR"]).default("OPINION"),
   createdAt: z.string().nullable(),
 });
 
@@ -170,6 +192,7 @@ export const publicEventInvitationSchema = z.object({
       presentationUrl: z.string().nullable(),
       presentationFileName: z.string().nullable(),
       status: z.enum(["OPEN", "CLOSED"]),
+      createdAt: z.string().nullable(),
     }),
   ),
 });
@@ -245,6 +268,7 @@ export const createPublicVoteSchema = z.object({
   evaluatorId: z.string().nullable().optional(),
   criteriaScores: voteCriteriaScoresSchema,
   comment: z.string().max(500).optional().nullable(),
+  commentType: z.enum(["OPINION", "ACTIVADOR"]).optional().default("OPINION"),
 });
 
 
@@ -308,6 +332,7 @@ export type DashboardRankingItem = z.infer<typeof dashboardRankingItemSchema>;
 export type CriterionAverage = z.infer<typeof criterionAverageSchema>;
 export type DashboardPitchDetail = z.infer<typeof dashboardPitchDetailSchema>;
 export type DashboardPitchComment = z.infer<typeof dashboardPitchCommentSchema>;
+export type PaginatedPitchComments = z.infer<typeof paginatedPitchCommentsSchema>;
 export type DashboardVote = z.infer<typeof dashboardVoteSchema>;
 export type DashboardPitchQr = z.infer<typeof dashboardEventQrSchema>;
 export type DashboardEventStats = z.infer<typeof dashboardEventStatsSchema>;

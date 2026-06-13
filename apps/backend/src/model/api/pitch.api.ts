@@ -2,10 +2,14 @@ import { Router } from "express";
 import express from "express";
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { constants } from "node:fs";
+import { access, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { isAbsolute, join } from "node:path";
 import { z } from "zod";
+import JSZip from "jszip";
+import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
+import { XMLParser } from "fast-xml-parser";
 import { requireSession } from "../../auth.js";
 import { db } from "../../db.js";
 import {
@@ -17,6 +21,8 @@ import { canManageEvent, getEventIdForPitch } from "../event.permissions.js";
 import {
   buildCriteriaAveragesSql,
   buildWeightedScoreSql,
+  formatCriterionLabel,
+  getTrophyCriterionIds,
   normalizeEventCriteria,
 } from "../criteria.js";
 import { validateServerEnv } from "@workspace/shared/env/server";
@@ -26,6 +32,7 @@ import {
   dashboardPitchSchema,
   dashboardPitchDetailSchema,
   dashboardPitchCommentSchema,
+  paginatedPitchCommentsSchema,
   publicPitchSchema,
 } from "@workspace/shared/api";
 
@@ -33,6 +40,7 @@ export const pitchRouter: Router = Router();
 const POWERPOINT_CONTENT_TYPES = new Set([
   "application/vnd.ms-powerpoint",
   "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "application/pdf",
 ]);
 
 const presentationUpload = express.raw({
@@ -40,6 +48,7 @@ const presentationUpload = express.raw({
   type: [
     "application/vnd.ms-powerpoint",
     "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    "application/pdf",
     "application/octet-stream",
   ],
 });
@@ -65,7 +74,192 @@ const presentationCache = new Map<string, CachedPresentation>();
 const presentationWarmupTasks = new Map<string, Promise<CachedPresentation | null>>();
 const presentationVersions = new Map<string, number>();
 
-// Detecta errores de Postgres por codigo para aplicar fallbacks de schema.
+const PATH_SEPARATOR = process.platform === "win32" ? ";" : ":";
+const executablePathCache = new Map<string, string>();
+
+async function resolveExecutablePath(command: string) {
+  if (isAbsolute(command)) {
+    await access(command, constants.X_OK);
+    return command;
+  }
+
+  if (executablePathCache.has(command)) {
+    return executablePathCache.get(command)!;
+  }
+
+  // eslint-disable-next-line turbo/no-undeclared-env-vars
+  const pathEnv = process.env.PATH ?? "";
+  const searchPaths = pathEnv.split(PATH_SEPARATOR).filter(Boolean);
+
+  for (const dir of searchPaths) {
+    const candidatePath = join(dir, command);
+
+    try {
+      await access(candidatePath, constants.X_OK);
+      executablePathCache.set(command, candidatePath);
+      return candidatePath;
+    } catch {
+      // ignore missing candidates
+    }
+  }
+
+  return null;
+}
+
+class MissingBinaryError extends Error {
+  constructor(candidates: string[]) {
+    super(
+      `Required binary not found: ${candidates.join(", ")}. ` +
+        `Install the required system package and make sure the executable is on PATH, or set the environment variable.`
+    );
+    this.name = "MissingBinaryError";
+  }
+}
+
+type PresentationPdfMethod = "auto" | "libreoffice" | "purejs";
+
+const PRESENTATION_PDF_METHOD: PresentationPdfMethod = (
+  (process.env.PRESENTATION_PDF_METHOD ?? "auto").toLowerCase() as PresentationPdfMethod
+);
+
+async function resolveSystemCommand(envVarName: string, fallbackNames: string[]) {
+  const candidates = [] as string[];
+
+  if (process.env[envVarName]) {
+    candidates.push(process.env[envVarName]!);
+  }
+
+  candidates.push(...fallbackNames);
+
+  for (const candidate of candidates) {
+    try {
+      const path = await resolveExecutablePath(candidate);
+
+      if (path) {
+        return path;
+      }
+    } catch {
+      // try next candidate
+    }
+  }
+
+  throw new MissingBinaryError(candidates);
+}
+
+async function convertPresentationBufferToPdfWithLibreOffice(
+  buffer: Buffer,
+  fileName: string,
+  contentType: string,
+) {
+  const workDir = await mkdtemp(join(tmpdir(), "pitch-presentation-"));
+  const extension = getPresentationExtension(fileName, contentType);
+  const inputPath = join(workDir, `presentation.${extension}`);
+  const outputPath = join(workDir, "presentation.pdf");
+
+  try {
+    await writeFile(inputPath, buffer);
+    const libreofficeCommand = await resolveSystemCommand("LIBREOFFICE_BINARY", [
+      "libreoffice",
+      "soffice",
+    ]);
+
+    await runProcess(
+      libreofficeCommand,
+      [
+        "--headless",
+        "--convert-to",
+        "pdf",
+        "--outdir",
+        workDir,
+        inputPath,
+      ],
+      60000,
+    );
+
+    return await readFile(outputPath);
+  } finally {
+    rm(workDir, { recursive: true, force: true }).catch(() => undefined);
+  }
+}
+
+function extractTextFromNode(node: unknown): string[] {
+  if (node == null) {
+    return [];
+  }
+
+  if (Array.isArray(node)) {
+    return node.flatMap(extractTextFromNode);
+  }
+
+  if (typeof node !== "object") {
+    return [];
+  }
+
+  return Object.entries(node).flatMap(([key, value]) => {
+    if (key === "a:t" && typeof value === "string") {
+      return [value];
+    }
+
+    return extractTextFromNode(value);
+  });
+}
+
+async function convertPptxBufferToPdfPureJs(buffer: Buffer) {
+  const zip = await JSZip.loadAsync(buffer);
+  const slidePaths = Object.keys(zip.files)
+    .filter((name) => /^ppt\/slides\/slide\d+\.xml$/.test(name))
+    .sort((a, b) => {
+      const aNum = Number(a.match(/slide(\d+)\.xml$/)?.[1] ?? 0);
+      const bNum = Number(b.match(/slide(\d+)\.xml$/)?.[1] ?? 0);
+      return aNum - bNum;
+    });
+
+  if (slidePaths.length === 0) {
+    throw new Error("No slide files found in PPTX.");
+  }
+
+  const pdfDoc = await PDFDocument.create();
+  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  const parser = new XMLParser({
+    ignoreAttributes: false,
+    attributeNamePrefix: "",
+    ignoreDeclaration: true,
+    parseTagValue: false,
+  });
+
+  for (const slidePath of slidePaths) {
+    const file = zip.file(slidePath);
+
+    if (!file) {
+      continue;
+    }
+
+    const slideXml = await file.async("string");
+    const slideJson = parser.parse(slideXml);
+    const slideText = extractTextFromNode(slideJson).join("\n\n");
+
+    const page = pdfDoc.addPage([1123.2, 794.88]);
+    const { width, height } = page.getSize();
+    const margin = 40;
+    const fontSize = 18;
+    const lineHeight = fontSize * 1.3;
+    const wrappedText = slideText || "(Empty slide)";
+
+    page.drawText(wrappedText, {
+      x: margin,
+      y: height - margin - fontSize,
+      size: fontSize,
+      font,
+      color: rgb(0, 0, 0),
+      maxWidth: width - margin * 2,
+      lineHeight,
+    });
+  }
+
+  return Buffer.from(await pdfDoc.save());
+}
+
+// Detecta errores de Postgres por código para aplicar alternativas de esquema.
 const hasPgErrorCode = (error: unknown, code: string) =>
   typeof error === "object" &&
   error !== null &&
@@ -105,12 +299,20 @@ function getPowerPointContentType(fileName: string, rawContentType: string | und
     return "application/vnd.ms-powerpoint";
   }
 
+  if (lowerFileName.endsWith(".pdf")) {
+    return "application/pdf";
+  }
+
   return null;
 }
 
 function getPresentationExtension(fileName: string, contentType: string) {
   const lowerFileName = fileName.toLowerCase();
   const lowerContentType = contentType.toLowerCase();
+
+  if (lowerFileName.endsWith(".pdf") || lowerContentType === "application/pdf") {
+    return "pdf";
+  }
 
   if (lowerFileName.endsWith(".pptx") || lowerContentType.includes("presentationml")) {
     return "pptx";
@@ -164,30 +366,38 @@ async function convertPresentationBufferToPdf(
   fileName: string,
   contentType: string,
 ) {
-  const workDir = await mkdtemp(join(tmpdir(), "pitch-presentation-"));
   const extension = getPresentationExtension(fileName, contentType);
-  const inputPath = join(workDir, `presentation.${extension}`);
-  const outputPath = join(workDir, "presentation.pdf");
 
-  try {
-    await writeFile(inputPath, buffer);
-    await runProcess(
-      "libreoffice",
-      [
-        "--headless",
-        "--convert-to",
-        "pdf",
-        "--outdir",
-        workDir,
-        inputPath,
-      ],
-      60000,
-    );
-
-    return await readFile(outputPath);
-  } finally {
-    rm(workDir, { recursive: true, force: true }).catch(() => undefined);
+  if (extension === "pdf") {
+    return buffer;
   }
+
+  if (PRESENTATION_PDF_METHOD === "purejs") {
+    if (extension !== "pptx") {
+      throw new Error(
+        "Pure JS converter only supports .pptx files. Use LibreOffice for .ppt files."
+      );
+    }
+
+    return convertPptxBufferToPdfPureJs(buffer);
+  }
+
+  if (PRESENTATION_PDF_METHOD === "libreoffice") {
+    return convertPresentationBufferToPdfWithLibreOffice(buffer, fileName, contentType);
+  }
+
+  if (extension === "pptx") {
+    try {
+      return await convertPresentationBufferToPdfWithLibreOffice(buffer, fileName, contentType);
+    } catch (error) {
+      if (error instanceof MissingBinaryError) {
+        return convertPptxBufferToPdfPureJs(buffer);
+      }
+      throw error;
+    }
+  }
+
+  return convertPresentationBufferToPdfWithLibreOffice(buffer, fileName, contentType);
 }
 
 function getPresentationVersion(pitchId: string) {
@@ -209,7 +419,8 @@ async function getPdfPagesCount(pdfBuffer: Buffer) {
 
   try {
     await writeFile(pdfPath, pdfBuffer);
-    const { stdout } = await runProcess("pdfinfo", [pdfPath], 15000);
+    const pdfinfoCommand = await resolveSystemCommand("PDFINFO_BINARY", ["pdfinfo"]);
+    const { stdout } = await runProcess(pdfinfoCommand, [pdfPath], 15000);
     const pagesMatch = stdout.match(/^Pages:\s+(\d+)/m);
     const pagesCount = Number(pagesMatch?.[1] ?? 0);
 
@@ -230,8 +441,10 @@ async function renderPresentationPage(pdfBuffer: Buffer, pageNumber: number) {
 
   try {
     await writeFile(pdfPath, pdfBuffer);
+    const pdftoppmCommand = await resolveSystemCommand("PDFTOPPM_BINARY", ["pdftoppm"]);
+
     await runProcess(
-      "pdftoppm",
+      pdftoppmCommand,
       [
         "-f",
         String(pageNumber),
@@ -615,7 +828,7 @@ pitchRouter.patch("/:id", async (req, res) => {
   }
 });
 
-// Recibe un archivo PowerPoint y prepara sus diapositivas para proyeccion local.
+// Recibe un archivo de PowerPoint y prepara sus diapositivas para la proyección local.
 pitchRouter.post("/:pitchId/presentation", presentationUpload, async (req, res) => {
   const session = await requireSession(req, res);
 
@@ -646,7 +859,7 @@ pitchRouter.post("/:pitchId/presentation", presentationUpload, async (req, res) 
 
     if (!contentType) {
       return res.status(400).json({
-        message: "Only .ppt and .pptx presentation files are supported",
+        message: "Only .ppt, .pptx and .pdf presentation files are supported",
       });
     }
 
@@ -671,7 +884,10 @@ pitchRouter.post("/:pitchId/presentation", presentationUpload, async (req, res) 
 
     const presentationVersion = bumpPresentationVersion(req.params.pitchId);
     void warmPresentationCache(req.params.pitchId, presentationVersion).catch((error) => {
-      console.warn("Presentation uploaded but could not be prepared yet", error);
+      console.warn(
+        "Presentation uploaded but could not be prepared yet. Ensure LibreOffice is installed or set LIBREOFFICE_BINARY.",
+        error,
+      );
     });
 
     return res.json(dashboardPitchSchema.parse(presentPitch(result.rows[0])));
@@ -721,7 +937,7 @@ pitchRouter.delete("/:id", async (req, res) => {
   }
 });
 
-// Endpoint publico para la pantalla de voto.
+// Endpoint público para la pantalla de voto.
 pitchRouter.get("/public/:pitchId", async (req, res) => {
   try {
     const evaluatorEmailParam = req.query.evaluatorEmail;
@@ -740,7 +956,7 @@ pitchRouter.get("/public/:pitchId", async (req, res) => {
     let result;
 
     try {
-      // Intenta traer tambien los criterios del evento si la columna existe.
+      // Intenta traer también los criterios del evento si la columna existe.
       result = await db.query(
         `
           SELECT
@@ -801,20 +1017,21 @@ pitchRouter.get("/public/:pitchId", async (req, res) => {
         const existingVoteResult = await db.query(
           `
             SELECT
-              id,
-              "pitchId",
-              "evaluatorId",
-              "evaluatorEmail",
-              "criteriaScores",
-              innovation,
-              viability,
-              impact,
-              presentation,
-              comment,
-              "createdAt"
-            FROM vote
-            WHERE "pitchId" = $1
-              AND "evaluatorEmail" = $2
+              v.id,
+              v."pitchId",
+              v."evaluatorId",
+              v."evaluatorEmail",
+              v."criteriaScores",
+              v.innovation,
+              v.viability,
+              v.impact,
+              v.presentation,
+              v.comment,
+              COALESCE(to_jsonb(v) ->> 'commentType', 'OPINION') AS "commentType",
+              v."createdAt"
+            FROM vote v
+            WHERE v."pitchId" = $1
+              AND v."evaluatorEmail" = $2
             LIMIT 1
           `,
           [req.params.pitchId, evaluatorEmail],
@@ -832,19 +1049,20 @@ pitchRouter.get("/public/:pitchId", async (req, res) => {
         const existingVoteResult = await db.query(
           `
             SELECT
-              id,
-              "pitchId",
-              "evaluatorId",
-              "evaluatorId" AS "evaluatorEmail",
-              innovation,
-              viability,
-              impact,
-              presentation,
-              comment,
-              "createdAt"
-            FROM vote
-            WHERE "pitchId" = $1
-              AND "evaluatorId" = $2
+              v.id,
+              v."pitchId",
+              v."evaluatorId",
+              v."evaluatorId" AS "evaluatorEmail",
+              v.innovation,
+              v.viability,
+              v.impact,
+              v.presentation,
+              v.comment,
+              COALESCE(to_jsonb(v) ->> 'commentType', 'OPINION') AS "commentType",
+              v."createdAt"
+            FROM vote v
+            WHERE v."pitchId" = $1
+              AND v."evaluatorId" = $2
             LIMIT 1
           `,
           [req.params.pitchId, evaluatorEmail],
@@ -915,7 +1133,7 @@ pitchRouter.get("/public/:pitchId/presentation/file", async (req, res) => {
   }
 });
 
-// Devuelve metadatos de las diapositivas ya preparadas para proyeccion.
+// Devuelve metadatos de las diapositivas ya preparadas para la proyección.
 pitchRouter.get("/public/:pitchId/presentation/meta", async (req, res) => {
   try {
     const cachedPresentation = await warmPresentationCache(req.params.pitchId);
@@ -1010,16 +1228,21 @@ pitchRouter.get("/detail/:pitchId", async (req, res) => {
         p."eventId",
         p.name,
         p.description,
+        p.status,
         p.color,
         p."logoUrl",
         p."presentationUrl",
         p."presentationFileName",
+        p."createdAt",
         COUNT(v.id)::int AS "votesCount",
         COALESCE(ROUND(AVG(v.innovation)::numeric, 2), 0) AS "innovationAvg",
         COALESCE(ROUND(AVG(v.viability)::numeric, 2), 0) AS "viabilityAvg",
         COALESCE(ROUND(AVG(v.impact)::numeric, 2), 0) AS "impactAvg",
-        COALESCE(ROUND(AVG(v.presentation)::numeric, 2), 0) AS "presentationAvg"
+        COALESCE(ROUND(AVG(v.presentation)::numeric, 2), 0) AS "presentationAvg",
+        ${buildWeightedScoreSql("v", "e.criteria")} AS "scoreAvg",
+        ${buildCriteriaAveragesSql("p", "e.criteria")} AS "criteriaAverages"
       FROM pitch p
+      INNER JOIN event e ON e.id = p."eventId"
       LEFT JOIN vote v ON v."pitchId" = p.id
       WHERE p.id = $1
       GROUP BY
@@ -1027,10 +1250,13 @@ pitchRouter.get("/detail/:pitchId", async (req, res) => {
         p."eventId",
         p.name,
         p.description,
+        p.status,
         p.color,
         p."logoUrl",
         p."presentationUrl",
-        p."presentationFileName"
+        p."presentationFileName",
+        p."createdAt",
+        e.criteria
       `,
       [req.params.pitchId],
     )
@@ -1080,6 +1306,7 @@ pitchRouter.get("/comments", async (req, res) => {
       `SELECT
         v.id,
         v.comment,
+        COALESCE(to_jsonb(v) ->> 'commentType', 'OPINION') AS "commentType",
         v."createdAt"
       FROM vote v
       WHERE v."pitchId" = $1
@@ -1097,10 +1324,86 @@ pitchRouter.get("/comments", async (req, res) => {
   }
 })
 
+// Devuelve una página de comentarios sin alterar el endpoint usado por la vista en vivo.
+pitchRouter.get("/comments/paginated", async (req, res) => {
+  const session = await requireSession(req, res);
+
+  if (!session) {
+    return;
+  }
+
+  const pitchId = req.query.pitchId;
+  const parsedPage = Number(req.query.page ?? 1);
+
+  if (typeof pitchId !== "string" || pitchId.length === 0) {
+    return res.status(400).json({ message: "pitchId is required" });
+  }
+
+  if (!Number.isInteger(parsedPage) || parsedPage < 1) {
+    return res.status(400).json({ message: "page must be a positive integer" });
+  }
+
+  try {
+    const eventId = await getEventIdForPitch(pitchId);
+
+    if (!eventId) {
+      return res.status(404).json({ message: "Pitch not found" });
+    }
+
+    const canManage = await canManageEvent(session.user.id, eventId);
+
+    if (!canManage) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    const pageSize = 20;
+    const offset = (parsedPage - 1) * pageSize;
+    const [commentsResult, countResult] = await Promise.all([
+      db.query(
+        `SELECT
+          v.id,
+          v.comment,
+          COALESCE(to_jsonb(v) ->> 'commentType', 'OPINION') AS "commentType",
+          v."createdAt"
+        FROM vote v
+        WHERE v."pitchId" = $1
+          AND v.comment IS NOT null
+          AND TRIM(v.comment) <> ''
+        ORDER BY v."createdAt" DESC
+        LIMIT $2 OFFSET $3`,
+        [pitchId, pageSize, offset],
+      ),
+      db.query(
+        `SELECT COUNT(*)::int AS total
+        FROM vote v
+        WHERE v."pitchId" = $1
+          AND v.comment IS NOT null
+          AND TRIM(v.comment) <> ''`,
+        [pitchId],
+      ),
+    ]);
+
+    const total = Number(countResult.rows[0]?.total ?? 0);
+
+    return res.status(200).json(
+      paginatedPitchCommentsSchema.parse({
+        comments: commentsResult.rows.map(presentPitchComment),
+        total,
+        page: parsedPage,
+        pageSize,
+        totalPages: Math.ceil(total / pageSize),
+      }),
+    );
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: "Failed to fetch paginated comments" });
+  }
+});
+
 // Variables usadas para construir URLs publicas.
 const env = validateServerEnv()
 
-// Devuelve la URL publica del pitch para generar QR.
+// Devuelve la URL pública del pitch para generar el QR.
 pitchRouter.get("/:pitchId/qr", async (req, res) => {
   const session = await requireSession(req, res)
 
@@ -1151,7 +1454,7 @@ pitchRouter.get("/:pitchId/qr", async (req, res) => {
   }
 })
 
-// Prepara los comentarios que luego podria resumir una IA.
+// Prepara los comentarios que luego podría resumir una IA.
 pitchRouter.post("/:pitchId/summary", async (req, res) => {
   const session = await requireSession(req, res)
 
@@ -1192,6 +1495,7 @@ pitchRouter.post("/:pitchId/summary", async (req, res) => {
       SELECT
         v.id,
         v.comment,
+        COALESCE(to_jsonb(v) ->> 'commentType', 'OPINION') AS "commentType",
         v."createdAt"
       FROM vote v
       WHERE v."pitchId" = $1
@@ -1282,7 +1586,8 @@ pitchRouter.get("/:pitchId/export", async (req, res) => {
           v.viability,
           v.impact,
           v.presentation,
-          v.comment
+          v.comment,
+          COALESCE(to_jsonb(v) ->> 'commentType', 'OPINION') AS "commentType"
         FROM pitch p
         INNER JOIN event e ON e.id = p."eventId"
         INNER JOIN pitch_stats ps ON ps.id = p.id
@@ -1303,6 +1608,7 @@ pitchRouter.get("/:pitchId/export", async (req, res) => {
       `"${String(value ?? "").replace(/"/g, '""')}"`;
 
     const eventCriteria = normalizeEventCriteria(pitch.criteria);
+    const trophyCriterionIds = getTrophyCriterionIds(eventCriteria);
 
     const getVoteScore = (row: Record<string, unknown>, criterionId: string) => {
       const scores = Array.isArray(row.criteriaScores) ? row.criteriaScores : [];
@@ -1376,16 +1682,23 @@ pitchRouter.get("/:pitchId/export", async (req, res) => {
       "Total AVG",
       "porcentaje",
       "promedio",
-      ...eventCriteria.map((criterion) => criterion.label),
-      ...eventCriteria.map((criterion) => `${criterion.label} Promedio`),
+      ...eventCriteria.map((criterion) =>
+        formatCriterionLabel(criterion, trophyCriterionIds),
+      ),
+      ...eventCriteria.map(
+        (criterion) =>
+          `${formatCriterionLabel(criterion, trophyCriterionIds)} Promedio`,
+      ),
       "Comentario",
-      "descripcion",
+      "Tipo comentario",
+      "descripción",
     ]
       .map((value) => escapeCsvValue(value))
       .join(",")
 
     const csvRows = detailResult.rows.map((row) => {
       const voteAverage = getVoteAverage(row);
+      const commentTypeLabel = row.commentType === "ACTIVADOR" ? "Activador" : "Opinión";
 
       return [
         escapeCsvValue(row.name),
@@ -1398,7 +1711,8 @@ pitchRouter.get("/:pitchId/export", async (req, res) => {
         row.scoreAvg,
         ...eventCriteria.map((criterion) => getVoteScore(row, criterion.id)),
         ...eventCriteria.map((criterion) => getAverageScore(row, criterion.id)),
-        escapeCsvValue(row.comment),
+        escapeCsvValue(row.comment ? `${commentTypeLabel}: "${row.comment}"` : ""),
+        escapeCsvValue(commentTypeLabel),
         escapeCsvValue(row.description),
       ].join(",")
     })

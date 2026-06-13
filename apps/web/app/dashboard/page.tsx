@@ -1,14 +1,18 @@
 "use client";
 
-import { Suspense, useMemo } from "react";
+import { Suspense, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
   ArrowLeft,
+  ArrowDown,
+  ArrowUp,
   ArrowUpRight,
   CircleDot,
+  LogOut,
   Plus,
+  Search,
   Users,
 } from "lucide-react";
 import { Button } from "@workspace/ui/components/button";
@@ -22,16 +26,54 @@ import {
   useUpdatePitchStatus,
   useUpdateEventStatus,
 } from "@/hooks/dashboard";
+import {
+  formatCriterionLabel,
+  getTrophyCriterionIds,
+} from "@/lib/criteria-highlights";
 import type { CriterionAverage, EventCriterion } from "@workspace/shared/api";
 // Utilidad para exportar resultados del evento.
 import { exportEvent } from "@/lib/dashboard-api";
 
 const defaultCriteria: EventCriterion[] = [
-  { id: "innovation", label: "Innovacion", weight: 25, isDefault: true },
+  { id: "innovation", label: "Innovación", weight: 25, isDefault: true },
   { id: "viability", label: "Viabilidad", weight: 25, isDefault: true },
   { id: "impact", label: "Impacto", weight: 25, isDefault: true },
-  { id: "presentation", label: "Presentacion", weight: 25, isDefault: true },
+  { id: "presentation", label: "Presentación", weight: 25, isDefault: true },
 ];
+
+type SortDirection = "asc" | "desc";
+type PitchSortField = "name" | "score" | "presentationOrder" | "votes" | "createdAt";
+
+const pitchSortOptions: Array<{ value: PitchSortField; label: string }> = [
+  { value: "name", label: "Nombre" },
+  { value: "score", label: "Puntuación total" },
+  { value: "presentationOrder", label: "Orden de presentación" },
+  { value: "votes", label: "Número de votos" },
+  { value: "createdAt", label: "Fecha/hora" },
+];
+
+function getCriterionAverageValue(
+  item: {
+    criteriaAverages?: CriterionAverage[];
+    innovationAvg: number;
+    viabilityAvg: number;
+    impactAvg: number;
+    presentationAvg: number;
+  },
+  criterionId: string,
+) {
+  const dynamicAverage = item.criteriaAverages?.find(
+    (criterion) => criterion.id === criterionId,
+  )?.avg;
+
+  if (dynamicAverage != null) return dynamicAverage;
+  if (criterionId === "innovation") return item.innovationAvg;
+  if (criterionId === "viability") return item.viabilityAvg;
+  if (criterionId === "impact") return item.impactAvg;
+  if (criterionId === "presentation") return item.presentationAvg;
+
+  return 0;
+}
 
 function QrDisplay({ url }: { url?: string }) {
   if (!url) {
@@ -47,13 +89,16 @@ function QrDisplay({ url }: { url?: string }) {
   return (
     <div className="rounded-2xl bg-white p-2 shadow-[0_10px_30px_rgba(0,0,0,0.35)]">
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={qrImageUrl} alt="QR de votacion" width={118} height={118} />
+      <img src={qrImageUrl} alt="QR de votación" width={118} height={118} />
     </div>
   );
 }
 
 function DashboardPageContent() {
   const searchParams = useSearchParams();
+  const [rankingSearch, setRankingSearch] = useState("");
+  const [rankingSortField, setRankingSortField] = useState<PitchSortField>("score");
+  const [rankingSortDirection, setRankingSortDirection] = useState<SortDirection>("desc");
   const { mutate: logout, isPending } = useSignOut();
   const { mutateAsync: mutateEventStatus, isPending: isUpdatingEventStatus } =
     useUpdateEventStatus();
@@ -71,6 +116,10 @@ function DashboardPageContent() {
   }, [events, requestedEventId]);
   const selectedEventId = selectedEvent?.id;
   const selectedCriteria = selectedEvent?.criteria ?? defaultCriteria;
+  const trophyCriterionIds = useMemo(
+    () => getTrophyCriterionIds(selectedCriteria),
+    [selectedCriteria],
+  );
 
   const {data: pitches = [] } = usePitches(selectedEventId); // Lista de pitches del evento seleccionado.
   const latestPitchId = useMemo(() => {
@@ -114,10 +163,106 @@ function DashboardPageContent() {
   const { data: rankingData = [] } = useRanking(selectedEventId);
   const { data: eventStats } = useEventStats(selectedEventId);
   const { data: qrData } = useEventQr(selectedEventId);
+  const criterionWinnerByCriterionId = useMemo(() => {
+    const winnersByCriterionId = new Map<string, string>();
+
+    for (const criterionId of trophyCriterionIds) {
+      const winner = rankingData
+        .filter((item) => item.votesCount > 0)
+        .map((item) => ({
+          id: item.id,
+          name: item.name,
+          votesCount: item.votesCount,
+          totalScore: item.scoreAvg,
+          average: getCriterionAverageValue(item, criterionId),
+        }))
+        .sort((left, right) => {
+          if (right.average !== left.average) {
+            return right.average - left.average;
+          }
+
+          if (right.totalScore !== left.totalScore) {
+            return right.totalScore - left.totalScore;
+          }
+
+          if (right.votesCount !== left.votesCount) {
+            return right.votesCount - left.votesCount;
+          }
+
+          return left.name.localeCompare(right.name);
+        })[0];
+
+      if (winner) {
+        winnersByCriterionId.set(criterionId, winner.id);
+      }
+    }
+
+    return winnersByCriterionId;
+  }, [rankingData, trophyCriterionIds]);
 
   const selectedPitchVotes = rankingData.find(item => item.id === selectedPitchId)?.votesCount ?? 0;
   const eventIsOpen = selectedEvent?.status === "OPEN";
   const pitchStatusById = new Map(pitches.map((pitch) => [pitch.id, pitch.status]));
+  const pitchMetaById = useMemo(() => {
+    return new Map(
+      pitches.map((pitch, index) => [
+        pitch.id,
+        {
+          createdAt: pitch.createdAt,
+          presentationOrder: index + 1,
+        },
+      ]),
+    );
+  }, [pitches]);
+
+  const visibleRankingData = useMemo(() => {
+    const normalizedSearch = rankingSearch.trim().toLowerCase();
+
+    return [...rankingData]
+      .filter((item) => {
+        if (!normalizedSearch) return true;
+
+        return `${item.name} ${item.description ?? ""}`
+          .toLowerCase()
+          .includes(normalizedSearch);
+      })
+      .sort((left, right) => {
+        const directionMultiplier = rankingSortDirection === "asc" ? 1 : -1;
+        const leftMeta = pitchMetaById.get(left.id);
+        const rightMeta = pitchMetaById.get(right.id);
+        let comparison = 0;
+
+        if (rankingSortField === "name") {
+          comparison = left.name.localeCompare(right.name);
+        } else if (rankingSortField === "score") {
+          comparison = left.scoreAvg - right.scoreAvg;
+        } else if (rankingSortField === "presentationOrder") {
+          comparison =
+            (leftMeta?.presentationOrder ?? Number.MAX_SAFE_INTEGER) -
+            (rightMeta?.presentationOrder ?? Number.MAX_SAFE_INTEGER);
+        } else if (rankingSortField === "votes") {
+          comparison = left.votesCount - right.votesCount;
+        } else {
+          const leftTime = Date.parse(leftMeta?.createdAt ?? "");
+          const rightTime = Date.parse(rightMeta?.createdAt ?? "");
+          comparison =
+            (Number.isFinite(leftTime) ? leftTime : 0) -
+            (Number.isFinite(rightTime) ? rightTime : 0);
+        }
+
+        if (comparison === 0) {
+          comparison = left.name.localeCompare(right.name);
+        }
+
+        return comparison * directionMultiplier;
+      });
+  }, [
+    pitchMetaById,
+    rankingData,
+    rankingSearch,
+    rankingSortDirection,
+    rankingSortField,
+  ]);
 
   async function handleToggleEventStatus() {
     if (!selectedEventId || !selectedEvent) return;
@@ -143,7 +288,7 @@ function DashboardPageContent() {
   // Tarjetas resumen que muestran las métricas principales.
   const stats = [
     {
-      label: "Pitches",
+      label: "Proyectos",
       value: String(pitches.length),
       accent: "text-white",
     },
@@ -158,7 +303,7 @@ function DashboardPageContent() {
       accent: "text-lime-300",
     },
     {
-      label: "Puntuacion media",
+      label: "Puntuación media",
       value:
         rankingData.length > 0
           ? (
@@ -218,7 +363,7 @@ function DashboardPageContent() {
     const words = label
       .trim() // Elimina espacios sobrantes.
       .split(/\s+/) // Separa el texto en palabras.
-      .filter(Boolean); // Descarta valores vacios.
+      .filter(Boolean); // Descarta valores vacíos.
 
     // Usa un valor neutro cuando no hay texto disponible.
     if (words.length === 0) {
@@ -249,7 +394,7 @@ function DashboardPageContent() {
                 className="inline-flex items-center gap-2 text-sm font-semibold text-[#8899aa] transition hover:text-white"
               >
                 <ArrowLeft className="size-4" />
-                <span>Volver al dashboard</span>
+                <span>Volver a eventos</span>
               </Link>
 
               <div className="hidden h-8 w-px rounded-full bg-[#263550] md:block" />
@@ -260,7 +405,7 @@ function DashboardPageContent() {
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-[#263550]">/</span>
                     <span className="text-xs font-bold uppercase italic tracking-[0.28em] text-[#83ce00]">
-                      Organizer Dashboard
+                      Panel del organizador
                     </span>
                   </div>
                   <span className="text-sm text-[#8899aa]">
@@ -272,16 +417,6 @@ function DashboardPageContent() {
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            <Link href={selectedEventId ? `/events/${selectedEventId}/team` : "#"}>
-              <Button
-                variant="outline"
-                disabled={!selectedEventId}
-                className="rounded-full border-[#263550] bg-[#0d1526] text-white hover:bg-[#1a2640] hover:text-white"
-              >
-                <Users className="size-4" />
-                Equipo
-              </Button>
-            </Link>
             <div
               className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] ${
                 eventIsOpen
@@ -292,6 +427,16 @@ function DashboardPageContent() {
               <CircleDot className="size-3 fill-current" />
               {eventIsOpen ? "En vivo" : "Cerrado"}
             </div>
+            <Link href={selectedEventId ? `/events/${selectedEventId}/team` : "#"}>
+              <Button
+                variant="outline"
+                disabled={!selectedEventId}
+                className="rounded-full border-[#263550] bg-[#0d1526] text-white hover:bg-[#1a2640] hover:text-white"
+              >
+                <Users className="size-4" />
+                Equipo
+              </Button>
+            </Link>
 
             <Button
               type="button"
@@ -306,17 +451,20 @@ function DashboardPageContent() {
               {isUpdatingEventStatus
                 ? "Actualizando..."
                 : eventIsOpen
-                  ? "Marcar cerrado"
+                  ? "Cerrar evento"
                   : "Reabrir evento"}
             </Button>
 
             <Button
               variant="outline"
-              className="rounded-full border-[#263550] bg-[#0d1526] text-white hover:bg-[#1a2640] hover:text-white"
+              size="icon"
+              className="rounded-2xl w-12 border-[#263550] bg-[#0d1526] text-white hover:bg-[#1a2640] hover:text-white"
               onClick={() => logout()}
               disabled={isPending}
+              aria-label={isPending ? "Cerrando sesión" : "Cerrar sesión"}
+              title={isPending ? "Cerrando sesión" : "Cerrar sesión"}
             >
-              {isPending ? "Cerrando..." : "Cerrar sesion"}
+              <LogOut className="size-4" />
             </Button>
           </div>
         </header>
@@ -324,34 +472,82 @@ function DashboardPageContent() {
         <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
           <div className="flex min-w-0 flex-col gap-4">
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-              {/* Renderiza una tarjeta por cada metrica. */}
+              {/* Renderiza una tarjeta por cada métrica. */}
               {stats.map((stat) => ( 
                 <article
                   key={stat.label}
                   className={`${panelClass} px-5 py-5`}
                 >
                   <p className="text-[10px] font-bold uppercase italic tracking-[0.3em] text-[#8899aa]">
-                    {stat.label} {/* Nombre de la metrica. */}
+                    {stat.label} {/* Nombre de la métrica. */}
                   </p>
                   <p className={`mt-3 text-4xl font-extrabold tracking-tight ${stat.accent}`}>
-                    {stat.value}{/* Valor principal de la metrica. */}
+                    {stat.value}{/* Valor principal de la métrica. */}
                   </p>
                 </article>
               ))}
             </div>
 
             <section className={`${panelClass} min-w-0 overflow-hidden`}>
-              <div className="flex items-center justify-between border-b border-[#263550] bg-[#0d1526] px-5 py-4">
+              <div className="flex flex-col gap-4 border-b border-[#263550] bg-[#0d1526] px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
                 <div>
                   <p className={eyebrowClass}>
                     Ranking en vivo
                   </p>
                   <p className="mt-1 text-sm text-[#a7a8be]">
-                    Tabla proyectable para moderacion y jurado.
+                    Tabla proyectable para moderación y jurado.
                   </p>
                 </div>
-                <div className="rounded-full border border-[#2a4a2a] bg-[#0a1a0a] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-[#ccff00]">
-                  Actualizado
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <label className="flex h-10 min-w-0 items-center gap-2 rounded-full border border-[#263550] bg-[#121d30] px-3 text-sm text-[#a9b3c9] sm:w-64">
+                    <Search className="size-4 shrink-0 text-[#83ce00]" />
+                    <input
+                      type="search"
+                      value={rankingSearch}
+                      onChange={(event) => setRankingSearch(event.target.value)}
+                      placeholder="Buscar pitch"
+                      className="min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-[#5f6b82]"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setRankingSortDirection((current) =>
+                        current === "asc" ? "desc" : "asc",
+                      )
+                    }
+                    className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#263550] bg-[#121d30] text-[#ccff00] transition hover:bg-[#1a2640]"
+                    aria-label={
+                      rankingSortDirection === "asc"
+                        ? "Orden ascendente"
+                        : "Orden descendente"
+                    }
+                    title={
+                      rankingSortDirection === "asc"
+                        ? "Ascendente"
+                        : "Descendente"
+                    }
+                  >
+                    {rankingSortDirection === "asc" ? (
+                      <ArrowUp className="size-4" />
+                    ) : (
+                      <ArrowDown className="size-4" />
+                    )}
+                  </button>
+                  <select
+                    value={rankingSortField}
+                    onChange={(event) =>
+                      setRankingSortField(event.target.value as PitchSortField)
+                    }
+                    className="h-10 rounded-full border border-[#2a4a2a] bg-[#0a1a0a] px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#ccff00] outline-none"
+                    aria-label="Campo de ordenación"
+                  >
+                    {pitchSortOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
@@ -366,16 +562,23 @@ function DashboardPageContent() {
                         <th
                           key={criterion.id}
                           className="px-4 py-3 font-medium"
-                          title={criterion.label}
+                          title={formatCriterionLabel(criterion, trophyCriterionIds)}
                         >
-                          {getCriterionShortLabel(criterion.label)}
+                          <span className="inline-flex items-center gap-1">
+                            {trophyCriterionIds.has(criterion.id) ? (
+                              <span aria-label="Criterio premiado" role="img">
+                                🏆
+                              </span>
+                            ) : null}
+                            {getCriterionShortLabel(criterion.label)}
+                          </span>
                         </th>
                       ))}
                       <th className="px-4 py-3 font-medium text-right">Total</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {rankingData.map((item, index) => {
+                    {visibleRankingData.map((item, index) => {
                       const pitchStatus = pitchStatusById.get(item.id) ?? "OPEN";
                       const nextStatus = pitchStatus === "OPEN" ? "CLOSED" : "OPEN";
                       const criterionAverages = getCriterionAverages(item);
@@ -394,18 +597,18 @@ function DashboardPageContent() {
                         <td className={`px-4 py-4 text-xs font-bold ${
                           index === 0 ? "text-[#83ce00]" : isLatestPitch ? "text-[#00f0ff]" : "text-[#8c8da4]"
                         }`}>
-                          {String(index + 1).padStart(2, "0")} {/* Posicion actual en el ranking. */}
+                          {String(index + 1).padStart(2, "0")} {/* Posición actual en el ranking. */}
                         </td>
                         <td className="px-4 py-4">
                           <div className="flex items-center gap-3">
                             <span
                               className={`h-2 w-2 rounded-full ${
-                                index === 0 ? "bg-[#ccff00]" : isLatestPitch ? "bg-[#0595f0]" : "bg-[#53546a]" // Destaca al lider y al pitch mas reciente.
+                                index === 0 ? "bg-[#ccff00]" : isLatestPitch ? "bg-[#0595f0]" : "bg-[#53546a]" // Destaca al líder y al pitch más reciente.
                               }`} 
                             />
                             {selectedEventId ? (
                               <Link
-                                href={`/events/${selectedEventId}/pitches/${item.id}/edit`}
+                                href={`/events/${selectedEventId}/pitches/${item.id}`}
                                 className={`font-semibold transition ${
                                   index === 0
                                     ? "text-[#f8ffcf] hover:text-[#83ce00]"
@@ -427,7 +630,7 @@ function DashboardPageContent() {
                             )}
                             {/* {isLatestPitch ? (
                               <span className="rounded-full border border-[#0595f0] bg-[#0595f0]/10 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-[#7fd4ff]">
-                                Ultimo
+                                Último
                               </span>
                             ) : null} */}
                           </div>
@@ -448,14 +651,32 @@ function DashboardPageContent() {
                                 : "bg-[#2a1018] text-[#ff8cab] hover:bg-[#3a1522]"
                             }`}
                           >
-                            {pitchStatus === "OPEN" ? "Activado" : "Cerrado"}
+                            {pitchStatus === "OPEN" ? "Activo" : "Cerrado"}
                           </Button>
                         </td>
-                        {criterionAverages.map((criterion) => (
-                          <td key={`${item.id}-${criterion.id}`} className="px-4 py-4 text-[#9da0bc]">
-                            {criterion.avg}
-                          </td>
-                        ))}
+                        {criterionAverages.map((criterion) => {
+                          const isCriterionWinner =
+                            criterionWinnerByCriterionId.get(criterion.id) ===
+                            item.id;
+
+                          return (
+                            <td key={`${item.id}-${criterion.id}`} className="px-4 py-4 text-[#9da0bc]">
+                              <div className="flex items-center gap-2">
+                                <span>{criterion.avg}</span>
+                                {isCriterionWinner ? (
+                                  <span
+                                    className="text-base"
+                                    aria-label={`Ganador de ${criterion.label}`}
+                                    title={`Ganador de ${criterion.label}`}
+                                    role="img"
+                                  >
+                                    🏆
+                                  </span>
+                                ) : null}
+                              </div>
+                            </td>
+                          );
+                        })}
                         <td className="px-4 py-4 text-right font-semibold text-[#ccff00]">
                           {item.scoreAvg} {/* Puntaje total del pitch. */}
                         </td>
@@ -473,7 +694,7 @@ function DashboardPageContent() {
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <p className={eyebrowClass}>
-                    Codigo QR del evento
+                    Código QR del evento
                   </p>
                   <h2 className="mt-2 text-xl font-semibold tracking-tight">{qrData?.name ?? selectedEvent?.name ?? "Sin evento seleccionado"}</h2>
                 </div>
@@ -494,13 +715,13 @@ function DashboardPageContent() {
               </div>
 
               <p className="mt-4 text-center text-xs text-[#8899aa]">
-                escanea para ver todos los pitches del evento
+                Escanea para ver todos los pitches del evento.
               </p>
 
               <div className="mt-4 flex flex-col gap-2 text-sm text-[#8899aa]">
                 <p className="flex items-center gap-2">
                   <span className="h-2.5 w-2.5 rounded-full bg-[#83ce00]" />
-                  Mas votos.
+                  Más votos.
                 </p>
                 <p className="flex items-center gap-2">
                   <span className="h-2.5 w-2.5 rounded-full bg-[#0595f0]" />
@@ -511,7 +732,7 @@ function DashboardPageContent() {
               {qrData?.publicVoteUrl && (
                 <div className="mt-4 rounded-2xl border border-[#263550] bg-[#0d1526] p-4">
                   <p className="text-[10px] font-bold uppercase italic tracking-[0.24em] text-[#83ce00]">
-                    Link de invitacion
+                    Enlace de invitación
                   </p>
                   <p className="mt-3 break-all text-sm leading-6 text-[#a9b3c9]">
                     {qrData.publicVoteUrl}
@@ -519,7 +740,7 @@ function DashboardPageContent() {
                   <div className="mt-4">
                     <Link href={qrData.publicVoteUrl} target="_blank" rel="noreferrer">
                       <Button className="rounded-full bg-[#83ce00] text-sm font-bold italic text-[#0d1526] hover:bg-[#a7ea2e]">
-                        Abrir invitacion
+                        Abrir invitación
                       </Button>
                     </Link>
                   </div>
@@ -598,7 +819,7 @@ export default function DashboardPage() {
         <main className="min-h-svh bg-[#0d1526] text-white">
           <div className="mx-auto flex min-h-svh w-full max-w-[1440px] items-center justify-center px-4 py-4 md:px-8 md:py-6">
             <div className="rounded-[20px] border border-[#263550] bg-[#121d30] px-6 py-4 text-sm text-[#8899aa]">
-              Cargando dashboard...
+              Cargando panel...
             </div>
           </div>
         </main>

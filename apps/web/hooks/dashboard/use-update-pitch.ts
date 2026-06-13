@@ -35,6 +35,9 @@ export function useUpdatePitch() {
       queryClient.invalidateQueries({ queryKey: ["pitches", updatedPitch.eventId] });
       queryClient.invalidateQueries({ queryKey: ["ranking", updatedPitch.eventId] });
       queryClient.invalidateQueries({ queryKey: ["pitch-detail", updatedPitch.id] });
+      queryClient.invalidateQueries({
+        queryKey: ["public-event-invitation", updatedPitch.eventId],
+      });
     },
   });
 }

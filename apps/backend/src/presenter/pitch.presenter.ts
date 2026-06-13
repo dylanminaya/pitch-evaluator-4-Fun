@@ -23,7 +23,7 @@ export const presentPitch = (pitch: {
   createdAt: pitch.createdAt instanceof Date ? pitch.createdAt.toISOString() : (pitch.createdAt ?? null),
 });
 
-// Forma publica del pitch para la pantalla de voto.
+// Forma pública del pitch para la pantalla de voto.
 export const presentPublicPitch = (pitch: {
   id: string;
   eventId: string;
@@ -58,39 +58,59 @@ export const presentPitchDetail = (pitch: {
   eventId: string;
   name: string;
   description: string;
+  status: "OPEN" | "CLOSED";
   color: string;
   logoUrl?: string | null;
   presentationUrl?: string | null;
   presentationFileName?: string | null;
+  createdAt?: Date | string | null;
   votesCount: number;
   innovationAvg: number;
   viabilityAvg: number;
   impactAvg: number;
   presentationAvg: number;
+  scoreAvg: number;
+  criteriaAverages?: Array<{
+    id: string;
+    label: string;
+    weight: number;
+    avg: number;
+  }> | null;
 }) => ({
   id: pitch.id,
   eventId: pitch.eventId,
   name: pitch.name,
   description: pitch.description,
+  status: pitch.status,
   color: pitch.color,
   logoUrl: pitch.logoUrl ?? null,
   presentationUrl: pitch.presentationUrl ?? null,
   presentationFileName: pitch.presentationFileName ?? null,
-  votesCount: pitch.votesCount,
-  innovationAvg: pitch.innovationAvg,
-  viabilityAvg: pitch.viabilityAvg,
-  impactAvg: pitch.impactAvg,
-  presentationAvg: pitch.presentationAvg,
+  createdAt: pitch.createdAt instanceof Date ? pitch.createdAt.toISOString() : (pitch.createdAt ?? null),
+  votesCount: Number(pitch.votesCount),
+  innovationAvg: Number(pitch.innovationAvg),
+  viabilityAvg: Number(pitch.viabilityAvg),
+  impactAvg: Number(pitch.impactAvg),
+  presentationAvg: Number(pitch.presentationAvg),
+  scoreAvg: Number(pitch.scoreAvg),
+  criteriaAverages: (pitch.criteriaAverages ?? []).map((criterion) => ({
+    id: criterion.id,
+    label: criterion.label,
+    weight: Number(criterion.weight),
+    avg: Number(criterion.avg),
+  })),
 });
 
 // Normaliza un comentario individual.
 export const presentPitchComment = (comment: {
   id: string;
   comment: string;
+  commentType?: "OPINION" | "ACTIVADOR" | null;
   createdAt: Date | string;
 }) => ({
   id: comment.id,
   comment: comment.comment,
+  commentType: comment.commentType ?? "OPINION",
   createdAt: comment.createdAt instanceof Date ? comment.createdAt.toISOString() : comment.createdAt,
 });
 
@@ -102,6 +122,7 @@ export const presentPitchSummary = (payload: {
   comments: Array<{
     id: string;
     comment: string;
+    commentType?: "OPINION" | "ACTIVADOR" | null;
     createdAt: Date | string;
   }>;
   summary: string | null;

@@ -8,6 +8,9 @@ const env = validateClientEnv();
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const client: any = createAuthClient({
   baseURL: env.NEXT_PUBLIC_API_URL,
+  fetchOptions: {
+    credentials: "include",
+  },
 });
 
 /**

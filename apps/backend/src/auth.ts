@@ -4,30 +4,37 @@ import { validateServerEnv } from "@workspace/shared/env/server";
 import type { Request, Response } from "express";
 import { fromNodeHeaders } from "better-auth/node";
 
-// Carga la configuracion del backend.
+// Carga la configuración del backend.
 const env = validateServerEnv();
 
 // Configura Better Auth con Postgres y login por email/password.
 export const auth = betterAuth({
   baseURL: env.BETTER_AUTH_URL,
   secret: env.BETTER_AUTH_SECRET,
-  trustedOrigins: [env.FRONTEND_URL, "http://127.0.0.1:3000"],
+  trustedOrigins: [env.FRONTEND_URL, "http://127.0.0.1:3000", "http://localhost:3000"],
   database: new Pool({
     connectionString: env.DATABASE_URL,
   }),
   emailAndPassword: {
     enabled: true,
   },
+  advanced: {
+    useSecureCookies: env.NODE_ENV === "production",
+    defaultCookieAttributes:
+      env.NODE_ENV === "production"
+        ? { sameSite: "none", secure: true, partitioned: true }
+        : undefined,
+  },
 });
 
-// Intenta leer la sesion actual desde los headers de la request.
+// Intenta leer la sesión actual desde los encabezados de la solicitud.
 export const getSessionFromRequest = async (req: Request) => {
   return auth.api.getSession({
     headers: fromNodeHeaders(req.headers),
   });
 };
 
-// Exige sesion y responde 401 si no hay usuario autenticado.
+// Exige una sesión y responde 401 si no hay un usuario autenticado.
 export const requireSession = async (req: Request, res: Response) => {
   const session = await getSessionFromRequest(req);
 
