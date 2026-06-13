@@ -50,13 +50,13 @@ export function LoginForm({
       <Card className="rounded-[28px] border border-[#263550] bg-[#1a2640] py-0 text-white shadow-[0_24px_60px_rgba(2,8,23,0.36)]">
         <CardHeader className="gap-3 border-b border-[#263550] px-6 py-6">
           <p className="text-[10px] font-bold uppercase italic tracking-[0.32em] text-[#83ce00]">
-            Login
+            Acceso
           </p>
           <CardTitle className="text-3xl font-black italic tracking-tight text-white">
             Entra a tu cuenta
           </CardTitle>
           <CardDescription className="text-sm leading-6 text-[#a9b3c9]">
-            Usa tu correo y contraseña para abrir el panel del organizer.
+            Usa tu correo y contraseña para abrir el panel del organizador.
           </CardDescription>
         </CardHeader>
         <CardContent className="px-6 py-6">
@@ -84,13 +84,13 @@ export function LoginForm({
               <Field>
                 <div className="flex items-center">
                   <FieldLabel htmlFor="password" className="text-xs font-bold uppercase italic tracking-[0.24em] text-[#8899aa]">
-                    Password
+                    Contraseña
                   </FieldLabel>
                   <Link
                     href="#"
                     className="ml-auto inline-block text-sm text-[#83ce00] underline-offset-4 hover:underline"
                   >
-                    Forgot your password?
+                    ¿Olvidaste tu contraseña?
                   </Link>
                 </div>
                 <Input
@@ -111,12 +111,12 @@ export function LoginForm({
                   {isPending ? "Entrando..." : "Entrar al dashboard"}
                 </Button>
                 <FieldDescription className="pt-2 text-center text-sm text-[#8899aa]">
-                  Don&apos;t have an account?{" "}
+                  ¿No tienes una cuenta?{" "}
                   <Link
                     href={redirectTo ? `/signup?redirect=${encodeURIComponent(redirectTo)}` : "/signup"}
                     className="font-semibold text-[#83ce00] underline underline-offset-4"
                   >
-                    Sign up
+                    Regístrate
                   </Link>
                 </FieldDescription>
               </Field>

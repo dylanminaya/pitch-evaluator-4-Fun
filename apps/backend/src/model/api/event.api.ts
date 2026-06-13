@@ -24,14 +24,14 @@ import {
 
 export const eventRouter: Router = Router();
 
-// Detecta errores de Postgres por codigo para aplicar fallbacks de schema.
+// Detecta errores de Postgres por código para aplicar alternativas de esquema.
 const hasPgErrorCode = (error: unknown, code: string) =>
   typeof error === "object" &&
   error !== null &&
   "code" in error &&
   error.code === code;
 
-// Devuelve la vista publica del evento usada por el link/QR de invitacion general.
+// Devuelve la vista pública del evento usada por el enlace o QR de invitación general.
 eventRouter.get("/public/:eventId", async (req, res) => {
   try {
     const eventResult = await db.query(
@@ -200,7 +200,7 @@ eventRouter.post("/", async (req, res) => {
     let result;
 
     try {
-      // Intenta insertar tambien los criterios si la DB ya tiene esa columna.
+      // Intenta insertar también los criterios si la base de datos ya tiene esa columna.
       result = await db.query(
         `
           INSERT INTO event (id, name, description, status, criteria, "createdAt", "organizerId")
@@ -210,7 +210,7 @@ eventRouter.post("/", async (req, res) => {
         [eventId, name, description, "OPEN", JSON.stringify(criteria), session.user.id],
       );
     } catch (error) {
-      // Fallback para bases viejas que todavia no tienen `criteria`.
+      // Alternativa para bases antiguas que todavía no tienen `criteria`.
       if (!hasPgErrorCode(error, "42703")) {
         throw error;
       }
@@ -498,7 +498,7 @@ eventRouter.get("/:eventId/export", async (req, res) => {
       ),
       "Comentario",
       "Tipo comentario",
-      "descripcion",
+      "descripción",
     ]
       .map((value) => escapeCsvValue(value))
       .join(",");
@@ -506,7 +506,7 @@ eventRouter.get("/:eventId/export", async (req, res) => {
     // Filas del CSV.
     const csvRows = result.rows.map((row) => {
       const voteAverage = getVoteAverage(row);
-      const commentTypeLabel = row.commentType === "ACTIVADOR" ? "Activador" : "Opinion";
+      const commentTypeLabel = row.commentType === "ACTIVADOR" ? "Activador" : "Opinión";
 
       return [
         pitchPositions.get(String(row.pitchid ?? row.pitchId)) ?? "",
@@ -549,7 +549,7 @@ eventRouter.get("/:eventId/export", async (req, res) => {
   }
 });
 
-// Devuelve metricas agregadas del evento para el dashboard.
+// Devuelve métricas agregadas del evento para el dashboard.
 eventRouter.get("/:eventId/stats", async (req, res) => {
   const session = await requireSession(req, res);
 
@@ -594,7 +594,7 @@ eventRouter.get("/:eventId/stats", async (req, res) => {
 // Variables usadas para construir URLs publicas.
 const env = validateServerEnv()
 
-// Devuelve la URL publica del evento para generar QR.
+// Devuelve la URL pública del evento para generar el QR.
 eventRouter.get("/:eventId/qr", async (req, res) => {
   const session = await requireSession(req, res)
 

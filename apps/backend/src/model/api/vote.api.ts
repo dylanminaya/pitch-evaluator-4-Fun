@@ -17,7 +17,7 @@ import {
 
 export const voteRouter: Router = Router();
 
-// Detecta errores de Postgres por codigo para aplicar fallbacks o respuestas claras.
+// Detecta errores de Postgres por código para aplicar alternativas o respuestas claras.
 const hasPgErrorCode = (error: unknown, code: string) =>
   typeof error === "object" &&
   error !== null &&
@@ -93,7 +93,7 @@ voteRouter.get("/", async (req, res) => {
   }
 });
 
-// Registra un voto publico.
+// Registra un voto público.
 voteRouter.post("/", async (req, res) => {
   const parsed = createPublicVoteSchema.safeParse(req.body);
 

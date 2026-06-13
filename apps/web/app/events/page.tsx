@@ -80,7 +80,7 @@ export default function EventsPage() {
 
   async function handleDelete(eventId: string, eventName: string) {
     const confirmed = window.confirm(
-      `Vas a eliminar "${eventName}". Esta accion no se puede deshacer.`
+      `Vas a eliminar "${eventName}". Esta acción no se puede deshacer.`
     );
 
     if (!confirmed) return;
@@ -98,7 +98,7 @@ export default function EventsPage() {
               <div className="flex items-center gap-2">
                 <span className="text-sm text-[#263550]">/</span>
                 <span className="text-xs font-bold uppercase italic tracking-[0.28em] text-[#83ce00]">
-                  Events Management
+                  Gestión de eventos
                 </span>
               </div>
               <span className="text-sm text-[#8899aa]">
@@ -110,7 +110,7 @@ export default function EventsPage() {
           <div className="flex flex-wrap items-center gap-3">
             <div className="inline-flex items-center gap-2 rounded-full border border-[#263550] bg-[#0d1526] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#83ce00]">
               <CircleDot className="size-3 fill-current" />
-              Organizer
+              Organizador
             </div>
             <Link href="/events/new">
               <Button className="h-10 rounded-full bg-[#83ce00] px-5 text-sm font-bold italic text-[#0d1526] hover:bg-[#a7ea2e]">
@@ -124,8 +124,8 @@ export default function EventsPage() {
               className="rounded-2xl w-12 border-[#263550] bg-[#0d1526] text-white hover:bg-[#1a2640] hover:text-white"
               onClick={() => logout()}
               disabled={isSigningOut}
-              aria-label={isSigningOut ? "Cerrando sesion" : "Cerrar sesion"}
-              title={isSigningOut ? "Cerrando sesion" : "Cerrar sesion"}
+              aria-label={isSigningOut ? "Cerrando sesión" : "Cerrar sesión"}
+              title={isSigningOut ? "Cerrando sesión" : "Cerrar sesión"}
             >
               <LogOut className="size-4" />
             </Button>
@@ -143,7 +143,7 @@ export default function EventsPage() {
               </h1>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-[#a9b3c9]">
                 Cada tarjeta te lleva al dashboard del evento para proyectar ranking,
-                revisar pitches y activar el QR de votacion.
+                revisar pitches y activar el QR de votación.
               </p>
             </div>
 
@@ -249,7 +249,7 @@ export default function EventsPage() {
                           </div>
                           <div className="inline-flex items-center gap-2">
                             <CircleDot className="size-4" />
-                            <span>{isOpen ? "Recepcionando votos" : "Sesion cerrada"}</span>
+                            <span>{isOpen ? "Recibiendo votos" : "Sesión cerrada"}</span>
                           </div>
                           {event.accessRole === "CO_ORGANIZER" ? (
                             <div className="inline-flex items-center gap-2">
@@ -261,7 +261,7 @@ export default function EventsPage() {
 
                         <div className="flex items-center justify-between">
                           <span className="text-[11px] font-bold uppercase italic tracking-[0.28em] text-[#83ce00]">
-                            {event.accessRole === "CO_ORGANIZER" ? "Eres co-organizer" : "Abrir dashboard"}
+                            {event.accessRole === "CO_ORGANIZER" ? "Eres coorganizador" : "Abrir dashboard"}
                           </span>
                           <div className="inline-flex items-center gap-2 rounded-full border border-[#263550] bg-[#0d1526] px-4 py-2 text-sm font-semibold text-white">
                             Entrar

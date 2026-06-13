@@ -23,7 +23,7 @@ export const presentPitch = (pitch: {
   createdAt: pitch.createdAt instanceof Date ? pitch.createdAt.toISOString() : (pitch.createdAt ?? null),
 });
 
-// Forma publica del pitch para la pantalla de voto.
+// Forma pública del pitch para la pantalla de voto.
 export const presentPublicPitch = (pitch: {
   id: string;
   eventId: string;

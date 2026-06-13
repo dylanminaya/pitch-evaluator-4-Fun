@@ -85,7 +85,7 @@ export default function RootLayout({
     >
       <body>
         <QueryProvider>
-          <Suspense fallback={<div>Loading...</div>}>
+          <Suspense fallback={<div>Cargando...</div>}>
             <AuthGuard>{children}</AuthGuard>
           </Suspense>
         </QueryProvider>

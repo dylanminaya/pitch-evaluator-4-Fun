@@ -23,11 +23,11 @@ import type { EventCriterion } from "@workspace/shared/api";
 const setupItems = [
   {
     title: "Votacion anonima",
-    description: "El publico vota sin exponer su identidad en pantalla.",
+    description: "El público vota sin exponer su identidad en pantalla.",
   },
   {
     title: "Comentarios",
-    description: "Habilita observaciones para enriquecer la evaluacion.",
+    description: "Habilita observaciones para enriquecer la evaluación.",
   },
   {
     title: "Ranking en vivo",
@@ -45,10 +45,10 @@ export default function NewEventPage() {
   const [hasTriedSubmit, setHasTriedSubmit] = useState(false);
   //
   const [criteria, setCriteria] = useState<EventCriterion[]>([
-    { id: "innovation", label: "Innovacion", weight: 25, isDefault: true, hasTrophy: false },
+    { id: "innovation", label: "Innovación", weight: 25, isDefault: true, hasTrophy: false },
     { id: "viability", label: "Viabilidad", weight: 25, isDefault: true, hasTrophy: false },
     { id: "impact", label: "Impacto", weight: 25, isDefault: true, hasTrophy: false },
-    { id: "presentation", label: "Presentacion", weight: 25, isDefault: true, hasTrophy: false },
+    { id: "presentation", label: "Presentación", weight: 25, isDefault: true, hasTrophy: false },
   ]);
 
   const totalWeight = useMemo(
@@ -227,7 +227,7 @@ export default function NewEventPage() {
             <p className="mt-2 max-w-2xl text-sm leading-6 text-[#a9b3c9]">
               Esta pantalla toma como referencia el flujo de `Desktop - Event Creation`
               de `pencil.pen`: formulario principal a la izquierda y resumen de
-              criterios/configuracion a la derecha.
+              criterios/configuración a la derecha.
             </p>
           </div>
 
@@ -239,12 +239,12 @@ export default function NewEventPage() {
             >
               <div className="flex flex-col gap-2 border-b border-[#263550] pb-5">
                 <p className="text-[11px] font-bold uppercase italic tracking-[0.3em] text-[#83ce00]">
-                  Informacion del evento
+                  Información del evento
                 </p>
                 <p className="text-sm text-[#a9b3c9]">
-                  Define el nombre y una descripcion clara para identificar el
-                  evento dentro del dashboard del organizer. Tambien puedes
-                  ajustar el peso de cada criterio de evaluacion.
+                  Define el nombre y una descripción clara para identificar el
+                  evento dentro del panel del organizador. También puedes
+                  ajustar el peso de cada criterio de evaluación.
                 </p>
               </div>
 
@@ -284,7 +284,7 @@ export default function NewEventPage() {
                     htmlFor="event-description"
                     className="text-xs font-bold uppercase italic tracking-[0.24em] text-[#8899aa]"
                   >
-                    Descripcion
+                    Descripción
                   </label>
                   <textarea
                     id="event-description"
@@ -305,7 +305,7 @@ export default function NewEventPage() {
                   <div className="inline-flex items-center gap-2">
                     <Target className="size-4 text-[#a855f7]" />
                     <p className="text-[11px] font-bold uppercase italic tracking-[0.24em] text-[#a88cc8]">
-                      Criterios de evaluacion
+                      Criterios de evaluación
                     </p>
                   </div>
                   <div className="flex items-center gap-3">
@@ -371,7 +371,7 @@ export default function NewEventPage() {
                             isSelectedTrophyCriterion
                               ? "Quitar trofeo"
                               : selectedTrophyCriteriaCount >= 2
-                                ? "Maximo 2 criterios con trofeo"
+                                ? "Máximo 2 criterios con trofeo"
                                 : isTrophyCriterion
                                   ? "Trofeo automatico por porcentaje"
                                   : "Asignar trofeo"
@@ -429,7 +429,7 @@ export default function NewEventPage() {
                   })}
                 </div>
                 <p className="mt-4 text-xs leading-5 text-[#8899aa]">
-                  Debe haber entre {MIN_CRITERIA} y {MAX_CRITERIA} criterios. Estos porcentajes se guardan y afectan el resultado final, asi que el total debe sumar 100%.
+                  Debe haber entre {MIN_CRITERIA} y {MAX_CRITERIA} criterios. Estos porcentajes se guardan y afectan el resultado final, así que el total debe sumar 100%.
                 </p>
               </section>
 
@@ -437,7 +437,7 @@ export default function NewEventPage() {
                 <div className="inline-flex items-center gap-2">
                   <Settings2 className="size-4 text-[#ff2d78]" />
                   <p className="text-[11px] font-bold uppercase italic tracking-[0.24em] text-[#ff7aaa]">
-                    Configuracion
+                    Configuración
                   </p>
                 </div>
 

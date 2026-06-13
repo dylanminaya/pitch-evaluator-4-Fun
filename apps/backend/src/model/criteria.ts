@@ -2,10 +2,10 @@ import { z } from "zod";
 import { eventCriterionSchema, type EventCriterion, type VoteCriterionScore } from "@workspace/shared/api";
 
 export const defaultCriteria: EventCriterion[] = [
-  { id: "innovation", label: "Innovacion", weight: 25, isDefault: true },
+  { id: "innovation", label: "Innovación", weight: 25, isDefault: true },
   { id: "viability", label: "Viabilidad", weight: 25, isDefault: true },
   { id: "impact", label: "Impacto", weight: 25, isDefault: true },
-  { id: "presentation", label: "Presentacion", weight: 25, isDefault: true },
+  { id: "presentation", label: "Presentación", weight: 25, isDefault: true },
 ];
 
 const criteriaSchema = z.array(eventCriterionSchema);

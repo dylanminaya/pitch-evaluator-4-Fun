@@ -146,7 +146,7 @@ export default function ProjectorPitchPage() {
         setAutoCloseCountdownSeconds(0);
       } catch {
         setAutoCloseError(
-          "No pudimos cerrar las votaciones automaticamente. Revisa tu sesion o cierralas manualmente.",
+          "No pudimos cerrar las votaciones automáticamente. Revisa tu sesión o ciérralas manualmente.",
         );
       }
     }
@@ -270,7 +270,7 @@ export default function ProjectorPitchPage() {
         });
 
         if (!response.ok) {
-          throw new Error("No pudimos cargar las paginas de la presentacion.");
+          throw new Error("No pudimos cargar las páginas de la presentación.");
         }
 
         const data = (await response.json()) as { pagesCount?: number };
@@ -402,8 +402,8 @@ export default function ProjectorPitchPage() {
     } catch {
       setAutoCloseError(
         status === "CLOSED"
-          ? "No pudimos cerrar las votaciones. Revisa tu sesion e intenta otra vez."
-          : "No pudimos abrir las votaciones. Revisa tu sesion e intenta otra vez.",
+          ? "No pudimos cerrar las votaciones. Revisa tu sesión e intenta otra vez."
+          : "No pudimos abrir las votaciones. Revisa tu sesión e intenta otra vez.",
       );
     }
   }
@@ -423,7 +423,7 @@ export default function ProjectorPitchPage() {
   if (isLoading) {
     return (
       <main className="flex min-h-svh items-center justify-center bg-[#050816] text-lg text-[#90a3bf]">
-        Cargando pantalla de proyeccion...
+        Cargando pantalla de proyección...
       </main>
     );
   }
@@ -431,7 +431,7 @@ export default function ProjectorPitchPage() {
   if (error || !pitch) {
     return (
       <main className="flex min-h-svh items-center justify-center bg-[#050816] px-6 text-center text-lg text-[#90a3bf]">
-        No pudimos cargar este pitch para proyeccion.
+        No pudimos cargar este pitch para proyección.
       </main>
     );
   }
@@ -490,7 +490,7 @@ export default function ProjectorPitchPage() {
                 <div className="absolute inset-0 z-10 flex items-center justify-center bg-black text-center">
                   <div className="mx-6 max-w-xl rounded-[28px] border border-white/10 bg-white/10 px-6 py-5 text-white shadow-[0_18px_60px_rgba(0,0,0,0.35)] backdrop-blur">
                     <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-[#83ce00]">
-                      Cargando presentacion
+                      Cargando presentación
                     </p>
                     <p className="mt-3 text-sm font-semibold text-[#c2ccdc]">
                       Estamos preparando las diapositivas.
@@ -570,14 +570,14 @@ export default function ProjectorPitchPage() {
 
               {pitch.logoUrl && imageFailed && (
                 <div className="absolute bottom-4 left-4 right-4 rounded-2xl border border-[#5a2433] bg-[#2a1018]/90 px-4 py-3 text-sm text-[#ffb7c9] backdrop-blur">
-                  No pudimos mostrar esta imagen. Prueba con un enlace directo al archivo o usa una URL publica de imagen.
+                  No pudimos mostrar esta imagen. Prueba con un enlace directo al archivo o usa una URL pública de imagen.
                 </div>
               )}
             </div>
 
             <div className="border-t border-white/10 bg-black/20 px-6 py-5 md:px-8 md:py-6">
               <p className="text-[11px] font-bold uppercase italic tracking-[0.32em] text-[#83ce00]">
-                Pantalla de proyeccion
+                Pantalla de proyección
               </p>
               <h1 className="mt-3 text-3xl font-black tracking-tight md:text-5xl">
                 {pitch.name}
@@ -618,7 +618,7 @@ export default function ProjectorPitchPage() {
                         : "bg-white/10 text-white hover:bg-white/15"
                     }`}
                   >
-                    Presentacion
+                    Presentación
                   </Button>
                   <Button
                     type="button"
@@ -752,7 +752,7 @@ export default function ProjectorPitchPage() {
               )}
 
               <div className="mt-4 rounded-[20px] border border-white/10 bg-white/5 px-4 py-3 text-sm leading-6 text-[#aebbd1]">
-                El cronometro cierra este pitch automaticamente al terminar el tiempo mas la espera configurada.
+                El cronómetro cierra este pitch automáticamente al terminar el tiempo más la espera configurada.
               </div>
             </aside>
           )}

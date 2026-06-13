@@ -35,10 +35,10 @@ import type { CriterionAverage, EventCriterion } from "@workspace/shared/api";
 import { exportEvent } from "@/lib/dashboard-api";
 
 const defaultCriteria: EventCriterion[] = [
-  { id: "innovation", label: "Innovacion", weight: 25, isDefault: true },
+  { id: "innovation", label: "Innovación", weight: 25, isDefault: true },
   { id: "viability", label: "Viabilidad", weight: 25, isDefault: true },
   { id: "impact", label: "Impacto", weight: 25, isDefault: true },
-  { id: "presentation", label: "Presentacion", weight: 25, isDefault: true },
+  { id: "presentation", label: "Presentación", weight: 25, isDefault: true },
 ];
 
 type SortDirection = "asc" | "desc";
@@ -46,9 +46,9 @@ type PitchSortField = "name" | "score" | "presentationOrder" | "votes" | "create
 
 const pitchSortOptions: Array<{ value: PitchSortField; label: string }> = [
   { value: "name", label: "Nombre" },
-  { value: "score", label: "Puntuacion total" },
-  { value: "presentationOrder", label: "Orden presentacion" },
-  { value: "votes", label: "Numero de votos" },
+  { value: "score", label: "Puntuación total" },
+  { value: "presentationOrder", label: "Orden de presentación" },
+  { value: "votes", label: "Número de votos" },
   { value: "createdAt", label: "Fecha/hora" },
 ];
 
@@ -89,7 +89,7 @@ function QrDisplay({ url }: { url?: string }) {
   return (
     <div className="rounded-2xl bg-white p-2 shadow-[0_10px_30px_rgba(0,0,0,0.35)]">
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={qrImageUrl} alt="QR de votacion" width={118} height={118} />
+      <img src={qrImageUrl} alt="QR de votación" width={118} height={118} />
     </div>
   );
 }
@@ -288,7 +288,7 @@ function DashboardPageContent() {
   // Tarjetas resumen que muestran las métricas principales.
   const stats = [
     {
-      label: "Pitches",
+      label: "Proyectos",
       value: String(pitches.length),
       accent: "text-white",
     },
@@ -303,7 +303,7 @@ function DashboardPageContent() {
       accent: "text-lime-300",
     },
     {
-      label: "Puntuacion media",
+      label: "Puntuación media",
       value:
         rankingData.length > 0
           ? (
@@ -363,7 +363,7 @@ function DashboardPageContent() {
     const words = label
       .trim() // Elimina espacios sobrantes.
       .split(/\s+/) // Separa el texto en palabras.
-      .filter(Boolean); // Descarta valores vacios.
+      .filter(Boolean); // Descarta valores vacíos.
 
     // Usa un valor neutro cuando no hay texto disponible.
     if (words.length === 0) {
@@ -394,7 +394,7 @@ function DashboardPageContent() {
                 className="inline-flex items-center gap-2 text-sm font-semibold text-[#8899aa] transition hover:text-white"
               >
                 <ArrowLeft className="size-4" />
-                <span>Volver al dashboard</span>
+                <span>Volver a eventos</span>
               </Link>
 
               <div className="hidden h-8 w-px rounded-full bg-[#263550] md:block" />
@@ -405,7 +405,7 @@ function DashboardPageContent() {
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-[#263550]">/</span>
                     <span className="text-xs font-bold uppercase italic tracking-[0.28em] text-[#83ce00]">
-                      Organizer Dashboard
+                      Panel del organizador
                     </span>
                   </div>
                   <span className="text-sm text-[#8899aa]">
@@ -451,7 +451,7 @@ function DashboardPageContent() {
               {isUpdatingEventStatus
                 ? "Actualizando..."
                 : eventIsOpen
-                  ? "Marcar cerrado"
+                  ? "Cerrar evento"
                   : "Reabrir evento"}
             </Button>
 
@@ -461,8 +461,8 @@ function DashboardPageContent() {
               className="rounded-2xl w-12 border-[#263550] bg-[#0d1526] text-white hover:bg-[#1a2640] hover:text-white"
               onClick={() => logout()}
               disabled={isPending}
-              aria-label={isPending ? "Cerrando sesion" : "Cerrar sesion"}
-              title={isPending ? "Cerrando sesion" : "Cerrar sesion"}
+              aria-label={isPending ? "Cerrando sesión" : "Cerrar sesión"}
+              title={isPending ? "Cerrando sesión" : "Cerrar sesión"}
             >
               <LogOut className="size-4" />
             </Button>
@@ -472,17 +472,17 @@ function DashboardPageContent() {
         <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
           <div className="flex min-w-0 flex-col gap-4">
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-              {/* Renderiza una tarjeta por cada metrica. */}
+              {/* Renderiza una tarjeta por cada métrica. */}
               {stats.map((stat) => ( 
                 <article
                   key={stat.label}
                   className={`${panelClass} px-5 py-5`}
                 >
                   <p className="text-[10px] font-bold uppercase italic tracking-[0.3em] text-[#8899aa]">
-                    {stat.label} {/* Nombre de la metrica. */}
+                    {stat.label} {/* Nombre de la métrica. */}
                   </p>
                   <p className={`mt-3 text-4xl font-extrabold tracking-tight ${stat.accent}`}>
-                    {stat.value}{/* Valor principal de la metrica. */}
+                    {stat.value}{/* Valor principal de la métrica. */}
                   </p>
                 </article>
               ))}
@@ -495,7 +495,7 @@ function DashboardPageContent() {
                     Ranking en vivo
                   </p>
                   <p className="mt-1 text-sm text-[#a7a8be]">
-                    Tabla proyectable para moderacion y jurado.
+                    Tabla proyectable para moderación y jurado.
                   </p>
                 </div>
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -540,7 +540,7 @@ function DashboardPageContent() {
                       setRankingSortField(event.target.value as PitchSortField)
                     }
                     className="h-10 rounded-full border border-[#2a4a2a] bg-[#0a1a0a] px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#ccff00] outline-none"
-                    aria-label="Campo de ordenacion"
+                    aria-label="Campo de ordenación"
                   >
                     {pitchSortOptions.map((option) => (
                       <option key={option.value} value={option.value}>
@@ -597,13 +597,13 @@ function DashboardPageContent() {
                         <td className={`px-4 py-4 text-xs font-bold ${
                           index === 0 ? "text-[#83ce00]" : isLatestPitch ? "text-[#00f0ff]" : "text-[#8c8da4]"
                         }`}>
-                          {String(index + 1).padStart(2, "0")} {/* Posicion actual en el ranking. */}
+                          {String(index + 1).padStart(2, "0")} {/* Posición actual en el ranking. */}
                         </td>
                         <td className="px-4 py-4">
                           <div className="flex items-center gap-3">
                             <span
                               className={`h-2 w-2 rounded-full ${
-                                index === 0 ? "bg-[#ccff00]" : isLatestPitch ? "bg-[#0595f0]" : "bg-[#53546a]" // Destaca al lider y al pitch mas reciente.
+                                index === 0 ? "bg-[#ccff00]" : isLatestPitch ? "bg-[#0595f0]" : "bg-[#53546a]" // Destaca al líder y al pitch más reciente.
                               }`} 
                             />
                             {selectedEventId ? (
@@ -630,7 +630,7 @@ function DashboardPageContent() {
                             )}
                             {/* {isLatestPitch ? (
                               <span className="rounded-full border border-[#0595f0] bg-[#0595f0]/10 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-[#7fd4ff]">
-                                Ultimo
+                                Último
                               </span>
                             ) : null} */}
                           </div>
@@ -651,7 +651,7 @@ function DashboardPageContent() {
                                 : "bg-[#2a1018] text-[#ff8cab] hover:bg-[#3a1522]"
                             }`}
                           >
-                            {pitchStatus === "OPEN" ? "Activado" : "Cerrado"}
+                            {pitchStatus === "OPEN" ? "Activo" : "Cerrado"}
                           </Button>
                         </td>
                         {criterionAverages.map((criterion) => {
@@ -694,7 +694,7 @@ function DashboardPageContent() {
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <p className={eyebrowClass}>
-                    Codigo QR del evento
+                    Código QR del evento
                   </p>
                   <h2 className="mt-2 text-xl font-semibold tracking-tight">{qrData?.name ?? selectedEvent?.name ?? "Sin evento seleccionado"}</h2>
                 </div>
@@ -715,13 +715,13 @@ function DashboardPageContent() {
               </div>
 
               <p className="mt-4 text-center text-xs text-[#8899aa]">
-                escanea para ver todos los pitches del evento
+                Escanea para ver todos los pitches del evento.
               </p>
 
               <div className="mt-4 flex flex-col gap-2 text-sm text-[#8899aa]">
                 <p className="flex items-center gap-2">
                   <span className="h-2.5 w-2.5 rounded-full bg-[#83ce00]" />
-                  Mas votos.
+                  Más votos.
                 </p>
                 <p className="flex items-center gap-2">
                   <span className="h-2.5 w-2.5 rounded-full bg-[#0595f0]" />
@@ -732,7 +732,7 @@ function DashboardPageContent() {
               {qrData?.publicVoteUrl && (
                 <div className="mt-4 rounded-2xl border border-[#263550] bg-[#0d1526] p-4">
                   <p className="text-[10px] font-bold uppercase italic tracking-[0.24em] text-[#83ce00]">
-                    Link de invitacion
+                    Enlace de invitación
                   </p>
                   <p className="mt-3 break-all text-sm leading-6 text-[#a9b3c9]">
                     {qrData.publicVoteUrl}
@@ -740,7 +740,7 @@ function DashboardPageContent() {
                   <div className="mt-4">
                     <Link href={qrData.publicVoteUrl} target="_blank" rel="noreferrer">
                       <Button className="rounded-full bg-[#83ce00] text-sm font-bold italic text-[#0d1526] hover:bg-[#a7ea2e]">
-                        Abrir invitacion
+                        Abrir invitación
                       </Button>
                     </Link>
                   </div>
@@ -819,7 +819,7 @@ export default function DashboardPage() {
         <main className="min-h-svh bg-[#0d1526] text-white">
           <div className="mx-auto flex min-h-svh w-full max-w-[1440px] items-center justify-center px-4 py-4 md:px-8 md:py-6">
             <div className="rounded-[20px] border border-[#263550] bg-[#121d30] px-6 py-4 text-sm text-[#8899aa]">
-              Cargando dashboard...
+              Cargando panel...
             </div>
           </div>
         </main>

@@ -196,7 +196,7 @@ export default function VotingScreenPage() {
   if (isLoadingSession && isLoading) {
     return (
       <main className="flex min-h-svh items-center justify-center bg-[#0d1526] text-[#8899aa]">
-        Cargando votacion...
+        Cargando votación...
       </main>
     );
   }
@@ -204,7 +204,7 @@ export default function VotingScreenPage() {
   if (isLoading) {
     return (
       <main className="flex min-h-svh items-center justify-center bg-[#0d1526] text-[#8899aa]">
-        Cargando votacion...
+        Cargando votación...
       </main>
     );
   }
@@ -232,7 +232,7 @@ export default function VotingScreenPage() {
             <p className="mt-2 text-sm leading-6 text-[#a9b3c9]">
               {pitch.pitchStatus === "OPEN" && pitch.eventStatus === "OPEN"
                 ? "Escribe tu correo para votar o cargar tu voto anterior."
-                : "Este pitch esta cerrado. Escribe tu correo para ver tu voto guardado."}
+                : "Este pitch está cerrado. Escribe tu correo para ver tu voto guardado."}
             </p>
           </div>
           <div className="mt-6">
@@ -278,10 +278,10 @@ export default function VotingScreenPage() {
               </div>
               <span className="text-sm text-[#8899aa]">
                 {isVotingClosed
-                  ? "La votacion esta cerrada. Tu voto queda en modo lectura."
+                  ? "La votación está cerrada. Tu voto queda en modo lectura."
                   : hasSavedVote
                   ? "Ya enviaste tu voto. No puede ser modificado."
-                  : "Evalua el pitch y envia tu voto."}
+                  : "Evalúa el pitch y envía tu voto."}
               </span>
             </div>
           </div>
@@ -307,9 +307,9 @@ export default function VotingScreenPage() {
             </p>
             <div className="mt-6 rounded-2xl border border-dashed border-[#263550] bg-[#0d1526] px-4 py-4 text-sm leading-6 text-[#8899aa]">
               {isVotingClosed
-                ? "La votacion para este pitch ya esta cerrada. Puedes ver las estrellas y el comentario guardados, pero no modificarlos."
+                ? "La votación para este pitch ya está cerrada. Puedes ver las estrellas y el comentario guardados, pero no modificarlos."
                 : hasSavedVote
-                  ? "Este correo ya registro un voto para este pitch. Tu evaluacion ya esta registrada y no puede cambiarse."
+                  ? "Este correo ya registró un voto para este pitch. Tu evaluación ya está registrada y no puede cambiarse."
                   : "Tu voto cuenta una sola vez por correo electronico. Toma unos segundos para evaluar de forma honesta cada criterio."}
             </div>
             <button
@@ -405,14 +405,14 @@ export default function VotingScreenPage() {
                   }`}
                   aria-label="Cambiar tipo de comentario"
                 >
-                  {getSelectedCommentType() === "ACTIVADOR" ? "Activador" : "Opinion"}
+                  {getSelectedCommentType() === "ACTIVADOR" ? "Activador" : "Opinión"}
                 </button>
               </div>
               <textarea
                 id="comment"
                 value={commentDraft ?? pitch.currentVote?.comment ?? ""}
                 onChange={(event) => setCommentDraft(event.target.value)}
-                placeholder="Que te dirias del equipo o de la solucion?"
+                placeholder="¿Qué le dirías al equipo sobre su solución?"
                 disabled={!canEditVote}
                 className="mt-4 min-h-28 w-full rounded-2xl border border-[#263550] bg-[#0d1526] px-4 py-3 text-sm text-white outline-none placeholder:text-[#66738f]"
               />
@@ -428,7 +428,7 @@ export default function VotingScreenPage() {
               <div className="rounded-2xl border border-[#263550] bg-[#121d30] p-4 text-sm text-[#83ce00]">
                 <div className="inline-flex items-center gap-2">
                   <CheckCircle2 className="size-4" />
-                  Voto guardado. Tu evaluacion ya esta registrada.
+                  Voto guardado. Tu evaluación ya está registrada.
                 </div>
               </div>
             )}

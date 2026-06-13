@@ -28,7 +28,7 @@ type InvitationSortField = "name" | "presentationOrder" | "createdAt";
 
 const invitationSortOptions: Array<{ value: InvitationSortField; label: string }> = [
   { value: "name", label: "Nombre" },
-  { value: "presentationOrder", label: "Orden presentacion" },
+  { value: "presentationOrder", label: "Orden de presentación" },
   { value: "createdAt", label: "Fecha/hora" },
 ];
 
@@ -178,7 +178,7 @@ export default function EventInvitationPage() {
   if (isLoading || isLoadingSession) {
     return (
       <main className="flex min-h-svh items-center justify-center bg-[#0d1526] text-[#8899aa]">
-        Cargando invitacion...
+        Cargando invitación...
       </main>
     );
   }
@@ -186,7 +186,7 @@ export default function EventInvitationPage() {
   if (error || !invitation) {
     return (
       <main className="flex min-h-svh items-center justify-center bg-[#0d1526] px-6 text-center text-[#8899aa]">
-        No pudimos cargar la invitacion del evento.
+        No pudimos cargar la invitación del evento.
       </main>
     );
   }
@@ -283,9 +283,9 @@ export default function EventInvitationPage() {
               <div className="rounded-2xl border border-[#263550] bg-[#0d1526] px-4 py-3">
                 <div className="inline-flex items-center gap-2 text-xs text-[#8899aa]">
                   <MapPin className="size-4 text-[#00f0ff]" />
-                  <span>Ubicacion</span>
+                  <span>Ubicación</span>
                 </div>
-                <p className="mt-2 text-sm font-medium text-white">Votacion digital</p>
+                <p className="mt-2 text-sm font-medium text-white">Votación digital</p>
               </div>
               <div className="rounded-2xl border border-[#263550] bg-[#0d1526] px-4 py-3">
                 <div className="inline-flex items-center gap-2 text-xs text-[#8899aa]">
@@ -360,7 +360,7 @@ export default function EventInvitationPage() {
                   setPitchSortField(event.target.value as InvitationSortField)
                 }
                 className="h-11 rounded-full border border-[#2a4a2a] bg-[#0a1a0a] px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#ccff00] outline-none"
-                aria-label="Campo de ordenacion"
+                  aria-label="Campo de ordenación"
               >
                 {invitationSortOptions.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -373,11 +373,11 @@ export default function EventInvitationPage() {
             <div className="mt-6 grid gap-4 md:grid-cols-2">
               {invitation.pitches.length === 0 ? (
                 <div className="rounded-2xl border border-[#263550] bg-[#0d1526] px-4 py-6 text-sm text-[#8899aa]">
-                  Este evento todavia no tiene pitches publicados.
+                  Este evento todavía no tiene pitches publicados.
                 </div>
               ) : visiblePitches.length === 0 ? (
                 <div className="rounded-2xl border border-[#263550] bg-[#0d1526] px-4 py-6 text-sm text-[#8899aa]">
-                  No hay pitches que coincidan con la busqueda.
+                  No hay pitches que coincidan con la búsqueda.
                 </div>
               ) : (
                 visiblePitches.map((pitch) => (
@@ -431,9 +431,9 @@ function InvitationPitchCard({
   const canViewPitch = canOpenPitch;
 
   return (
-    <article className="rounded-2xl border border-[#263550] bg-[#0d1526] p-5">
+    <article className="flex h-full flex-col rounded-2xl border border-[#263550] bg-[#0d1526] p-5">
       <div
-        className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-bold uppercase italic tracking-[0.18em] ${statusClass}`}
+        className={`inline-flex self-start items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-bold uppercase italic tracking-[0.18em] ${statusClass}`}
       >
         <StatusIcon className="size-4" />
         {statusLabel}
@@ -452,7 +452,7 @@ function InvitationPitchCard({
       >
         {pitch.description}
       </p>
-      <div className="mt-5">
+      <div className="mt-auto pt-5">
         <Link href={canViewPitch ? `/vote/${pitch.id}${evaluatorEmailQuery}` : "#"} aria-disabled={!canViewPitch}>
           <Button
             className="h-11 w-full rounded-full bg-[#83ce00] text-sm font-bold italic text-[#0d1526] hover:bg-[#a7ea2e]"

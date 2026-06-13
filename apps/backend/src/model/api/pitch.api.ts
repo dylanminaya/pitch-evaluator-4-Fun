@@ -259,7 +259,7 @@ async function convertPptxBufferToPdfPureJs(buffer: Buffer) {
   return Buffer.from(await pdfDoc.save());
 }
 
-// Detecta errores de Postgres por codigo para aplicar fallbacks de schema.
+// Detecta errores de Postgres por código para aplicar alternativas de esquema.
 const hasPgErrorCode = (error: unknown, code: string) =>
   typeof error === "object" &&
   error !== null &&
@@ -828,7 +828,7 @@ pitchRouter.patch("/:id", async (req, res) => {
   }
 });
 
-// Recibe un archivo PowerPoint y prepara sus diapositivas para proyeccion local.
+// Recibe un archivo de PowerPoint y prepara sus diapositivas para la proyección local.
 pitchRouter.post("/:pitchId/presentation", presentationUpload, async (req, res) => {
   const session = await requireSession(req, res);
 
@@ -937,7 +937,7 @@ pitchRouter.delete("/:id", async (req, res) => {
   }
 });
 
-// Endpoint publico para la pantalla de voto.
+// Endpoint público para la pantalla de voto.
 pitchRouter.get("/public/:pitchId", async (req, res) => {
   try {
     const evaluatorEmailParam = req.query.evaluatorEmail;
@@ -956,7 +956,7 @@ pitchRouter.get("/public/:pitchId", async (req, res) => {
     let result;
 
     try {
-      // Intenta traer tambien los criterios del evento si la columna existe.
+      // Intenta traer también los criterios del evento si la columna existe.
       result = await db.query(
         `
           SELECT
@@ -1133,7 +1133,7 @@ pitchRouter.get("/public/:pitchId/presentation/file", async (req, res) => {
   }
 });
 
-// Devuelve metadatos de las diapositivas ya preparadas para proyeccion.
+// Devuelve metadatos de las diapositivas ya preparadas para la proyección.
 pitchRouter.get("/public/:pitchId/presentation/meta", async (req, res) => {
   try {
     const cachedPresentation = await warmPresentationCache(req.params.pitchId);
@@ -1324,7 +1324,7 @@ pitchRouter.get("/comments", async (req, res) => {
   }
 })
 
-// Devuelve una pagina de comentarios sin alterar el endpoint usado por la vista en vivo.
+// Devuelve una página de comentarios sin alterar el endpoint usado por la vista en vivo.
 pitchRouter.get("/comments/paginated", async (req, res) => {
   const session = await requireSession(req, res);
 
@@ -1403,7 +1403,7 @@ pitchRouter.get("/comments/paginated", async (req, res) => {
 // Variables usadas para construir URLs publicas.
 const env = validateServerEnv()
 
-// Devuelve la URL publica del pitch para generar QR.
+// Devuelve la URL pública del pitch para generar el QR.
 pitchRouter.get("/:pitchId/qr", async (req, res) => {
   const session = await requireSession(req, res)
 
@@ -1454,7 +1454,7 @@ pitchRouter.get("/:pitchId/qr", async (req, res) => {
   }
 })
 
-// Prepara los comentarios que luego podria resumir una IA.
+// Prepara los comentarios que luego podría resumir una IA.
 pitchRouter.post("/:pitchId/summary", async (req, res) => {
   const session = await requireSession(req, res)
 
@@ -1691,14 +1691,14 @@ pitchRouter.get("/:pitchId/export", async (req, res) => {
       ),
       "Comentario",
       "Tipo comentario",
-      "descripcion",
+      "descripción",
     ]
       .map((value) => escapeCsvValue(value))
       .join(",")
 
     const csvRows = detailResult.rows.map((row) => {
       const voteAverage = getVoteAverage(row);
-      const commentTypeLabel = row.commentType === "ACTIVADOR" ? "Activador" : "Opinion";
+      const commentTypeLabel = row.commentType === "ACTIVADOR" ? "Activador" : "Opinión";
 
       return [
         escapeCsvValue(row.name),

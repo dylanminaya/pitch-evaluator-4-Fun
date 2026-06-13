@@ -12,7 +12,7 @@ export type Pitch = {
   createdAt: Date;
 };
 
-// Forma publica del pitch para la pantalla de voto.
+// Forma pública del pitch para la pantalla de voto.
 export type PublicPitch = {
   id: string;
   eventId: string;

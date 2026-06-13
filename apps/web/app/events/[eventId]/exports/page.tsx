@@ -33,10 +33,10 @@ import type {
 } from "@workspace/shared/api";
 
 const defaultCriteria: EventCriterion[] = [
-  { id: "innovation", label: "Innovacion", weight: 25, isDefault: true },
+  { id: "innovation", label: "Innovación", weight: 25, isDefault: true },
   { id: "viability", label: "Viabilidad", weight: 25, isDefault: true },
   { id: "impact", label: "Impacto", weight: 25, isDefault: true },
-  { id: "presentation", label: "Presentacion", weight: 25, isDefault: true },
+  { id: "presentation", label: "Presentación", weight: 25, isDefault: true },
 ];
 
 type SortDirection = "asc" | "desc";
@@ -45,8 +45,8 @@ type PitchSortField = "name" | "score" | "presentationOrder" | "votes" | "create
 const pitchSortOptions: Array<{ value: PitchSortField; label: string }> = [
   { value: "name", label: "Nombre" },
   { value: "score", label: "Puntuacion total" },
-  { value: "presentationOrder", label: "Orden presentacion" },
-  { value: "votes", label: "Numero de votos" },
+  { value: "presentationOrder", label: "Orden de presentación" },
+  { value: "votes", label: "Número de votos" },
   { value: "createdAt", label: "Fecha/hora" },
 ];
 
@@ -435,7 +435,7 @@ export default function EventExportsPage() {
       ),
       "Comentario",
       "Tipo comentario",
-      "descripcion",
+      "descripción",
     ];
 
     const dataRows = rows.map((row, index) => [
@@ -454,9 +454,9 @@ export default function EventExportsPage() {
           row.criterionAverages.find((item) => item.id === criterion.id)?.avg ?? 0,
       ),
       row.vote?.comment
-        ? `${row.vote.commentType === "ACTIVADOR" ? "Activador" : "Opinion"}: "${row.vote.comment}"`
+        ? `${row.vote.commentType === "ACTIVADOR" ? "Activador" : "Opinión"}: "${row.vote.comment}"`
         : "",
-      row.vote?.commentType === "ACTIVADOR" ? "Activador" : "Opinion",
+      row.vote?.commentType === "ACTIVADOR" ? "Activador" : "Opinión",
       row.description,
     ]);
 
@@ -529,7 +529,7 @@ export default function EventExportsPage() {
             <div className="hidden h-8 w-px bg-[#263550] md:block" />
             <div className="flex flex-col">
               <span className="text-[11px] font-bold uppercase italic tracking-[0.3em] text-[#83ce00]">
-                Centro de exportacion
+                Centro de exportación
               </span>
               <span className="text-sm text-[#a9b3c9]">
                 Exporta uno, varios o todos los pitches del evento.
@@ -566,7 +566,7 @@ export default function EventExportsPage() {
                 </div>
                 <div className="rounded-2xl border border-[#263550] bg-[#0d1526] px-4 py-3">
                   <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-[#8899aa]">
-                    Gmail de votadores
+                    Correos de votantes
                   </p>
                   {selectedParticipantRows.length > 0 ? (
                     <div className="mt-3 space-y-3">
@@ -591,19 +591,19 @@ export default function EventExportsPage() {
                         disabled={participantCount === 0}
                         className="w-full justify-between rounded-full bg-[#83ce00] text-xs font-bold italic text-[#0d1526] hover:bg-[#a7ea2e]"
                       >
-                        <span>{showParticipantEmails ? "Ocultar Gmail" : "Ver Gmail"}</span>
+                        <span>{showParticipantEmails ? "Ocultar correos" : "Ver correos"}</span>
                         <Mail className="size-4" />
                       </Button>
 
                       {participantVotesError ? (
                         <p className="text-xs text-[#ff8cab]">
-                          No pudimos cargar los Gmail de la seleccion.
+                          No pudimos cargar los correos de la selección.
                         </p>
                       ) : null}
 
                       {showParticipantEmails ? (
                         <p className="text-xs text-[#8899aa]">
-                          La lista esta abierta en una ventana flotante.
+                          La lista está abierta en una ventana flotante.
                         </p>
                       ) : null}
                     </div>
@@ -650,7 +650,7 @@ export default function EventExportsPage() {
               </div>
 
               <div className="mt-5 rounded-2xl border border-dashed border-[#263550] bg-[#0d1526] px-4 py-4 text-sm leading-6 text-[#a9b3c9]">
-                Usa el buscador y la ordenacion para preparar la vista antes de exportar.
+                Usa el buscador y la ordenación para preparar la vista antes de exportar.
               </div>
             </div>
           </aside>
@@ -706,7 +706,7 @@ export default function EventExportsPage() {
                     setRankingSortField(event.target.value as PitchSortField)
                   }
                   className="h-10 rounded-full border border-[#2a4a2a] bg-[#0a1a0a] px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#ccff00] outline-none"
-                  aria-label="Campo de ordenacion"
+                  aria-label="Campo de ordenación"
                 >
                   {pitchSortOptions.map((option) => (
                     <option key={option.value} value={option.value}>
@@ -730,11 +730,11 @@ export default function EventExportsPage() {
               <div className="px-5 py-10 text-sm text-[#8899aa]">Cargando exportaciones...</div>
             ) : rankingRows.length === 0 ? (
               <div className="px-5 py-10 text-sm text-[#8899aa]">
-                Este evento todavia no tiene pitches para exportar.
+                Este evento todavía no tiene pitches para exportar.
               </div>
             ) : visibleRankingRows.length === 0 ? (
               <div className="px-5 py-10 text-sm text-[#8899aa]">
-                No hay pitches que coincidan con la busqueda.
+                No hay pitches que coincidan con la búsqueda.
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -747,7 +747,7 @@ export default function EventExportsPage() {
                       <th className="px-4 py-3 font-medium">Estado</th>
                       <th className="px-4 py-3 font-medium text-right">Votos</th>
                       <th className="px-4 py-3 font-medium text-right">Porcentaje</th>
-                      <th className="px-4 py-3 font-medium text-right">Accion</th>
+                      <th className="px-4 py-3 font-medium text-right">Acción</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -857,7 +857,7 @@ export default function EventExportsPage() {
             <div className="flex items-start justify-between gap-4 border-b border-[#263550] px-5 py-4">
               <div className="min-w-0">
                 <p className="text-[11px] font-bold uppercase italic tracking-[0.3em] text-[#83ce00]">
-                  Gmail de votadores
+                  Correos de votantes
                 </p>
                 <h2
                   id="participant-emails-title"
@@ -866,14 +866,14 @@ export default function EventExportsPage() {
                   {participantTitle}
                 </h2>
                 <p className="mt-1 text-sm text-[#a9b3c9]">
-                  {participantCount} Gmail registrados
+                  {participantCount} correos registrados
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setShowParticipantEmails(false)}
                 className="inline-flex size-10 shrink-0 items-center justify-center rounded-full border border-[#263550] bg-[#0d1526] text-white transition hover:bg-[#1a2640]"
-                aria-label="Cerrar lista de Gmail"
+                aria-label="Cerrar lista de correos"
               >
                 <X className="size-5" />
               </button>
@@ -882,7 +882,7 @@ export default function EventExportsPage() {
             <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
               {participantEmails.length === 0 ? (
                 <p className="rounded-2xl border border-[#263550] bg-[#0d1526] px-4 py-3 text-sm text-[#8899aa]">
-                  Todavia no hay Gmail registrados para la seleccion.
+                  Todavía no hay correos registrados para la selección.
                 </p>
               ) : (
                 <div className="space-y-2">

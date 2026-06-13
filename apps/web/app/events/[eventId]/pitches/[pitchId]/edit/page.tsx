@@ -97,7 +97,7 @@ function EditPitchForm({
               className="inline-flex items-center gap-2 text-sm font-semibold text-[#8899aa] transition hover:text-white"
             >
               <ArrowLeft className="size-4" />
-              <span>Volver a informacion</span>
+              <span>Volver a información</span>
             </Link>
             <div className="hidden h-8 w-px bg-[#263550] md:block" />
             <div className="flex flex-col">
@@ -128,10 +128,10 @@ function EditPitchForm({
           >
             <div className="flex flex-col gap-2 border-b border-[#263550] pb-5">
               <p className="text-[11px] font-bold uppercase italic tracking-[0.3em] text-[#83ce00]">
-                Informacion del pitch
+                Información del pitch
               </p>
               <p className="text-sm text-[#a9b3c9]">
-                Puedes editar nombre, descripcion, color y logo del pitch.
+                Puedes editar nombre, descripción, color y logo del pitch.
               </p>
             </div>
 
@@ -166,12 +166,12 @@ function EditPitchForm({
 
               <div className="flex flex-col gap-3">
                 <label className="text-xs font-bold uppercase italic tracking-[0.24em] text-[#8899aa]">
-                  Descripcion
+                  Descripción
                 </label>
                 <textarea
                   value={description}
                   onChange={(event) => setDescription(event.target.value)}
-                  placeholder="Describe la solucion, el problema y el valor del pitch."
+                  placeholder="Describe la solución, el problema y el valor del pitch."
                   disabled={isSaving}
                   className="min-h-36 rounded-2xl border border-[#263550] bg-[#0d1526] px-4 py-3 text-sm text-white outline-none placeholder:text-[#66738f]"
                 />
@@ -199,7 +199,7 @@ function EditPitchForm({
                     />
                   </div>
                   <p className="text-xs text-[#8899aa]">
-                    Usa el selector o escribe un HEX valido como `#83CE00` o `#0595F0`.
+                    Usa el selector o escribe un HEX válido como `#83CE00` o `#0595F0`.
                   </p>
                 </div>
                 <div className="flex flex-col gap-3">
@@ -221,7 +221,7 @@ function EditPitchForm({
                   Presentación opcional
                 </label>
                 <p className="rounded-2xl border border-[#263550] bg-[#0d1526] px-4 py-3 text-xs leading-5 text-[#a9b3c9]">
-                  Tamano maximo permitido: 50 MB. Usa archivos .ppt, .pptx o .pdf.
+                  Tamaño máximo permitido: 50 MB. Usa archivos .ppt, .pptx o .pdf.
                 </p>
                 <Input
                   type="file"
@@ -233,7 +233,7 @@ function EditPitchForm({
                 <p className="text-xs text-[#8899aa]">
                   {pitch.presentationFileName
                     ? `Archivo actual: ${pitch.presentationFileName}. Sube otro para reemplazarlo.`
-                    : "La presentacion se preparara como diapositivas para proyectarla en el navegador."}
+                    : "La presentación se preparará como diapositivas para proyectarla en el navegador."}
                 </p>
               </div>
             </div>
@@ -250,13 +250,13 @@ function EditPitchForm({
                   className="inline-flex rounded-full px-3 py-1 text-[11px] font-bold uppercase italic tracking-[0.24em] text-white"
                   style={{ backgroundColor: `${color}33` }}
                 >
-                  Pitch en edicion
+                  Pitch en edición
                 </div>
                 <h2 className="mt-5 text-3xl font-black tracking-tight text-white">
                   {name || "Nombre del pitch"}
                 </h2>
                 <p className="mt-3 text-sm leading-6 text-[#a9b3c9]">
-                  {description || "La descripcion actualizada aparecera aqui antes de guardar."}
+                  {description || "La descripción actualizada aparecerá aquí antes de guardar."}
                 </p>
               </div>
             </section>
@@ -272,7 +272,7 @@ function EditPitchForm({
                   Tip
                 </div>
                 <p className="mt-2">
-                  Revisa bien color, nombre y descripcion antes de guardar para que el dashboard muestre el pitch actualizado.
+                  Revisa bien el color, el nombre y la descripción antes de guardar para que el dashboard muestre el pitch actualizado.
                 </p>
               </div>
             </section>

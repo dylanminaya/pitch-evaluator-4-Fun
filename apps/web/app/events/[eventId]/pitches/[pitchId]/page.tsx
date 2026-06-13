@@ -18,10 +18,10 @@ import { usePitchComments, usePitches, useRanking } from "@/hooks/dashboard";
 import type { CriterionAverage } from "@workspace/shared/api";
 
 const defaultCriteriaAverages: CriterionAverage[] = [
-  { id: "innovation", label: "Innovacion", weight: 25, avg: 0 },
+  { id: "innovation", label: "Innovación", weight: 25, avg: 0 },
   { id: "viability", label: "Viabilidad", weight: 25, avg: 0 },
   { id: "impact", label: "Impacto", weight: 25, avg: 0 },
-  { id: "presentation", label: "Presentacion", weight: 25, avg: 0 },
+  { id: "presentation", label: "Presentación", weight: 25, avg: 0 },
 ];
 
 function formatDate(value: string | null) {
@@ -38,7 +38,7 @@ function formatDate(value: string | null) {
 }
 
 function getCommentTypeLabel(type: "OPINION" | "ACTIVADOR") {
-  return type === "ACTIVADOR" ? "Activador" : "Opinion";
+  return type === "ACTIVADOR" ? "Activador" : "Opinión";
 }
 
 export default function PitchDetailPage() {
@@ -71,7 +71,7 @@ export default function PitchDetailPage() {
   if (arePitchesLoading || isRankingLoading) {
     return (
       <main className="flex min-h-svh items-center justify-center bg-[#0d1526] text-[#a9b3c9]">
-        Cargando informacion del pitch...
+        Cargando información del pitch...
       </main>
     );
   }
@@ -79,7 +79,7 @@ export default function PitchDetailPage() {
   if (pitchesError || !pitch) {
     return (
       <main className="flex min-h-svh items-center justify-center bg-[#0d1526] px-6 text-center text-[#a9b3c9]">
-        No pudimos cargar la informacion de este pitch.
+        No pudimos cargar la información de este pitch.
       </main>
     );
   }
@@ -102,10 +102,10 @@ export default function PitchDetailPage() {
             <div className="hidden h-8 w-px bg-[#263550] md:block" />
             <div className="flex flex-col">
               <span className="text-[11px] font-bold uppercase italic tracking-[0.3em] text-[#83ce00]">
-                Informacion del pitch
+                Información del pitch
               </span>
               <span className="text-sm text-[#a9b3c9]">
-                Caracteristicas, resultados y comentarios del proyecto.
+                Características, resultados y comentarios del proyecto.
               </span>
             </div>
           </div>
@@ -173,7 +173,7 @@ export default function PitchDetailPage() {
 
                 <div className="mt-7 border-t border-[#263550] pt-6">
                   <p className="text-[11px] font-bold uppercase italic tracking-[0.24em] text-[#83ce00]">
-                    Descripcion
+                    Descripción
                   </p>
                   <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-[#c4ccdc]">
                     {pitch.description}
@@ -185,7 +185,7 @@ export default function PitchDetailPage() {
             <section className="rounded-[24px] border border-[#263550] bg-[#1a2640] p-6 shadow-[0_18px_45px_rgba(2,8,23,0.35)] md:p-8">
               <div className="flex flex-col gap-2 border-b border-[#263550] pb-5">
                 <p className="text-[11px] font-bold uppercase italic tracking-[0.3em] text-[#83ce00]">
-                  Caracteristicas y evaluacion
+                  Características y evaluación
                 </p>
                 <p className="text-sm text-[#a9b3c9]">
                   Promedio recibido por cada criterio configurado en el evento.
@@ -219,7 +219,7 @@ export default function PitchDetailPage() {
                 </div>
                 {totalPages > 0 ? (
                   <p className="text-xs font-semibold text-[#8899aa]">
-                    Pagina {page} de {totalPages}
+                    Página {page} de {totalPages}
                   </p>
                 ) : null}
               </div>
@@ -234,8 +234,8 @@ export default function PitchDetailPage() {
                 ) : comments.length === 0 ? (
                   <div className="flex flex-col items-center rounded-2xl border border-dashed border-[#263550] bg-[#0d1526] px-5 py-10 text-center">
                     <MessageSquare className="size-8 text-[#66738f]" />
-                    <p className="mt-3 font-semibold">Aun no hay comentarios</p>
-                    <p className="mt-1 text-sm text-[#8899aa]">Los comentarios de los evaluadores apareceran aqui.</p>
+                    <p className="mt-3 font-semibold">Aún no hay comentarios</p>
+                    <p className="mt-1 text-sm text-[#8899aa]">Los comentarios de los evaluadores aparecerán aquí.</p>
                   </div>
                 ) : (
                   comments.map((comment) => (
@@ -307,22 +307,22 @@ export default function PitchDetailPage() {
             <section className="rounded-[24px] border border-[#263550] bg-[#1a2640] p-6 shadow-[0_18px_45px_rgba(2,8,23,0.35)]">
               <div className="inline-flex items-center gap-2 text-[11px] font-bold uppercase italic tracking-[0.24em] text-[#83ce00]">
                 <FileText className="size-4 text-[#8899aa]" />
-                Presentacion
+                Presentación
               </div>
               {pitch.presentationUrl ? (
                 <div className="mt-5">
                   <p className="break-words text-sm leading-6 text-[#a9b3c9]">
-                    {pitch.presentationFileName ?? "Presentacion del pitch"}
+                    {pitch.presentationFileName ?? "Presentación del pitch"}
                   </p>
                   <Link href={pitch.presentationUrl} target="_blank" rel="noreferrer">
                     <Button className="mt-4 w-full rounded-full bg-[#83ce00] font-bold text-[#0d1526] hover:bg-[#a7ea2e]">
-                      Abrir presentacion
+                      Abrir presentación
                     </Button>
                   </Link>
                 </div>
               ) : (
                 <p className="mt-5 rounded-2xl border border-dashed border-[#263550] bg-[#0d1526] px-4 py-5 text-sm leading-6 text-[#8899aa]">
-                  Este pitch no tiene una presentacion adjunta.
+                  Este pitch no tiene una presentación adjunta.
                 </p>
               )}
             </section>
