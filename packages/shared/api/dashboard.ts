@@ -123,15 +123,19 @@ export const dashboardPitchDetailSchema = z.object({
   eventId: z.string(),
   name: z.string(),
   description: z.string(),
+  status: z.enum(["OPEN", "CLOSED"]),
   color: z.string(),
   logoUrl: z.string().nullable(),
   presentationUrl: z.string().nullable(),
   presentationFileName: z.string().nullable(),
+  createdAt: z.string().nullable(),
   votesCount: z.number(),
   innovationAvg: z.number(),
   viabilityAvg: z.number(),
   impactAvg: z.number(),
   presentationAvg: z.number(),
+  scoreAvg: z.number(),
+  criteriaAverages: z.array(criterionAverageSchema),
 });
 
 export const dashboardPitchCommentSchema = z.object({
@@ -139,6 +143,14 @@ export const dashboardPitchCommentSchema = z.object({
   comment: z.string(),
   commentType: z.enum(["OPINION", "ACTIVADOR"]).default("OPINION"),
   createdAt: z.string(),
+});
+
+export const paginatedPitchCommentsSchema = z.object({
+  comments: z.array(dashboardPitchCommentSchema),
+  total: z.number().int().nonnegative(),
+  page: z.number().int().positive(),
+  pageSize: z.number().int().positive(),
+  totalPages: z.number().int().nonnegative(),
 });
 
 export const dashboardVoteSchema = z.object({
@@ -320,6 +332,7 @@ export type DashboardRankingItem = z.infer<typeof dashboardRankingItemSchema>;
 export type CriterionAverage = z.infer<typeof criterionAverageSchema>;
 export type DashboardPitchDetail = z.infer<typeof dashboardPitchDetailSchema>;
 export type DashboardPitchComment = z.infer<typeof dashboardPitchCommentSchema>;
+export type PaginatedPitchComments = z.infer<typeof paginatedPitchCommentsSchema>;
 export type DashboardVote = z.infer<typeof dashboardVoteSchema>;
 export type DashboardPitchQr = z.infer<typeof dashboardEventQrSchema>;
 export type DashboardEventStats = z.infer<typeof dashboardEventStatsSchema>;

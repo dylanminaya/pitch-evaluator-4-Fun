@@ -58,29 +58,47 @@ export const presentPitchDetail = (pitch: {
   eventId: string;
   name: string;
   description: string;
+  status: "OPEN" | "CLOSED";
   color: string;
   logoUrl?: string | null;
   presentationUrl?: string | null;
   presentationFileName?: string | null;
+  createdAt?: Date | string | null;
   votesCount: number;
   innovationAvg: number;
   viabilityAvg: number;
   impactAvg: number;
   presentationAvg: number;
+  scoreAvg: number;
+  criteriaAverages?: Array<{
+    id: string;
+    label: string;
+    weight: number;
+    avg: number;
+  }> | null;
 }) => ({
   id: pitch.id,
   eventId: pitch.eventId,
   name: pitch.name,
   description: pitch.description,
+  status: pitch.status,
   color: pitch.color,
   logoUrl: pitch.logoUrl ?? null,
   presentationUrl: pitch.presentationUrl ?? null,
   presentationFileName: pitch.presentationFileName ?? null,
-  votesCount: pitch.votesCount,
-  innovationAvg: pitch.innovationAvg,
-  viabilityAvg: pitch.viabilityAvg,
-  impactAvg: pitch.impactAvg,
-  presentationAvg: pitch.presentationAvg,
+  createdAt: pitch.createdAt instanceof Date ? pitch.createdAt.toISOString() : (pitch.createdAt ?? null),
+  votesCount: Number(pitch.votesCount),
+  innovationAvg: Number(pitch.innovationAvg),
+  viabilityAvg: Number(pitch.viabilityAvg),
+  impactAvg: Number(pitch.impactAvg),
+  presentationAvg: Number(pitch.presentationAvg),
+  scoreAvg: Number(pitch.scoreAvg),
+  criteriaAverages: (pitch.criteriaAverages ?? []).map((criterion) => ({
+    id: criterion.id,
+    label: criterion.label,
+    weight: Number(criterion.weight),
+    avg: Number(criterion.avg),
+  })),
 });
 
 // Normaliza un comentario individual.

@@ -63,7 +63,7 @@ function EditPitchForm({
     setSaveError(null);
 
     try {
-      // Send only editable fields, then return to dashboard focused on the updated pitch.
+      // Send only editable fields, then return to the updated pitch detail.
       const updatedPitch = await mutateAsync({
         pitchId,
         data: {
@@ -78,9 +78,7 @@ function EditPitchForm({
         await uploadPitchPresentation(updatedPitch.id, presentationFile);
       }
 
-      router.push(
-        `/dashboard?eventId=${updatedPitch.eventId}&pitchId=${updatedPitch.id}`,
-      );
+      router.push(`/events/${updatedPitch.eventId}/pitches/${updatedPitch.id}`);
     } catch (error) {
       setSaveError(error);
     } finally {
@@ -95,11 +93,11 @@ function EditPitchForm({
         <header className="flex flex-col gap-5 rounded-[20px] border border-[#263550] bg-[#121d30] px-5 py-4 shadow-[0_22px_60px_rgba(2,8,23,0.42)] md:flex-row md:items-center md:justify-between md:px-8">
           <div className="flex items-center gap-4">
             <Link
-              href={`/dashboard?eventId=${eventId}&pitchId=${pitchId}`}
+              href={`/events/${eventId}/pitches/${pitchId}`}
               className="inline-flex items-center gap-2 text-sm font-semibold text-[#8899aa] transition hover:text-white"
             >
               <ArrowLeft className="size-4" />
-              <span>Volver al dashboard</span>
+              <span>Volver a informacion</span>
             </Link>
             <div className="hidden h-8 w-px bg-[#263550] md:block" />
             <div className="flex flex-col">

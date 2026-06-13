@@ -32,6 +32,7 @@ import {
   dashboardPitchSchema,
   dashboardPitchDetailSchema,
   dashboardPitchCommentSchema,
+  paginatedPitchCommentsSchema,
   publicPitchSchema,
 } from "@workspace/shared/api";
 
@@ -1227,16 +1228,21 @@ pitchRouter.get("/detail/:pitchId", async (req, res) => {
         p."eventId",
         p.name,
         p.description,
+        p.status,
         p.color,
         p."logoUrl",
         p."presentationUrl",
         p."presentationFileName",
+        p."createdAt",
         COUNT(v.id)::int AS "votesCount",
         COALESCE(ROUND(AVG(v.innovation)::numeric, 2), 0) AS "innovationAvg",
         COALESCE(ROUND(AVG(v.viability)::numeric, 2), 0) AS "viabilityAvg",
         COALESCE(ROUND(AVG(v.impact)::numeric, 2), 0) AS "impactAvg",
-        COALESCE(ROUND(AVG(v.presentation)::numeric, 2), 0) AS "presentationAvg"
+        COALESCE(ROUND(AVG(v.presentation)::numeric, 2), 0) AS "presentationAvg",
+        ${buildWeightedScoreSql("v", "e.criteria")} AS "scoreAvg",
+        ${buildCriteriaAveragesSql("p", "e.criteria")} AS "criteriaAverages"
       FROM pitch p
+      INNER JOIN event e ON e.id = p."eventId"
       LEFT JOIN vote v ON v."pitchId" = p.id
       WHERE p.id = $1
       GROUP BY
@@ -1244,10 +1250,13 @@ pitchRouter.get("/detail/:pitchId", async (req, res) => {
         p."eventId",
         p.name,
         p.description,
+        p.status,
         p.color,
         p."logoUrl",
         p."presentationUrl",
-        p."presentationFileName"
+        p."presentationFileName",
+        p."createdAt",
+        e.criteria
       `,
       [req.params.pitchId],
     )
@@ -1314,6 +1323,82 @@ pitchRouter.get("/comments", async (req, res) => {
     res.status(500).json({ message: "Failed to fetch comments"})
   }
 })
+
+// Devuelve una pagina de comentarios sin alterar el endpoint usado por la vista en vivo.
+pitchRouter.get("/comments/paginated", async (req, res) => {
+  const session = await requireSession(req, res);
+
+  if (!session) {
+    return;
+  }
+
+  const pitchId = req.query.pitchId;
+  const parsedPage = Number(req.query.page ?? 1);
+
+  if (typeof pitchId !== "string" || pitchId.length === 0) {
+    return res.status(400).json({ message: "pitchId is required" });
+  }
+
+  if (!Number.isInteger(parsedPage) || parsedPage < 1) {
+    return res.status(400).json({ message: "page must be a positive integer" });
+  }
+
+  try {
+    const eventId = await getEventIdForPitch(pitchId);
+
+    if (!eventId) {
+      return res.status(404).json({ message: "Pitch not found" });
+    }
+
+    const canManage = await canManageEvent(session.user.id, eventId);
+
+    if (!canManage) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    const pageSize = 20;
+    const offset = (parsedPage - 1) * pageSize;
+    const [commentsResult, countResult] = await Promise.all([
+      db.query(
+        `SELECT
+          v.id,
+          v.comment,
+          COALESCE(to_jsonb(v) ->> 'commentType', 'OPINION') AS "commentType",
+          v."createdAt"
+        FROM vote v
+        WHERE v."pitchId" = $1
+          AND v.comment IS NOT null
+          AND TRIM(v.comment) <> ''
+        ORDER BY v."createdAt" DESC
+        LIMIT $2 OFFSET $3`,
+        [pitchId, pageSize, offset],
+      ),
+      db.query(
+        `SELECT COUNT(*)::int AS total
+        FROM vote v
+        WHERE v."pitchId" = $1
+          AND v.comment IS NOT null
+          AND TRIM(v.comment) <> ''`,
+        [pitchId],
+      ),
+    ]);
+
+    const total = Number(countResult.rows[0]?.total ?? 0);
+
+    return res.status(200).json(
+      paginatedPitchCommentsSchema.parse({
+        comments: commentsResult.rows.map(presentPitchComment),
+        total,
+        page: parsedPage,
+        pageSize,
+        totalPages: Math.ceil(total / pageSize),
+      }),
+    );
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: "Failed to fetch paginated comments" });
+  }
+});
 
 // Variables usadas para construir URLs publicas.
 const env = validateServerEnv()
