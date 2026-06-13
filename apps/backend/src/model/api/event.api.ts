@@ -17,7 +17,7 @@ import {
   buildCriteriaAveragesSql,
   buildWeightedScoreSql,
   formatCriterionLabel,
-  getTopWeightedCriterionIds,
+  getTrophyCriterionIds,
   normalizeEventCriteria,
 } from "../criteria.js";
 
@@ -404,7 +404,7 @@ eventRouter.get("/:eventId/export", async (req, res) => {
       `"${String(value ?? "").replace(/"/g, '""')}"`;
 
     const eventCriteria = normalizeEventCriteria(eventResult.rows[0].criteria);
-    const topCriterionIds = getTopWeightedCriterionIds(eventCriteria);
+    const trophyCriterionIds = getTrophyCriterionIds(eventCriteria);
 
     const getVoteScore = (row: Record<string, unknown>, criterionId: string) => {
       const scores = Array.isArray(row.criteriaScores) ? row.criteriaScores : [];
@@ -490,11 +490,11 @@ eventRouter.get("/:eventId/export", async (req, res) => {
       "porcentaje",
       "promedio",
       ...eventCriteria.map((criterion) =>
-        formatCriterionLabel(criterion, topCriterionIds),
+        formatCriterionLabel(criterion, trophyCriterionIds),
       ),
       ...eventCriteria.map(
         (criterion) =>
-          `${formatCriterionLabel(criterion, topCriterionIds)} Promedio`,
+          `${formatCriterionLabel(criterion, trophyCriterionIds)} Promedio`,
       ),
       "Comentario",
       "Tipo comentario",

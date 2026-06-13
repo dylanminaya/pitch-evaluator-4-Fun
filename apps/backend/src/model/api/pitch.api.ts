@@ -22,7 +22,7 @@ import {
   buildCriteriaAveragesSql,
   buildWeightedScoreSql,
   formatCriterionLabel,
-  getTopWeightedCriterionIds,
+  getTrophyCriterionIds,
   normalizeEventCriteria,
 } from "../criteria.js";
 import { validateServerEnv } from "@workspace/shared/env/server";
@@ -1523,7 +1523,7 @@ pitchRouter.get("/:pitchId/export", async (req, res) => {
       `"${String(value ?? "").replace(/"/g, '""')}"`;
 
     const eventCriteria = normalizeEventCriteria(pitch.criteria);
-    const topCriterionIds = getTopWeightedCriterionIds(eventCriteria);
+    const trophyCriterionIds = getTrophyCriterionIds(eventCriteria);
 
     const getVoteScore = (row: Record<string, unknown>, criterionId: string) => {
       const scores = Array.isArray(row.criteriaScores) ? row.criteriaScores : [];
@@ -1598,11 +1598,11 @@ pitchRouter.get("/:pitchId/export", async (req, res) => {
       "porcentaje",
       "promedio",
       ...eventCriteria.map((criterion) =>
-        formatCriterionLabel(criterion, topCriterionIds),
+        formatCriterionLabel(criterion, trophyCriterionIds),
       ),
       ...eventCriteria.map(
         (criterion) =>
-          `${formatCriterionLabel(criterion, topCriterionIds)} Promedio`,
+          `${formatCriterionLabel(criterion, trophyCriterionIds)} Promedio`,
       ),
       "Comentario",
       "Tipo comentario",

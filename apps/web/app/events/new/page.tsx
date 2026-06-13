@@ -16,7 +16,7 @@ import { Button } from "@workspace/ui/components/button";
 import { Input } from "@workspace/ui/components/input";
 import { FeedbackPanel } from "@/components/feedback-panel";
 import { useCreateEvent } from "@/hooks/dashboard";
-import { getTopWeightedCriterionIds } from "@/lib/criteria-highlights";
+import { getTrophyCriterionIds } from "@/lib/criteria-highlights";
 import { getEventFormIssues, getFriendlyErrorItems } from "@/lib/user-feedback";
 import type { EventCriterion } from "@workspace/shared/api";
 
@@ -45,10 +45,10 @@ export default function NewEventPage() {
   const [hasTriedSubmit, setHasTriedSubmit] = useState(false);
   //
   const [criteria, setCriteria] = useState<EventCriterion[]>([
-    { id: "innovation", label: "Innovacion", weight: 25, isDefault: true },
-    { id: "viability", label: "Viabilidad", weight: 25, isDefault: true },
-    { id: "impact", label: "Impacto", weight: 25, isDefault: true },
-    { id: "presentation", label: "Presentacion", weight: 25, isDefault: true },
+    { id: "innovation", label: "Innovacion", weight: 25, isDefault: true, hasTrophy: false },
+    { id: "viability", label: "Viabilidad", weight: 25, isDefault: true, hasTrophy: false },
+    { id: "impact", label: "Impacto", weight: 25, isDefault: true, hasTrophy: false },
+    { id: "presentation", label: "Presentacion", weight: 25, isDefault: true, hasTrophy: false },
   ]);
 
   const totalWeight = useMemo(
@@ -59,10 +59,13 @@ export default function NewEventPage() {
     () => getEventFormIssues({ name, description, criteria }),
     [criteria, description, name],
   );
-  const topCriterionIds = useMemo(
-    () => getTopWeightedCriterionIds(criteria),
+  const trophyCriterionIds = useMemo(
+    () => getTrophyCriterionIds(criteria),
     [criteria],
   );
+  const selectedTrophyCriteriaCount = criteria.filter(
+    (criterion) => criterion.hasTrophy,
+  ).length;
   const errorItems = error ? getFriendlyErrorItems(error) : [];
   const hasValidCriteriaCount =
     criteria.length >= MIN_CRITERIA && criteria.length <= MAX_CRITERIA;
@@ -91,6 +94,7 @@ export default function NewEventPage() {
         label: `Criterio ${current.length + 1}`,
         weight: 0,
         isDefault: false,
+        hasTrophy: false,
       },
     ]);
   }
@@ -115,6 +119,21 @@ export default function NewEventPage() {
           : criterion,
       ),
     );
+  }
+
+  function handleCriterionTrophyChange(id: string) {
+    setCriteria((current) => {
+      const selectedCount = current.filter(
+        (criterion) => criterion.hasTrophy,
+      ).length;
+
+      return current.map((criterion) => {
+        if (criterion.id !== id) return criterion;
+        if (!criterion.hasTrophy && selectedCount >= 2) return criterion;
+
+        return { ...criterion, hasTrophy: !criterion.hasTrophy };
+      });
+    });
   }
 
   function handleRemoveCriterion(id: string) {
@@ -293,6 +312,9 @@ export default function NewEventPage() {
                     <span className="text-xs text-[#8899aa]">
                       {criteria.length}/{MAX_CRITERIA} criterios
                     </span>
+                    <span className="text-xs text-[#f4c400]">
+                      🏆 {selectedTrophyCriteriaCount || trophyCriterionIds.size}/2
+                    </span>
                     <span className={`text-xs ${totalWeight === 100 ? "text-[#83ce00]" : "text-[#ff8cab]"}`}>
                       Total {totalWeight}%
                     </span>
@@ -310,7 +332,8 @@ export default function NewEventPage() {
 
                 <div className="mt-5 flex flex-col gap-3">
                   {criteria.map((criterion) => {
-                    const isTopCriterion = topCriterionIds.has(criterion.id);
+                    const isTrophyCriterion = trophyCriterionIds.has(criterion.id);
+                    const isSelectedTrophyCriterion = Boolean(criterion.hasTrophy);
 
                     return (
                     <div
@@ -326,12 +349,37 @@ export default function NewEventPage() {
                           disabled={isPending}
                           className="h-10 border-[#263550] bg-[#121d30] text-white"
                         />
+                        <button
+                          type="button"
+                          onClick={() => handleCriterionTrophyChange(criterion.id)}
+                          disabled={
+                            isPending ||
+                            (!isSelectedTrophyCriterion &&
+                              selectedTrophyCriteriaCount >= 2)
+                          }
+                          className={`inline-flex size-10 shrink-0 items-center justify-center rounded-xl border text-lg transition disabled:cursor-not-allowed disabled:opacity-35 ${
+                            isTrophyCriterion
+                              ? "border-[#f4c400] bg-[#f4c400]/15"
+                              : "border-[#263550] bg-[#121d30] grayscale hover:border-[#f4c400] hover:grayscale-0"
+                          }`}
+                          aria-label={
+                            isSelectedTrophyCriterion
+                              ? `Quitar trofeo de ${criterion.label}`
+                              : `Asignar trofeo a ${criterion.label}`
+                          }
+                          title={
+                            isSelectedTrophyCriterion
+                              ? "Quitar trofeo"
+                              : selectedTrophyCriteriaCount >= 2
+                                ? "Maximo 2 criterios con trofeo"
+                                : isTrophyCriterion
+                                  ? "Trofeo automatico por porcentaje"
+                                  : "Asignar trofeo"
+                          }
+                        >
+                          🏆
+                        </button>
                         <span className="flex shrink-0 items-center gap-2 text-sm font-bold text-[#83ce00]">
-                          {isTopCriterion ? (
-                            <span aria-label="Criterio con mayor porcentaje" role="img">
-                              🏆
-                            </span>
-                          ) : null}
                           {criterion.weight}%
                         </span>
                       </div>

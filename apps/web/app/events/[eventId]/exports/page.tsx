@@ -23,7 +23,7 @@ import { useEvents, usePitches, useRanking } from "@/hooks/dashboard";
 import { exportPitch, getVotes } from "@/lib/dashboard-api";
 import {
   formatCriterionLabel,
-  getTopWeightedCriterionIds,
+  getTrophyCriterionIds,
 } from "@/lib/criteria-highlights";
 import { getFriendlyErrorItems } from "@/lib/user-feedback";
 import type {
@@ -177,8 +177,8 @@ export default function EventExportsPage() {
   );
 
   const selectedCriteria = selectedEvent?.criteria ?? defaultCriteria;
-  const topCriterionIds = useMemo(
-    () => getTopWeightedCriterionIds(selectedCriteria),
+  const trophyCriterionIds = useMemo(
+    () => getTrophyCriterionIds(selectedCriteria),
     [selectedCriteria],
   );
   const pitchStatusById = useMemo(
@@ -427,11 +427,11 @@ export default function EventExportsPage() {
       "porcentaje",
       "promedio",
       ...selectedCriteria.map((criterion) =>
-        formatCriterionLabel(criterion, topCriterionIds),
+        formatCriterionLabel(criterion, trophyCriterionIds),
       ),
       ...selectedCriteria.map(
         (criterion) =>
-          `${formatCriterionLabel(criterion, topCriterionIds)} Promedio`,
+          `${formatCriterionLabel(criterion, trophyCriterionIds)} Promedio`,
       ),
       "Comentario",
       "Tipo comentario",

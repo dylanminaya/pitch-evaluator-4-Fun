@@ -29,7 +29,7 @@ import {
 } from "@/hooks/dashboard";
 import {
   formatCriterionLabel,
-  getTopWeightedCriterionIds,
+  getTrophyCriterionIds,
 } from "@/lib/criteria-highlights";
 import type { CriterionAverage, EventCriterion } from "@workspace/shared/api";
 // Utilidad para exportar resultados del evento.
@@ -52,6 +52,29 @@ const pitchSortOptions: Array<{ value: PitchSortField; label: string }> = [
   { value: "votes", label: "Numero de votos" },
   { value: "createdAt", label: "Fecha/hora" },
 ];
+
+function getCriterionAverageValue(
+  item: {
+    criteriaAverages?: CriterionAverage[];
+    innovationAvg: number;
+    viabilityAvg: number;
+    impactAvg: number;
+    presentationAvg: number;
+  },
+  criterionId: string,
+) {
+  const dynamicAverage = item.criteriaAverages?.find(
+    (criterion) => criterion.id === criterionId,
+  )?.avg;
+
+  if (dynamicAverage != null) return dynamicAverage;
+  if (criterionId === "innovation") return item.innovationAvg;
+  if (criterionId === "viability") return item.viabilityAvg;
+  if (criterionId === "impact") return item.impactAvg;
+  if (criterionId === "presentation") return item.presentationAvg;
+
+  return 0;
+}
 
 function QrDisplay({ url }: { url?: string }) {
   if (!url) {
@@ -94,8 +117,8 @@ function DashboardPageContent() {
   }, [events, requestedEventId]);
   const selectedEventId = selectedEvent?.id;
   const selectedCriteria = selectedEvent?.criteria ?? defaultCriteria;
-  const topCriterionIds = useMemo(
-    () => getTopWeightedCriterionIds(selectedCriteria),
+  const trophyCriterionIds = useMemo(
+    () => getTrophyCriterionIds(selectedCriteria),
     [selectedCriteria],
   );
 
@@ -141,6 +164,42 @@ function DashboardPageContent() {
   const { data: rankingData = [] } = useRanking(selectedEventId);
   const { data: eventStats } = useEventStats(selectedEventId);
   const { data: qrData } = useEventQr(selectedEventId);
+  const criterionWinnerByCriterionId = useMemo(() => {
+    const winnersByCriterionId = new Map<string, string>();
+
+    for (const criterionId of trophyCriterionIds) {
+      const winner = rankingData
+        .filter((item) => item.votesCount > 0)
+        .map((item) => ({
+          id: item.id,
+          name: item.name,
+          votesCount: item.votesCount,
+          totalScore: item.scoreAvg,
+          average: getCriterionAverageValue(item, criterionId),
+        }))
+        .sort((left, right) => {
+          if (right.average !== left.average) {
+            return right.average - left.average;
+          }
+
+          if (right.totalScore !== left.totalScore) {
+            return right.totalScore - left.totalScore;
+          }
+
+          if (right.votesCount !== left.votesCount) {
+            return right.votesCount - left.votesCount;
+          }
+
+          return left.name.localeCompare(right.name);
+        })[0];
+
+      if (winner) {
+        winnersByCriterionId.set(criterionId, winner.id);
+      }
+    }
+
+    return winnersByCriterionId;
+  }, [rankingData, trophyCriterionIds]);
 
   const selectedPitchVotes = rankingData.find(item => item.id === selectedPitchId)?.votesCount ?? 0;
   const eventIsOpen = selectedEvent?.status === "OPEN";
@@ -514,11 +573,11 @@ function DashboardPageContent() {
                         <th
                           key={criterion.id}
                           className="px-4 py-3 font-medium"
-                          title={formatCriterionLabel(criterion, topCriterionIds)}
+                          title={formatCriterionLabel(criterion, trophyCriterionIds)}
                         >
                           <span className="inline-flex items-center gap-1">
-                            {topCriterionIds.has(criterion.id) ? (
-                              <span aria-label="Criterio con mayor porcentaje" role="img">
+                            {trophyCriterionIds.has(criterion.id) ? (
+                              <span aria-label="Criterio premiado" role="img">
                                 🏆
                               </span>
                             ) : null}
@@ -606,11 +665,29 @@ function DashboardPageContent() {
                             {pitchStatus === "OPEN" ? "Activado" : "Cerrado"}
                           </Button>
                         </td>
-                        {criterionAverages.map((criterion) => (
-                          <td key={`${item.id}-${criterion.id}`} className="px-4 py-4 text-[#9da0bc]">
-                            {criterion.avg}
-                          </td>
-                        ))}
+                        {criterionAverages.map((criterion) => {
+                          const isCriterionWinner =
+                            criterionWinnerByCriterionId.get(criterion.id) ===
+                            item.id;
+
+                          return (
+                            <td key={`${item.id}-${criterion.id}`} className="px-4 py-4 text-[#9da0bc]">
+                              <div className="flex items-center gap-2">
+                                <span>{criterion.avg}</span>
+                                {isCriterionWinner ? (
+                                  <span
+                                    className="text-base"
+                                    aria-label={`Ganador de ${criterion.label}`}
+                                    title={`Ganador de ${criterion.label}`}
+                                    role="img"
+                                  >
+                                    🏆
+                                  </span>
+                                ) : null}
+                              </div>
+                            </td>
+                          );
+                        })}
                         <td className="px-4 py-4 text-right font-semibold text-[#ccff00]">
                           {item.scoreAvg} {/* Puntaje total del pitch. */}
                         </td>

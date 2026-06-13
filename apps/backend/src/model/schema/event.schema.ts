@@ -15,6 +15,13 @@ const criteriaSchema = z
       });
     }
 
+    if (criteria.filter((criterion) => criterion.hasTrophy).length > 2) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "No more than 2 criteria can have trophies",
+      });
+    }
+
     const ids = new Set<string>();
 
     for (const criterion of criteria) {

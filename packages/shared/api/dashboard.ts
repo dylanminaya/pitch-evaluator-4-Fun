@@ -5,6 +5,7 @@ export const eventCriterionSchema = z.object({
   label: z.string().min(1),
   weight: z.number().int().min(0).max(100),
   isDefault: z.boolean().optional(),
+  hasTrophy: z.boolean().optional(),
 });
 
 export const voteCriterionScoreSchema = z.object({
@@ -30,6 +31,13 @@ const criteriaArraySchema = z
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: "Criteria weights must add up to 100%",
+      });
+    }
+
+    if (criteria.filter((criterion) => criterion.hasTrophy).length > 2) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "No more than 2 criteria can have trophies",
       });
     }
 

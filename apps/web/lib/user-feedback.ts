@@ -164,6 +164,20 @@ export function getEventFormIssues(input: {
     );
   }
 
+  const trophyCriteriaCount = input.criteria.filter(
+    (criterion) => criterion.hasTrophy,
+  ).length;
+
+  if (trophyCriteriaCount > 2) {
+    issues.push(
+      createItem(
+        "event-criteria-trophies",
+        "Hay mas de 2 criterios con trofeo.",
+        "Deja seleccionados como maximo 2 criterios premiados.",
+      ),
+    );
+  }
+
   const totalWeight = input.criteria.reduce(
     (sum, criterion) => sum + criterion.weight,
     0,

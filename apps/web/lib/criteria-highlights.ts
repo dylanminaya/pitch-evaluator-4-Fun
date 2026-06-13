@@ -2,10 +2,15 @@ import type { EventCriterion } from "@workspace/shared/api";
 
 export const topCriterionMarker = "🏆";
 
-export function getTopWeightedCriterionIds(
-  criteria: EventCriterion[],
-  limit = 2,
-) {
+export function getTrophyCriterionIds(criteria: EventCriterion[]) {
+  const selectedCriteria = criteria.filter((criterion) => criterion.hasTrophy);
+
+  if (selectedCriteria.length > 0) {
+    return new Set(
+      selectedCriteria.slice(0, 2).map((criterion) => criterion.id),
+    );
+  }
+
   return new Set(
     criteria
       .map((criterion, index) => ({ criterion, index }))
@@ -16,16 +21,16 @@ export function getTopWeightedCriterionIds(
 
         return left.index - right.index;
       })
-      .slice(0, limit)
+      .slice(0, 2)
       .map(({ criterion }) => criterion.id),
   );
 }
 
 export function formatCriterionLabel(
   criterion: EventCriterion,
-  topCriterionIds: Set<string>,
+  trophyCriterionIds: Set<string>,
 ) {
-  return topCriterionIds.has(criterion.id)
+  return trophyCriterionIds.has(criterion.id)
     ? `${topCriterionMarker} ${criterion.label}`
     : criterion.label;
 }
