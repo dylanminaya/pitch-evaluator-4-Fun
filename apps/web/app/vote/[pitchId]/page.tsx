@@ -2,18 +2,21 @@
 
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { CheckCircle2, Sparkles, Star } from "lucide-react";
 import { Button } from "@workspace/ui/components/button";
 import { usePublicPitch, useSubmitPublicVote } from "@/hooks/dashboard";
 import { useSession } from "@/lib/better-auth/auth-client";
+import { getTrophyCriterionIds } from "@/lib/criteria-highlights";
 import type { EventCriterion } from "@workspace/shared/api";
 
 const evaluatorEmailStorageKey = "pitch-evaluator-email";
+type CommentType = "OPINION" | "ACTIVADOR";
 
 export default function VotingScreenPage() {
   const params = useParams<{ pitchId: string }>();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const pitchId = params.pitchId;
   const [emailInput, setEmailInput] = useState("");
   const [evaluatorEmail, setEvaluatorEmail] = useState<string | null>(null);
@@ -30,9 +33,14 @@ export default function VotingScreenPage() {
   const { mutateAsync: submitVote, isPending, isSuccess, error: voteError } =
     useSubmitPublicVote();
   const [commentDraft, setCommentDraft] = useState<string | null>(null);
+  const [commentTypeDraft, setCommentTypeDraft] = useState<CommentType | null>(null);
   const [scoreDrafts, setScoreDrafts] = useState<Record<string, number>>({});
 
   const criteria: EventCriterion[] = useMemo(() => pitch?.criteria ?? [], [pitch?.criteria]);
+  const trophyCriterionIds = useMemo(
+    () => getTrophyCriterionIds(criteria),
+    [criteria],
+  );
   const hasAlreadyVoted = Boolean(pitch?.hasVoted);
   const hasSavedVote = hasAlreadyVoted || isSuccess;
   const isVotingClosed = pitch?.eventStatus !== "OPEN" || pitch?.pitchStatus !== "OPEN";
@@ -81,6 +89,7 @@ export default function VotingScreenPage() {
     setEvaluatorEmail(normalizedEmail);
     setIsChangingEmail(false);
     setCommentDraft(null);
+    setCommentTypeDraft(null);
     setScoreDrafts({});
     router.replace(`/vote/${pitchId}?evaluatorEmail=${encodeURIComponent(normalizedEmail)}`);
   }
@@ -94,6 +103,7 @@ export default function VotingScreenPage() {
     setEmailInput("");
     setIsChangingEmail(true);
     setCommentDraft(null);
+    setCommentTypeDraft(null);
     setScoreDrafts({});
     router.replace(`/vote/${pitchId}`);
   }
@@ -127,6 +137,10 @@ export default function VotingScreenPage() {
     return scoreDrafts[criterionId] ?? getSavedScore(criterionId);
   }
 
+  function getSelectedCommentType(): CommentType {
+    return commentTypeDraft ?? pitch?.currentVote?.commentType ?? "OPINION";
+  }
+
   function getRatingLabel(value?: number) {
     if (!value) {
       return "Sin evaluar";
@@ -138,7 +152,7 @@ export default function VotingScreenPage() {
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (isVotingClosed || hasAlreadyVoted) {
+    if (!pitch || isVotingClosed || hasAlreadyVoted) {
       return;
     }
 
@@ -156,18 +170,33 @@ export default function VotingScreenPage() {
         score: getSelectedScore(criterion.id) ?? 3,
       })),
       comment: (commentDraft ?? pitch?.currentVote?.comment ?? "").trim() || null,
+      commentType: getSelectedCommentType(),
     });
 
     window.localStorage.setItem(evaluatorEmailStorageKey, normalizedEmail);
     setEvaluatorEmail(normalizedEmail);
     setIsChangingEmail(false);
-    router.replace(`/vote/${pitchId}?evaluatorEmail=${encodeURIComponent(normalizedEmail)}`);
+
+    const votedPitchIds = new Set(
+      (searchParams.get("votedPitchIds") ?? "")
+        .split(",")
+        .map((storedPitchId) => storedPitchId.trim())
+        .filter(Boolean),
+    );
+    votedPitchIds.add(pitchId);
+
+    const query = new URLSearchParams({
+      evaluatorEmail: normalizedEmail,
+      votedPitchIds: Array.from(votedPitchIds).join(","),
+    });
+
+    router.replace(`/invitation/${pitch.eventId}?${query.toString()}`);
   }
 
   if (isLoadingSession && isLoading) {
     return (
       <main className="flex min-h-svh items-center justify-center bg-[#0d1526] text-[#8899aa]">
-        Cargando votacion...
+        Cargando votación...
       </main>
     );
   }
@@ -175,7 +204,7 @@ export default function VotingScreenPage() {
   if (isLoading) {
     return (
       <main className="flex min-h-svh items-center justify-center bg-[#0d1526] text-[#8899aa]">
-        Cargando votacion...
+        Cargando votación...
       </main>
     );
   }
@@ -203,7 +232,7 @@ export default function VotingScreenPage() {
             <p className="mt-2 text-sm leading-6 text-[#a9b3c9]">
               {pitch.pitchStatus === "OPEN" && pitch.eventStatus === "OPEN"
                 ? "Escribe tu correo para votar o cargar tu voto anterior."
-                : "Este pitch esta cerrado. Escribe tu correo para ver tu voto guardado."}
+                : "Este pitch está cerrado. Escribe tu correo para ver tu voto guardado."}
             </p>
           </div>
           <div className="mt-6">
@@ -249,10 +278,10 @@ export default function VotingScreenPage() {
               </div>
               <span className="text-sm text-[#8899aa]">
                 {isVotingClosed
-                  ? "La votacion esta cerrada. Tu voto queda en modo lectura."
+                  ? "La votación está cerrada. Tu voto queda en modo lectura."
                   : hasSavedVote
                   ? "Ya enviaste tu voto. No puede ser modificado."
-                  : "Evalua el pitch y envia tu voto."}
+                  : "Evalúa el pitch y envía tu voto."}
               </span>
             </div>
           </div>
@@ -278,9 +307,9 @@ export default function VotingScreenPage() {
             </p>
             <div className="mt-6 rounded-2xl border border-dashed border-[#263550] bg-[#0d1526] px-4 py-4 text-sm leading-6 text-[#8899aa]">
               {isVotingClosed
-                ? "La votacion para este pitch ya esta cerrada. Puedes ver las estrellas y el comentario guardados, pero no modificarlos."
+                ? "La votación para este pitch ya está cerrada. Puedes ver las estrellas y el comentario guardados, pero no modificarlos."
                 : hasSavedVote
-                  ? "Este correo ya registro un voto para este pitch. Tu evaluacion ya esta registrada y no puede cambiarse."
+                  ? "Este correo ya registró un voto para este pitch. Tu evaluación ya está registrada y no puede cambiarse."
                   : "Tu voto cuenta una sola vez por correo electronico. Toma unos segundos para evaluar de forma honesta cada criterio."}
             </div>
             <button
@@ -294,7 +323,10 @@ export default function VotingScreenPage() {
 
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             <div className="grid gap-4 md:grid-cols-2">
-              {criteria.map((criterion) => (
+              {criteria.map((criterion) => {
+                const isTrophyCriterion = trophyCriterionIds.has(criterion.id);
+
+                return (
                 <section
                   key={criterion.id}
                   className="rounded-[24px] border border-[#263550] bg-[#1a2640] p-6 shadow-[0_18px_45px_rgba(2,8,23,0.35)]"
@@ -302,6 +334,11 @@ export default function VotingScreenPage() {
                   <div className="flex items-center justify-between gap-3">
                     <div className="inline-flex items-center gap-2 text-[11px] font-bold uppercase italic tracking-[0.24em] text-[#83ce00]">
                       <Sparkles className="size-4 text-[#8899aa]" />
+                      {isTrophyCriterion ? (
+                        <span aria-label="Criterio premiado" role="img">
+                          🏆
+                        </span>
+                      ) : null}
                       {criterion.label}
                     </div>
                     <div className="flex items-center gap-3">
@@ -339,21 +376,43 @@ export default function VotingScreenPage() {
                     })}
                   </div>
                 </section>
-              ))}
+                );
+              })}
             </div>
 
             <section className="rounded-[24px] border border-[#263550] bg-[#1a2640] p-6 shadow-[0_18px_45px_rgba(2,8,23,0.35)]">
-              <label
-                htmlFor="comment"
-                className="text-[11px] font-bold uppercase italic tracking-[0.24em] text-[#8899aa]"
-              >
-                Comentario opcional
-              </label>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <label
+                  htmlFor="comment"
+                  className="text-[11px] font-bold uppercase italic tracking-[0.24em] text-[#8899aa]"
+                >
+                  Comentario opcional
+                </label>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setCommentTypeDraft((current) =>
+                      (current ?? pitch.currentVote?.commentType ?? "OPINION") === "OPINION"
+                        ? "ACTIVADOR"
+                        : "OPINION",
+                    )
+                  }
+                  disabled={!canEditVote}
+                  className={`h-9 rounded-full border px-4 text-xs font-black uppercase tracking-[0.16em] transition disabled:cursor-not-allowed disabled:opacity-70 ${
+                    getSelectedCommentType() === "ACTIVADOR"
+                      ? "border-[#00f0ff]/70 bg-[#00f0ff] text-[#0d1526] hover:bg-white"
+                      : "border-[#83ce00]/70 bg-[#83ce00] text-[#0d1526] hover:bg-[#a7ea2e]"
+                  }`}
+                  aria-label="Cambiar tipo de comentario"
+                >
+                  {getSelectedCommentType() === "ACTIVADOR" ? "Activador" : "Opinión"}
+                </button>
+              </div>
               <textarea
                 id="comment"
                 value={commentDraft ?? pitch.currentVote?.comment ?? ""}
                 onChange={(event) => setCommentDraft(event.target.value)}
-                placeholder="Que te dirias del equipo o de la solucion?"
+                placeholder="¿Qué le dirías al equipo sobre su solución?"
                 disabled={!canEditVote}
                 className="mt-4 min-h-28 w-full rounded-2xl border border-[#263550] bg-[#0d1526] px-4 py-3 text-sm text-white outline-none placeholder:text-[#66738f]"
               />
@@ -369,7 +428,7 @@ export default function VotingScreenPage() {
               <div className="rounded-2xl border border-[#263550] bg-[#121d30] p-4 text-sm text-[#83ce00]">
                 <div className="inline-flex items-center gap-2">
                   <CheckCircle2 className="size-4" />
-                  Voto guardado. Tu evaluacion ya esta registrada.
+                  Voto guardado. Tu evaluación ya está registrada.
                 </div>
               </div>
             )}
@@ -379,11 +438,19 @@ export default function VotingScreenPage() {
                 type="button"
                 variant="outline"
                 onClick={() => {
-                  const query = effectiveEvaluatorEmail
-                    ? `?evaluatorEmail=${encodeURIComponent(effectiveEvaluatorEmail)}`
-                    : "";
+                  const query = new URLSearchParams();
+                  const votedPitchIds = searchParams.get("votedPitchIds");
 
-                  router.push(`/invitation/${pitch.eventId}${query}`);
+                  if (effectiveEvaluatorEmail) {
+                    query.set("evaluatorEmail", effectiveEvaluatorEmail);
+                  }
+
+                  if (votedPitchIds) {
+                    query.set("votedPitchIds", votedPitchIds);
+                  }
+
+                  const queryString = query.toString();
+                  router.push(`/invitation/${pitch.eventId}${queryString ? `?${queryString}` : ""}`);
                 }}
                 className="h-12 rounded-full border-[#263550] bg-transparent px-6 text-sm font-bold text-white hover:bg-[#1a2640] hover:text-white"
               >

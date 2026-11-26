@@ -10,6 +10,7 @@ export const presentVote = (vote: {
   impact: number;
   presentation: number;
   comment?: string | null;
+  commentType?: "OPINION" | "ACTIVADOR" | null;
   createdAt?: Date | string;
 }) => ({
   id: vote.id,
@@ -25,6 +26,7 @@ export const presentVote = (vote: {
   impact: vote.impact,
   presentation: vote.presentation,
   comment: vote.comment ?? null,
+  commentType: vote.commentType ?? "OPINION",
   createdAt: vote.createdAt instanceof Date ? vote.createdAt.toISOString() : (vote.createdAt ?? null),
 });
 

@@ -11,6 +11,7 @@ export const voteSchema = z.object({
   impact: z.number().int().min(1).max(5),
   presentation: z.number().int().min(1).max(5),
   comment: z.string().max(500).optional().nullable(),
+  commentType: z.enum(["OPINION", "ACTIVADOR"]).default("OPINION"),
   createdAt: z.string().datetime(),
 });
 

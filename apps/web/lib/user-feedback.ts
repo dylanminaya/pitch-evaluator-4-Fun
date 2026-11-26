@@ -58,8 +58,8 @@ export function getPitchFormIssues(input: {
     issues.push(
       createItem(
         "pitch-description-min",
-        "La descripcion es demasiado corta.",
-        "Explica el problema, la solucion o el valor del pitch en una frase completa.",
+        "La descripción es demasiado corta.",
+        "Explica el problema, la solución o el valor del pitch en una frase completa.",
       ),
     );
   }
@@ -68,8 +68,8 @@ export function getPitchFormIssues(input: {
     issues.push(
       createItem(
         "pitch-description-max",
-        "La descripcion supera el limite permitido.",
-        "Reduce la descripcion a 500 caracteres o menos.",
+        "La descripción supera el límite permitido.",
+        "Reduce la descripción a 500 caracteres o menos.",
       ),
     );
   }
@@ -78,7 +78,7 @@ export function getPitchFormIssues(input: {
     issues.push(
       createItem(
         "pitch-color",
-        "El color no tiene un formato HEX valido.",
+        "El color no tiene un formato HEX válido.",
         "Usa un valor como #83CE00 o #0595F0.",
       ),
     );
@@ -88,8 +88,8 @@ export function getPitchFormIssues(input: {
     issues.push(
       createItem(
         "pitch-logo-url",
-        "La URL del logo no es valida.",
-        "Pega un enlace completo que empiece con http:// o https://, o deja ese campo vacio.",
+        "La URL del logo no es válida.",
+        "Pega un enlace completo que empiece con http:// o https://, o deja ese campo vacío.",
       ),
     );
   }
@@ -118,7 +118,7 @@ export function getEventFormIssues(input: {
     issues.push(
       createItem(
         "event-name-max",
-        "El nombre del evento supera el limite permitido.",
+        "El nombre del evento supera el límite permitido.",
         "Usa un nombre de 100 caracteres o menos.",
       ),
     );
@@ -128,7 +128,7 @@ export function getEventFormIssues(input: {
     issues.push(
       createItem(
         "event-description-min",
-        "La descripcion del evento es demasiado corta.",
+        "La descripción del evento es demasiado corta.",
         "Agrega una frase breve que explique el objetivo o el contexto del evento.",
       ),
     );
@@ -138,8 +138,8 @@ export function getEventFormIssues(input: {
     issues.push(
       createItem(
         "event-description-max",
-        "La descripcion del evento es demasiado larga.",
-        "Reduce la descripcion a 500 caracteres o menos.",
+        "La descripción del evento es demasiado larga.",
+        "Reduce la descripción a 500 caracteres o menos.",
       ),
     );
   }
@@ -159,7 +159,21 @@ export function getEventFormIssues(input: {
       createItem(
         "event-criteria-max",
         "Hay demasiados criterios para este evento.",
-        "Usa un maximo de 6 criterios.",
+        "Usa un máximo de 6 criterios.",
+      ),
+    );
+  }
+
+  const trophyCriteriaCount = input.criteria.filter(
+    (criterion) => criterion.hasTrophy,
+  ).length;
+
+  if (trophyCriteriaCount > 2) {
+    issues.push(
+      createItem(
+        "event-criteria-trophies",
+        "Hay más de 2 criterios con trofeo.",
+        "Deja seleccionados como máximo 2 criterios premiados.",
       ),
     );
   }
@@ -185,7 +199,7 @@ export function getEventFormIssues(input: {
       createItem(
         "event-criteria-label",
         "Hay criterios sin nombre.",
-        "Escribe un nombre claro para cada criterio, por ejemplo: Innovacion o Viabilidad.",
+        "Escribe un nombre claro para cada criterio, por ejemplo: Innovación o Viabilidad.",
       ),
     );
   }
@@ -206,7 +220,7 @@ export function getEventFormIssues(input: {
     issues.push(
       createItem(
         "event-criteria-duplicate",
-        "Hay criterios repetidos y eso puede confundir la votacion.",
+        "Hay criterios repetidos y eso puede confundir la votación.",
         "Usa nombres distintos para cada criterio.",
       ),
     );
@@ -219,7 +233,7 @@ export function getFriendlyErrorItems(error: unknown): FeedbackItem[] {
   const rawMessage =
     error instanceof Error && error.message.trim()
       ? error.message.trim()
-      : "No pudimos completar la accion.";
+      : "No pudimos completar la acción.";
   const normalized = rawMessage.toLowerCase();
 
   if (normalized.includes("project name must have at least 3 characters")) {
@@ -246,7 +260,7 @@ export function getFriendlyErrorItems(error: unknown): FeedbackItem[] {
     return [
       createItem(
         "friendly-pitch-description-min",
-        "La descripcion del pitch es demasiado corta.",
+        "La descripción del pitch es demasiado corta.",
         "Agrega una frase con al menos 5 caracteres.",
       ),
     ];
@@ -256,8 +270,8 @@ export function getFriendlyErrorItems(error: unknown): FeedbackItem[] {
     return [
       createItem(
         "friendly-color",
-        "El color no tiene un formato valido.",
-        "Usa un HEX de 6 digitos como #83CE00.",
+        "El color no tiene un formato válido.",
+        "Usa un HEX de 6 dígitos como #83CE00.",
       ),
     ];
   }
@@ -266,8 +280,8 @@ export function getFriendlyErrorItems(error: unknown): FeedbackItem[] {
     return [
       createItem(
         "friendly-url",
-        "La URL enviada no es valida.",
-        "Pega un enlace completo con http:// o https://, o deja el campo vacio.",
+        "La URL enviada no es válida.",
+        "Pega un enlace completo con http:// o https://, o deja el campo vacío.",
       ),
     ];
   }
@@ -276,7 +290,7 @@ export function getFriendlyErrorItems(error: unknown): FeedbackItem[] {
     return [
       createItem(
         "friendly-criteria-weight",
-        "La configuracion de criterios no suma 100%.",
+        "La configuración de criterios no suma 100%.",
         "Ajusta los porcentajes hasta llegar exactamente a 100%.",
       ),
     ];
@@ -287,7 +301,7 @@ export function getFriendlyErrorItems(error: unknown): FeedbackItem[] {
       createItem(
         "friendly-forbidden",
         "Tu usuario no tiene permiso para hacer esto en este evento.",
-        "Entra con un organizer autorizado o vuelve al evento correcto.",
+        "Entra con una cuenta de organizador autorizada o vuelve al evento correcto.",
       ),
     ];
   }
@@ -296,8 +310,8 @@ export function getFriendlyErrorItems(error: unknown): FeedbackItem[] {
     return [
       createItem(
         "friendly-unauthorized",
-        "Tu sesion expiro o el navegador no envio la sesion al servidor.",
-        "Inicia sesion de nuevo y vuelve a guardar el pitch.",
+        "Tu sesión expiró o el navegador no envió la sesión al servidor.",
+        "Inicia sesión de nuevo y vuelve a guardar el pitch.",
       ),
     ];
   }
@@ -306,18 +320,18 @@ export function getFriendlyErrorItems(error: unknown): FeedbackItem[] {
     return [
       createItem(
         "friendly-presentation-prepare",
-        "No pudimos preparar el PowerPoint para proyectarlo.",
-        "El pitch quedo guardado. Prueba subir de nuevo el .ppt o .pptx desde editar pitch.",
+        "No pudimos preparar la presentación para proyectarla.",
+        "El pitch quedó guardado. Prueba subir de nuevo un .ppt, .pptx o .pdf desde editar pitch.",
       ),
     ];
   }
 
-  if (normalized.includes("only .ppt and .pptx")) {
+  if (normalized.includes("only .ppt, .pptx and .pdf")) {
     return [
       createItem(
         "friendly-presentation-format",
-        "El archivo seleccionado no parece ser un PowerPoint valido.",
-        "Sube un archivo con extension .ppt o .pptx.",
+        "El archivo seleccionado no parece ser una presentación válida.",
+        "Sube un archivo con extensión .ppt, .pptx o .pdf.",
       ),
     ];
   }
@@ -327,7 +341,7 @@ export function getFriendlyErrorItems(error: unknown): FeedbackItem[] {
       createItem(
         "friendly-not-found",
         "El recurso que intentaste usar ya no existe o cambió.",
-        "Recarga la pagina y vuelve a intentarlo desde el dashboard.",
+        "Recarga la página y vuelve a intentarlo desde el dashboard.",
       ),
     ];
   }
@@ -336,7 +350,7 @@ export function getFriendlyErrorItems(error: unknown): FeedbackItem[] {
     return [
       createItem(
         "friendly-export",
-        "No pudimos generar la exportacion.",
+        "No pudimos generar la exportación.",
         "Intenta de nuevo en unos segundos. Si sigue fallando, revisa que el evento tenga datos.",
       ),
     ];
@@ -358,7 +372,7 @@ export function getFriendlyErrorItems(error: unknown): FeedbackItem[] {
       createItem(
         "friendly-fetch",
         "No pudimos comunicarnos correctamente con el servidor.",
-        "Recarga la pagina y verifica que el backend este disponible.",
+        "Recarga la página y verifica que el backend esté disponible.",
       ),
       createItem("friendly-fetch-detail", rawMessage),
     ];

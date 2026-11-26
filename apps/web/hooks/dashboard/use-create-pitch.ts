@@ -21,9 +21,12 @@ export function useCreatePitch() {
 
       return createPitch(validation.data);
     },
-    onSuccess: (_createdPitch, variables) => {
+    onSuccess: (createdPitch, variables) => {
       queryClient.invalidateQueries({ queryKey: ["pitches", variables.eventId] });
       queryClient.invalidateQueries({ queryKey: ["ranking", variables.eventId] });
+      queryClient.invalidateQueries({
+        queryKey: ["public-event-invitation", createdPitch.eventId],
+      });
     },
   });
 }

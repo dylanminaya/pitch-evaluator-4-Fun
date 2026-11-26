@@ -8,5 +8,8 @@ export function usePublicEventInvitation(eventId?: string) {
     queryKey: ["public-event-invitation", eventId],
     queryFn: () => getPublicEventInvitation(eventId!),
     enabled: Boolean(eventId),
+    refetchInterval: 2_000,
+    refetchIntervalInBackground: true,
+    refetchOnWindowFocus: true,
   });
 }

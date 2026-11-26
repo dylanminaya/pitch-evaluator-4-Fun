@@ -32,6 +32,9 @@ Required variables:
 - `BETTER_AUTH_URL` - Backend URL (e.g., `http://localhost:3001`)
 - `FRONTEND_URL` - Frontend URL (e.g., `http://localhost:3000`)
 - `NEXT_PUBLIC_API_URL` - Backend URL for the frontend
+- `LIBREOFFICE_BINARY` - Optional path to LibreOffice if it is not available on PATH
+
+> Note: LibreOffice is a native system dependency, not an npm package. On Vercel, this means the backend must run on an environment where LibreOffice is already installed or you must use a separate service for conversion.
 
 ### 3. Start the database
 
@@ -76,7 +79,8 @@ Run `just` to see all available commands:
 | `just db-down`    | Stop database containers          |
 | `just db-logs`    | View database logs                |
 | `just db-reset`   | Reset database (removes all data) |
-| `just db-migrate` | Run better-auth migrations        |
+| `just db-migrate` | Run migrations and create app tables |
+| `just db-schema`  | Create app tables only            |
 
 ### Backend Commands
 

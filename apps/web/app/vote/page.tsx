@@ -9,7 +9,7 @@ export default function VoteIndexPage() {
       <div className="max-w-md rounded-[24px] border border-[#263550] bg-[#1a2640] px-8 py-10">
         <h1 className="text-2xl font-black tracking-tight">Pitch no especificado</h1>
         <p className="mt-3 text-sm leading-6 text-[#a9b3c9]">
-          Abre primero la invitacion del evento y luego entra al pitch que quieras votar.
+          Abre primero la invitación del evento y luego entra al pitch que quieras votar.
         </p>
         <div className="mt-6">
           <Link href="/">

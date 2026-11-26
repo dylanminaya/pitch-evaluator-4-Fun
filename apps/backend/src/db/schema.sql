@@ -69,6 +69,7 @@ CREATE TABLE IF NOT EXISTS vote (
   impact        INTEGER     NOT NULL CHECK (impact BETWEEN 1 AND 5),
   presentation  INTEGER     NOT NULL CHECK (presentation BETWEEN 1 AND 5),
   comment       TEXT,
+  "commentType" TEXT        NOT NULL DEFAULT 'OPINION' CHECK ("commentType" IN ('OPINION', 'ACTIVADOR')),
   "createdAt"   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE ("pitchId", "evaluatorEmail")
 );
@@ -78,6 +79,15 @@ ADD COLUMN IF NOT EXISTS "criteriaScores" JSONB NOT NULL DEFAULT '[]'::jsonb;
 
 ALTER TABLE vote
 ADD COLUMN IF NOT EXISTS "evaluatorEmail" TEXT;
+
+ALTER TABLE vote
+ADD COLUMN IF NOT EXISTS "commentType" TEXT NOT NULL DEFAULT 'OPINION';
+
+ALTER TABLE vote
+DROP CONSTRAINT IF EXISTS vote_comment_type_check;
+
+ALTER TABLE vote
+ADD CONSTRAINT vote_comment_type_check CHECK ("commentType" IN ('OPINION', 'ACTIVADOR'));
 
 CREATE UNIQUE INDEX IF NOT EXISTS vote_pitch_evaluator_email_unique
 ON vote ("pitchId", "evaluatorEmail")

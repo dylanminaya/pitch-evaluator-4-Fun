@@ -2,10 +2,10 @@ import { z } from "zod";
 import { eventCriterionSchema, type EventCriterion, type VoteCriterionScore } from "@workspace/shared/api";
 
 export const defaultCriteria: EventCriterion[] = [
-  { id: "innovation", label: "Innovacion", weight: 25, isDefault: true },
+  { id: "innovation", label: "Innovación", weight: 25, isDefault: true },
   { id: "viability", label: "Viabilidad", weight: 25, isDefault: true },
   { id: "impact", label: "Impacto", weight: 25, isDefault: true },
-  { id: "presentation", label: "Presentacion", weight: 25, isDefault: true },
+  { id: "presentation", label: "Presentación", weight: 25, isDefault: true },
 ];
 
 const criteriaSchema = z.array(eventCriterionSchema);
@@ -47,54 +47,98 @@ export const getScoreByCriterionId = (
   criterionId: string,
 ) => criteriaScores.find((item) => item.criterionId === criterionId)?.score ?? null;
 
-const buildWeightLookupSql = (eventCriteriaAlias: string, criterionId: string, fallbackWeight: number) => `
-  COALESCE(
-    (
-      SELECT (criterion_item->>'weight')::numeric
-      FROM jsonb_array_elements(${eventCriteriaAlias}) criterion_item
-      WHERE criterion_item->>'id' = '${criterionId}'
-      LIMIT 1
-    ),
-    ${fallbackWeight}
-  )
+export const topCriterionMarker = "🏆";
+
+export function getTrophyCriterionIds(criteria: EventCriterion[]) {
+  const selectedCriteria = criteria.filter((criterion) => criterion.hasTrophy);
+
+  if (selectedCriteria.length > 0) {
+    return new Set(
+      selectedCriteria.slice(0, 2).map((criterion) => criterion.id),
+    );
+  }
+
+  return new Set(
+    criteria
+      .map((criterion, index) => ({ criterion, index }))
+      .sort((left, right) => {
+        if (right.criterion.weight !== left.criterion.weight) {
+          return right.criterion.weight - left.criterion.weight;
+        }
+
+        return left.index - right.index;
+      })
+      .slice(0, 2)
+      .map(({ criterion }) => criterion.id),
+  );
+}
+
+export function formatCriterionLabel(
+  criterion: EventCriterion,
+  trophyCriterionIds: Set<string>,
+) {
+  return trophyCriterionIds.has(criterion.id)
+    ? `${topCriterionMarker} ${criterion.label}`
+    : criterion.label;
+}
+
+const buildLegacyAverageScoreSql = (voteAlias: string) => `
+  (
+    ${voteAlias}.innovation::numeric +
+    ${voteAlias}.viability::numeric +
+    ${voteAlias}.impact::numeric +
+    ${voteAlias}.presentation::numeric
+  ) / 4
+`;
+
+const buildLegacyScoreSql = (voteAlias: string, criterionIdSql: string) => `
+  CASE ${criterionIdSql}
+    WHEN 'innovation' THEN ${voteAlias}.innovation::numeric
+    WHEN 'viability' THEN ${voteAlias}.viability::numeric
+    WHEN 'impact' THEN ${voteAlias}.impact::numeric
+    WHEN 'presentation' THEN ${voteAlias}.presentation::numeric
+    ELSE ${buildLegacyAverageScoreSql(voteAlias)}
+  END
 `;
 
 export function buildWeightedScoreSql(voteAlias: string, eventCriteriaAlias: string) {
-  const innovationWeightSql = buildWeightLookupSql(eventCriteriaAlias, "innovation", 25);
-  const viabilityWeightSql = buildWeightLookupSql(eventCriteriaAlias, "viability", 25);
-  const impactWeightSql = buildWeightLookupSql(eventCriteriaAlias, "impact", 25);
-  const presentationWeightSql = buildWeightLookupSql(eventCriteriaAlias, "presentation", 25);
-
   return `
     COALESCE(
       ROUND(
         AVG(
-          CASE
-            WHEN jsonb_typeof(${voteAlias}."criteriaScores") = 'array'
-              AND jsonb_array_length(${voteAlias}."criteriaScores") > 0
-            THEN (
-              SELECT
-                SUM((score_item->>'score')::numeric * (criterion_item->>'weight')::numeric)
-                / NULLIF(SUM((criterion_item->>'weight')::numeric), 0)
-              FROM jsonb_array_elements(${voteAlias}."criteriaScores") score_item
-              INNER JOIN jsonb_array_elements(${eventCriteriaAlias}) criterion_item
-                ON criterion_item->>'id' = score_item->>'criterionId'
-            )
-            ELSE (
-              (
-                ${voteAlias}.innovation * ${innovationWeightSql} +
-                ${voteAlias}.viability * ${viabilityWeightSql} +
-                ${voteAlias}.impact * ${impactWeightSql} +
-                ${voteAlias}.presentation * ${presentationWeightSql}
-              ) / NULLIF(
-                ${innovationWeightSql} +
-                ${viabilityWeightSql} +
-                ${impactWeightSql} +
-                ${presentationWeightSql},
+          (
+            SELECT
+              SUM(scored_criteria.score * scored_criteria.weight)
+              / NULLIF(
+                SUM(
+                  CASE
+                    WHEN scored_criteria.score IS NULL THEN 0
+                    ELSE scored_criteria.weight
+                  END
+                ),
                 0
               )
-            )
-          END
+            FROM (
+              SELECT
+                (criterion_item->>'weight')::numeric AS weight,
+                COALESCE(
+                  (
+                    SELECT (score_item->>'score')::numeric
+                    FROM jsonb_array_elements(
+                      CASE
+                        WHEN jsonb_typeof(${voteAlias}."criteriaScores") = 'array'
+                        THEN ${voteAlias}."criteriaScores"
+                        ELSE '[]'::jsonb
+                      END
+                    ) score_item
+                    WHERE score_item->>'criterionId' = criterion_item->>'id'
+                    LIMIT 1
+                  ),
+                  ${buildLegacyScoreSql(voteAlias, "criterion_item->>'id'")}
+                ) AS score
+              FROM jsonb_array_elements(${eventCriteriaAlias}) criterion_item
+            ) scored_criteria
+          )
         )::numeric,
         2
       ),
@@ -118,19 +162,16 @@ export function buildCriteriaAveragesSql(pitchAlias: string, eventCriteriaAlias:
                 CASE
                   WHEN jsonb_typeof(v2."criteriaScores") = 'array'
                     AND jsonb_array_length(v2."criteriaScores") > 0
-                  THEN (
-                    SELECT (score_item->>'score')::numeric
-                    FROM jsonb_array_elements(v2."criteriaScores") score_item
-                    WHERE score_item->>'criterionId' = criterion_item->>'id'
-                    LIMIT 1
+                  THEN COALESCE(
+                    (
+                      SELECT (score_item->>'score')::numeric
+                      FROM jsonb_array_elements(v2."criteriaScores") score_item
+                      WHERE score_item->>'criterionId' = criterion_item->>'id'
+                      LIMIT 1
+                    ),
+                    ${buildLegacyScoreSql("v2", "criterion_item->>'id'")}
                   )
-                  ELSE CASE criterion_item->>'id'
-                    WHEN 'innovation' THEN v2.innovation::numeric
-                    WHEN 'viability' THEN v2.viability::numeric
-                    WHEN 'impact' THEN v2.impact::numeric
-                    WHEN 'presentation' THEN v2.presentation::numeric
-                    ELSE NULL
-                  END
+                  ELSE ${buildLegacyScoreSql("v2", "criterion_item->>'id'")}
                 END
               )::numeric, 2)
               FROM vote v2

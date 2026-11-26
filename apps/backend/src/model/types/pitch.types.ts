@@ -12,7 +12,7 @@ export type Pitch = {
   createdAt: Date;
 };
 
-// Forma publica del pitch para la pantalla de voto.
+// Forma pública del pitch para la pantalla de voto.
 export type PublicPitch = {
   id: string;
   eventId: string;
@@ -47,6 +47,7 @@ export type PitchDetail = {
 export type PitchComment = {
   id: string;
   comment: string;
+  commentType?: "OPINION" | "ACTIVADOR" | null;
   createdAt: Date;
 };
 

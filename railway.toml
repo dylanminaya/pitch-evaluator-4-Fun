@@ -1,0 +1,6 @@
+[build]
+builder = "nixpacks"
+buildCommand = "pnpm --filter @workspace/shared build && pnpm --filter backend build"
+
+[deploy]
+startCommand = "pnpm --filter backend start"

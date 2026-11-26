@@ -4,13 +4,15 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./env": "./env/index.ts",
-    "./env/client": "./env/client.ts",
-    "./env/server": "./env/server.ts",
-    "./api": "./api/index.ts",
-    "./api/*": "./api/*.ts"
+    "./env": "./dist/env/index.js",
+    "./env/client": "./dist/env/client.js",
+    "./env/server": "./dist/env/server.js",
+    "./api": "./dist/api/index.js",
+    "./api/*": "./dist/api/*.js"
   },
+  "types": "./dist/env/index.d.ts",
   "scripts": {
+    "build": "tsc -p tsconfig.json",
     "lint": "eslint",
     "format": "prettier --write \"**/*.ts\"",
     "typecheck": "tsc --noEmit"

@@ -17,12 +17,25 @@ import {
 
 export const voteRouter: Router = Router();
 
-// Detecta errores de Postgres por codigo para aplicar fallbacks o respuestas claras.
+// Detecta errores de Postgres por código para aplicar alternativas o respuestas claras.
 const hasPgErrorCode = (error: unknown, code: string) =>
   typeof error === "object" &&
   error !== null &&
   "code" in error &&
   error.code === code;
+
+async function ensureVoteCommentTypeColumn() {
+  await db.query(`
+    ALTER TABLE vote
+    ADD COLUMN IF NOT EXISTS "commentType" TEXT NOT NULL DEFAULT 'OPINION';
+
+    ALTER TABLE vote
+    DROP CONSTRAINT IF EXISTS vote_comment_type_check;
+
+    ALTER TABLE vote
+    ADD CONSTRAINT vote_comment_type_check CHECK ("commentType" IN ('OPINION', 'ACTIVADOR'));
+  `);
+}
 
 // Lista los votos de un pitch para dashboard.
 voteRouter.get("/", async (req, res) => {
@@ -64,6 +77,7 @@ voteRouter.get("/", async (req, res) => {
           v.impact,
           v.presentation,
           v.comment,
+          COALESCE(to_jsonb(v) ->> 'commentType', 'OPINION') AS "commentType",
           v."createdAt"
         FROM vote v
         WHERE v."pitchId" = $1
@@ -79,7 +93,7 @@ voteRouter.get("/", async (req, res) => {
   }
 });
 
-// Registra un voto publico.
+// Registra un voto público.
 voteRouter.post("/", async (req, res) => {
   const parsed = createPublicVoteSchema.safeParse(req.body);
 
@@ -96,6 +110,7 @@ voteRouter.post("/", async (req, res) => {
     evaluatorEmail,
     criteriaScores,
     comment,
+    commentType,
   } = parsed.data;
 
   try {
@@ -195,8 +210,8 @@ voteRouter.post("/", async (req, res) => {
     let result;
 
     try {
-      try {
-        result = await db.query(
+      const insertVoteWithCommentType = () =>
+        db.query(
           `
             INSERT INTO vote (
               id,
@@ -209,9 +224,10 @@ voteRouter.post("/", async (req, res) => {
               impact,
               presentation,
               comment,
+              "commentType",
               "createdAt"
             )
-            VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7, $8, $9, $10, NOW())
+            VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7, $8, $9, $10, $11, NOW())
             RETURNING
               id,
               "pitchId",
@@ -223,6 +239,7 @@ voteRouter.post("/", async (req, res) => {
               impact,
               presentation,
               comment,
+              "commentType",
               "createdAt"
           `,
           [
@@ -236,55 +253,70 @@ voteRouter.post("/", async (req, res) => {
             impact,
             presentation,
             comment ?? null,
+            commentType,
           ],
         );
+
+      try {
+        result = await insertVoteWithCommentType();
       } catch (error) {
         if (!hasPgErrorCode(error, "42703")) {
           throw error;
         }
 
         try {
-          // Fallback para bases viejas sin `criteriaScores`.
-          result = await db.query(
-            `
-              INSERT INTO vote (
-                id,
-                "pitchId",
-                "evaluatorId",
-                "evaluatorEmail",
+          await ensureVoteCommentTypeColumn();
+          result = await insertVoteWithCommentType();
+        } catch (retryError) {
+          if (!hasPgErrorCode(retryError, "42703")) {
+            throw retryError;
+          }
+
+          try {
+            // Fallback para bases viejas sin `commentType`.
+            result = await db.query(
+              `
+                INSERT INTO vote (
+                  id,
+                  "pitchId",
+                  "evaluatorId",
+                  "evaluatorEmail",
+                  "criteriaScores",
+                  innovation,
+                  viability,
+                  impact,
+                  presentation,
+                  comment,
+                  "createdAt"
+                )
+                VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7, $8, $9, $10, NOW())
+                RETURNING
+                  id,
+                  "pitchId",
+                  "evaluatorId",
+                  "evaluatorEmail",
+                  "criteriaScores",
+                  innovation,
+                  viability,
+                  impact,
+                  presentation,
+                  comment,
+                  "createdAt"
+              `,
+              [
+                randomUUID(),
+                pitchId,
+                evaluatorId ?? null,
+                evaluatorEmail,
+                JSON.stringify(criteriaScores),
                 innovation,
                 viability,
                 impact,
                 presentation,
-                comment,
-                "createdAt"
-              )
-              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
-              RETURNING
-                id,
-                "pitchId",
-                "evaluatorId",
-                "evaluatorEmail",
-                innovation,
-                viability,
-                impact,
-                presentation,
-                comment,
-                "createdAt"
-            `,
-            [
-              randomUUID(),
-              pitchId,
-              evaluatorId ?? null,
-              evaluatorEmail,
-              innovation,
-              viability,
-              impact,
-              presentation,
-              comment ?? null,
-            ],
-          );
-        } catch (fallbackError) {
+                comment ?? null,
+              ],
+            );
+          } catch (fallbackError) {
           if (!hasPgErrorCode(fallbackError, "42703")) {
             throw fallbackError;
           }
@@ -375,6 +407,7 @@ voteRouter.post("/", async (req, res) => {
             );
           }
         }
+      }
       }
     } catch(error) {
     if (

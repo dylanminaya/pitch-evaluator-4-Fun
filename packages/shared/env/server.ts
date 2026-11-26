@@ -19,6 +19,10 @@ const serverEnvSchema = z.object({
   FRONTEND_URL: z.string().url("FRONTEND_URL must be a valid URL"),
   RESEND_API_KEY: z.string().min(1, "RESEND_API_KEY is required"),
   EMAIL_FROM: z.string().email("EMAIL_FROM must be a valid email address"),
+  LIBREOFFICE_BINARY: z.string().optional(),
+  PRESENTATION_PDF_METHOD: z
+    .enum(["auto", "libreoffice", "purejs"])
+    .default("auto"),
 
   // Server
   PORT: z.coerce.number().default(3001),

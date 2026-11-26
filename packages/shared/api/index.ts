@@ -1,4 +1,4 @@
 // Re-export all API types
-export * from "./common";
-export * from "./auth";
-export * from "./dashboard";
+export * from "./common.js";
+export * from "./auth.js";
+export * from "./dashboard.js";

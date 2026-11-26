@@ -9,6 +9,7 @@ export { useUpdateEventStatus } from "./use-update-event-status";
 export { usePitches } from "./use-pitches";
 export { useRanking } from "./use-ranking";
 export { usePitchDetail } from "./use-pitch-detail";
+export { usePitchComments } from "./use-pitch-comments";
 export { usePitchQr } from "./use-pitch-qr";
 export { useEventQr } from "./use-event-qr";
 export { useUpdatePitch } from "./use-update-pitch";

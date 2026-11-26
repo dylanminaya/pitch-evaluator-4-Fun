@@ -12,7 +12,7 @@ import { voteRouter } from "./model/api/vote.api.js";
 const env = validateServerEnv();
 const app = express();
 
-// Permite requests del frontend con cookies/sesion.
+// Permite solicitudes del frontend con cookies/sesión.
 app.use(
   cors({
     origin: env.FRONTEND_URL,
@@ -26,7 +26,7 @@ app.all("/api/auth/*", toNodeHandler(auth));
 // Permite leer JSON en el body de las requests.
 app.use(express.json());
 
-// Health check basico para saber si el backend esta vivo.
+// Comprobación básica para saber si el backend está activo.
 app.get("/health", (_req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
 });

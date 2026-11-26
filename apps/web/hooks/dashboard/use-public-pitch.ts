@@ -9,5 +9,8 @@ export function usePublicPitch(pitchId?: string, evaluatorEmail?: string | null)
     queryKey: ["public-pitch", pitchId, evaluatorEmail],
     queryFn: () => getPublicPitch(pitchId!, evaluatorEmail ?? undefined),
     enabled: Boolean(pitchId),
+    refetchInterval: 2_000,
+    refetchIntervalInBackground: true,
+    refetchOnWindowFocus: true,
   });
 }

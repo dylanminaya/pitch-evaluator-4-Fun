@@ -11,6 +11,7 @@ import {
   type DashboardRankingItem,
   type DashboardPitchDetail,
   type DashboardPitchComment,
+  type PaginatedPitchComments,
   type DashboardVote,
   type DashboardPitchQr,
   type PublicPitch,
@@ -32,6 +33,7 @@ export type {
   DashboardRankingItem,
   DashboardPitchDetail,
   DashboardPitchComment,
+  PaginatedPitchComments,
   DashboardVote,
   DashboardPitchQr,
   PublicPitch,
@@ -103,6 +105,27 @@ export function getPitchComments(pitchId: string) {
   return apiFetch<DashboardPitchComment[]>(
     `/api/pitch/comments?pitchId=${pitchId}`,
   );
+}
+
+export async function getPaginatedPitchComments(pitchId: string, page: number) {
+  try {
+    return await apiFetch<PaginatedPitchComments>(
+      `/api/pitch/comments/paginated?pitchId=${encodeURIComponent(pitchId)}&page=${page}`,
+    );
+  } catch {
+    // Keeps the detail usable while an older backend instance is still running.
+    const comments = await getPitchComments(pitchId);
+    const pageSize = 20;
+    const start = (page - 1) * pageSize;
+
+    return {
+      comments: comments.slice(start, start + pageSize),
+      total: comments.length,
+      page,
+      pageSize,
+      totalPages: Math.ceil(comments.length / pageSize),
+    };
+  }
 }
 
 export function getVotes(pitchId: string) {
@@ -217,3 +240,6 @@ export function acceptOrganizerInvitation(token: string) {
     body: JSON.stringify({ token }),
   });
 }
+
+
+

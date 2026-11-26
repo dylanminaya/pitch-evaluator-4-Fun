@@ -1,13 +1,13 @@
 {
   "extends": "@workspace/typescript-config/base.json",
   "compilerOptions": {
-    "module": "ESNext",
-    "moduleResolution": "bundler",
-    "types": ["node"],
-    "paths": {
-      "@workspace/shared/*": ["./*"]
-    }
+    "outDir": "dist",
+    "rootDir": ".",
+    "declaration": true,
+    "declarationMap": true,
+    "incremental": true,
+    "types": ["node"]
   },
-  "include": ["."],
+  "include": ["env/**/*.ts", "api/**/*.ts"],
   "exclude": ["node_modules", "dist"]
 }
