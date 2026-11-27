@@ -15,7 +15,7 @@ type AuthShellProps = {
 const featureItems = [
   "Ranking en vivo con visual listo para proyectar",
   "Un QR por evento para abrir todos los pitches al instante",
-  "Resumen de IA y control del flujo del evento",
+  "Control del flujo del evento y exportación de resultados",
 ];
 
 export function AuthShell({
@@ -58,7 +58,7 @@ export function AuthShell({
               </div>
               <div className="inline-flex items-center gap-2 rounded-full border border-[#2a4a2a] bg-[#0a1a0a] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#ccff00]">
                 <Sparkles className="size-3" />
-                Dashboard-ready
+                Todo en un panel
               </div>
             </div>
 

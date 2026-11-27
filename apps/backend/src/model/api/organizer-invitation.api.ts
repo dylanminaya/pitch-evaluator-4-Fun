@@ -27,6 +27,11 @@ import { Router } from "express";
 const env = validateServerEnv();
 export const organizerInvitationRouter: Router = Router();
 
+// Link que abre la pagina publica de aceptacion en el frontend.
+function buildAcceptUrl(token: string) {
+  return `${env.FRONTEND_URL}/organizer-invitations/${token}`;
+}
+
 // Crea una invitacion para otro organizer dentro de un evento.
 eventRouter.post("/:eventId/organizer-invitations", async (req, res) => {
   const session = await requireSession(req, res);
@@ -126,8 +131,8 @@ eventRouter.post("/:eventId/organizer-invitations", async (req, res) => {
       ],
     );
 
-    // Link que abre la pagina publica de aceptacion en el frontend.
-    const inviteUrl = `${env.FRONTEND_URL}/organizer-invitations/${token}`;
+    const acceptUrl = buildAcceptUrl(token);
+    let emailSent = true;
 
     try {
       // El correo falla sin romper la creacion de la invitacion.
@@ -135,15 +140,19 @@ eventRouter.post("/:eventId/organizer-invitations", async (req, res) => {
         to: email,
         eventName: eventResult.rows[0].name,
         inviterEmail: session.user.email,
-        inviteUrl,
+        inviteUrl: acceptUrl,
       });
     } catch (emailError) {
+      emailSent = false;
       console.error("Failed to send organizer invitation email", emailError);
     }
 
-    const invitation = dashboardEventOrganizerInvitationSchema.parse(
-      presentOrganizerInvitation(result.rows[0]),
-    );
+    // Se devuelve el link para que el organizer lo comparta si el correo fallo.
+    const invitation = dashboardEventOrganizerInvitationSchema.parse({
+      ...presentOrganizerInvitation(result.rows[0]),
+      acceptUrl,
+      emailSent,
+    });
 
     return res.status(201).json(invitation);
   } catch (error) {
@@ -183,7 +192,8 @@ eventRouter.get("/:eventId/organizer-invitations", async (req, res) => {
           "invitedByUserId",
           "acceptedByUserId",
           "expiresAt",
-          "createdAt"
+          "createdAt",
+          token
         FROM event_organizer_invitation
         WHERE "eventId" = $1
           AND status = 'PENDING'
@@ -192,8 +202,12 @@ eventRouter.get("/:eventId/organizer-invitations", async (req, res) => {
       [req.params.eventId],
     );
 
+    // Incluye el link para poder reenviar invitaciones pendientes a mano.
     const invitations = organizerInvitationListSchema.parse(
-      result.rows.map(presentOrganizerInvitation),
+      result.rows.map((row) => ({
+        ...presentOrganizerInvitation(row),
+        acceptUrl: buildAcceptUrl(row.token),
+      })),
     );
 
     return res.json(invitations);

@@ -20,6 +20,7 @@ import {
 import { Input } from "@workspace/ui/components/input";
 import { useSignIn } from "@/hooks/auth";
 import { signOut } from "@/lib/better-auth/auth-client";
+import { getFriendlyAuthErrorMessage } from "@/lib/user-feedback";
 
 export function LoginForm({
   className,
@@ -50,13 +51,13 @@ export function LoginForm({
       <Card className="rounded-[28px] border border-[#263550] bg-[#1a2640] py-0 text-white shadow-[0_24px_60px_rgba(2,8,23,0.36)]">
         <CardHeader className="gap-3 border-b border-[#263550] px-6 py-6">
           <p className="text-[10px] font-bold uppercase italic tracking-[0.32em] text-[#83ce00]">
-            Login
+            Iniciar sesión
           </p>
           <CardTitle className="text-3xl font-black italic tracking-tight text-white">
             Entra a tu cuenta
           </CardTitle>
           <CardDescription className="text-sm leading-6 text-[#a9b3c9]">
-            Usa tu correo y contraseña para abrir el panel del organizer.
+            Usa tu correo y contraseña para abrir tu panel de organizador.
           </CardDescription>
         </CardHeader>
         <CardContent className="px-6 py-6">
@@ -64,35 +65,27 @@ export function LoginForm({
             <FieldGroup className="gap-6">
               {error && (
                 <div className="rounded-2xl border border-[#5a2433] bg-[#2a1018] p-3 text-sm text-[#ff8cab]">
-                  {error.message}
+                  {getFriendlyAuthErrorMessage(error)}
                 </div>
               )}
               <Field>
                 <FieldLabel htmlFor="email" className="text-xs font-bold uppercase italic tracking-[0.24em] text-[#8899aa]">
-                  Email
+                  Correo electrónico
                 </FieldLabel>
                 <Input
                   id="email"
                   name="email"
                   type="email"
-                  placeholder="m@example.com"
+                  placeholder="tu@correo.com"
                   required
                   disabled={isPending}
                   className="h-12 rounded-2xl border-[#263550] bg-[#0d1526] px-4 text-white placeholder:text-[#66738f] focus-visible:border-[#0595f0] focus-visible:ring-[#0595f0]/25"
                 />
               </Field>
               <Field>
-                <div className="flex items-center">
-                  <FieldLabel htmlFor="password" className="text-xs font-bold uppercase italic tracking-[0.24em] text-[#8899aa]">
-                    Password
-                  </FieldLabel>
-                  <Link
-                    href="#"
-                    className="ml-auto inline-block text-sm text-[#83ce00] underline-offset-4 hover:underline"
-                  >
-                    Forgot your password?
-                  </Link>
-                </div>
+                <FieldLabel htmlFor="password" className="text-xs font-bold uppercase italic tracking-[0.24em] text-[#8899aa]">
+                  Contraseña
+                </FieldLabel>
                 <Input
                   id="password"
                   name="password"
@@ -111,12 +104,12 @@ export function LoginForm({
                   {isPending ? "Entrando..." : "Entrar al dashboard"}
                 </Button>
                 <FieldDescription className="pt-2 text-center text-sm text-[#8899aa]">
-                  Don&apos;t have an account?{" "}
+                  ¿No tienes cuenta?{" "}
                   <Link
                     href={redirectTo ? `/signup?redirect=${encodeURIComponent(redirectTo)}` : "/signup"}
                     className="font-semibold text-[#83ce00] underline underline-offset-4"
                   >
-                    Sign up
+                    Regístrate
                   </Link>
                 </FieldDescription>
               </Field>

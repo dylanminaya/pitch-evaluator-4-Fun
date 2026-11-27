@@ -69,6 +69,7 @@ function buildRankingRows({
   ranking,
   selectedCriteria,
   pitchStatusById,
+  pitchCreatedAtById,
 }: {
   ranking: Array<{
     id: string;
@@ -84,6 +85,7 @@ function buildRankingRows({
   }>;
   selectedCriteria: EventCriterion[];
   pitchStatusById: Map<string, "OPEN" | "CLOSED">;
+  pitchCreatedAtById: Map<string, string | null>;
 }) {
   function getCriterionAverages(item: {
     criteriaAverages?: CriterionAverage[];
@@ -111,6 +113,13 @@ function buildRankingRows({
     }));
   }
 
+  function getCreatedAtTime(pitchId: string) {
+    const createdAt = pitchCreatedAtById.get(pitchId);
+    const time = createdAt ? Date.parse(createdAt) : Number.NaN;
+    return Number.isNaN(time) ? null : time;
+  }
+
+  // Mismo orden que el ranking del backend: promedio, votos y fecha de creación.
   return [...ranking]
     .map((item) => ({
       ...item,
@@ -119,12 +128,22 @@ function buildRankingRows({
       criterionAverages: getCriterionAverages(item),
     }))
     .sort((left, right) => {
-      if (right.percentage !== left.percentage) {
-        return right.percentage - left.percentage;
+      if (right.scoreAvg !== left.scoreAvg) {
+        return right.scoreAvg - left.scoreAvg;
       }
 
       if (right.votesCount !== left.votesCount) {
         return right.votesCount - left.votesCount;
+      }
+
+      const leftCreatedAt = getCreatedAtTime(left.id);
+      const rightCreatedAt = getCreatedAtTime(right.id);
+
+      if (leftCreatedAt !== rightCreatedAt) {
+        // Sin fecha va al final, como NULLS LAST en Postgres.
+        if (leftCreatedAt === null) return 1;
+        if (rightCreatedAt === null) return -1;
+        return leftCreatedAt - rightCreatedAt;
       }
 
       return left.name.localeCompare(right.name);
@@ -153,36 +172,20 @@ export default function EventExportsPage() {
     () => new Map(pitches.map((pitch) => [pitch.id, pitch.status])),
     [pitches],
   );
-
-  const rankingRows = useMemo(() => {
-    return buildRankingRows({ ranking, selectedCriteria, pitchStatusById });
-  }, [pitchStatusById, ranking, selectedCriteria]);
-
-  const pitchesById = useMemo(
-    () => new Map(pitches.map((pitch) => [pitch.id, pitch])),
+  const pitchCreatedAtById = useMemo(
+    () => new Map(pitches.map((pitch) => [pitch.id, pitch.createdAt])),
     [pitches],
   );
 
-  const rankingRowsByCreatedAt = useMemo(() => {
-    return [...rankingRows].sort((left, right) => {
-      const leftCreatedAt = Date.parse(pitchesById.get(left.id)?.createdAt ?? "");
-      const rightCreatedAt = Date.parse(pitchesById.get(right.id)?.createdAt ?? "");
-
-      if (Number.isFinite(rightCreatedAt) && Number.isFinite(leftCreatedAt)) {
-        return rightCreatedAt - leftCreatedAt;
-      }
-
-      if (Number.isFinite(rightCreatedAt)) {
-        return 1;
-      }
-
-      if (Number.isFinite(leftCreatedAt)) {
-        return -1;
-      }
-
-      return left.name.localeCompare(right.name);
+  const rankingRows = useMemo(() => {
+    return buildRankingRows({
+      ranking,
+      selectedCriteria,
+      pitchStatusById,
+      pitchCreatedAtById,
     });
-  }, [pitchesById, rankingRows]);
+  }, [pitchCreatedAtById, pitchStatusById, ranking, selectedCriteria]);
+
 
   useEffect(() => {
     setSelectedPitchIds((current) =>
@@ -191,9 +194,9 @@ export default function EventExportsPage() {
   }, [rankingRows]);
 
   const allSelected =
-    rankingRowsByCreatedAt.length > 0 && selectedPitchIds.length === rankingRowsByCreatedAt.length;
+    rankingRows.length > 0 && selectedPitchIds.length === rankingRows.length;
 
-  const selectedRows = rankingRowsByCreatedAt.filter((row) => selectedPitchIds.includes(row.id));
+  const selectedRows = rankingRows.filter((row) => selectedPitchIds.includes(row.id));
 
   function togglePitchSelection(pitchId: string) {
     setSelectedPitchIds((current) =>
@@ -204,7 +207,7 @@ export default function EventExportsPage() {
   }
 
   function toggleSelectAll() {
-    setSelectedPitchIds(allSelected ? [] : rankingRowsByCreatedAt.map((row) => row.id));
+    setSelectedPitchIds(allSelected ? [] : rankingRows.map((row) => row.id));
   }
 
   function getVoteScore(vote: DashboardVote | undefined, criterionId: string) {
@@ -262,13 +265,10 @@ export default function EventExportsPage() {
   }
 
   function buildCombinedCsv(rows: ExportVoteRow[]) {
-    const pitchPositions = new Map<string, number>();
-
-    for (const row of rows) {
-      if (!pitchPositions.has(row.id)) {
-        pitchPositions.set(row.id, pitchPositions.size + 1);
-      }
-    }
+    // Posición dentro del ranking completo, no dentro de la selección.
+    const pitchPositions = new Map(
+      rankingRows.map((row, index) => [row.id, index + 1]),
+    );
 
     const header = [
       "posicion",
@@ -344,7 +344,8 @@ export default function EventExportsPage() {
       const csv = buildCombinedCsv(await buildRowsWithVotes(rows));
       const fileNameBase = createSlug(selectedEvent?.name ?? "event");
       const suffix = mode === "all" ? "all-pitches" : "selected-pitches";
-      const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+      // BOM UTF-8 para que Excel muestre bien los acentos.
+      const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
       triggerBlobDownload(blob, `${fileNameBase}-${suffix}.csv`);
     } catch (error) {
       setExportError(
@@ -492,7 +493,7 @@ export default function EventExportsPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {rankingRowsByCreatedAt.map((row, index) => {
+                    {rankingRows.map((row, index) => {
                       const isSelected = selectedPitchIds.includes(row.id);
 
                       return (

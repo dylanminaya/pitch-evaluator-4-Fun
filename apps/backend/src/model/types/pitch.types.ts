@@ -50,17 +50,6 @@ export type PitchComment = {
   createdAt: Date;
 };
 
-// Payload devuelto por el endpoint de resumen.
-export type PitchSummaryPayload = {
-  pitchId: string;
-  pitchName: string;
-  commentsCount: number;
-  commets: PitchComment[];
-  summary: string | null;
-  status: "PENDING_AI" |"READY"|"FAILED";
-  message: string;
-};
-
 // Datos necesarios para mostrar o generar el QR del pitch.
 export type PitchQrPayload = {
   id: string;
@@ -83,5 +72,4 @@ export type PitchExportRow = {
   impactAvg: number;
   presentationAvg: number;
   scoreAvg: number;
-  aiSummary: string;
 }

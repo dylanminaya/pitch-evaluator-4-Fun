@@ -1,8 +1,7 @@
 import { db } from "../db.js";
 
-// Revisa si un usuario puede administrar un evento.
-export async function canManageEvent(userId: string, eventId: string) {
-  // Owner original del evento.
+// Revisa si el usuario es el owner original del evento.
+export async function isEventOwner(userId: string, eventId: string) {
   const ownerResult = await db.query(
     `
       SELECT 1
@@ -13,7 +12,12 @@ export async function canManageEvent(userId: string, eventId: string) {
     [eventId, userId],
   );
 
-  if ((ownerResult.rowCount ?? 0) > 0) {
+  return (ownerResult.rowCount ?? 0) > 0;
+}
+
+// Revisa si un usuario puede administrar un evento.
+export async function canManageEvent(userId: string, eventId: string) {
+  if (await isEventOwner(userId, eventId)) {
     return true;
   }
 

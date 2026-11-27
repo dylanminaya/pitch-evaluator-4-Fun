@@ -7,7 +7,7 @@ import {
   ArrowLeft,
   Check,
   Plus,
-  Settings2,
+  Info,
   // Sparkles,
   Target,
   Trash2,
@@ -21,16 +21,16 @@ import type { EventCriterion } from "@workspace/shared/api";
 
 const setupItems = [
   {
-    title: "Votacion anonima",
-    description: "El publico vota sin exponer su identidad en pantalla.",
+    title: "Votación anónima",
+    description: "El público vota sin que su identidad se muestre en pantalla.",
   },
   {
     title: "Comentarios",
-    description: "Habilita observaciones para enriquecer la evaluacion.",
+    description: "Los votantes pueden dejar observaciones para cada pitch.",
   },
   {
     title: "Ranking en vivo",
-    description: "Muestra resultados y posiciones en tiempo real.",
+    description: "Resultados y posiciones actualizados en tiempo real.",
   },
 ];
 
@@ -44,10 +44,10 @@ export default function NewEventPage() {
   const [hasTriedSubmit, setHasTriedSubmit] = useState(false);
   //
   const [criteria, setCriteria] = useState<EventCriterion[]>([
-    { id: "innovation", label: "Innovacion", weight: 25, isDefault: true },
+    { id: "innovation", label: "Innovación", weight: 25, isDefault: true },
     { id: "viability", label: "Viabilidad", weight: 25, isDefault: true },
     { id: "impact", label: "Impacto", weight: 25, isDefault: true },
-    { id: "presentation", label: "Presentacion", weight: 25, isDefault: true },
+    { id: "presentation", label: "Presentación", weight: 25, isDefault: true },
   ]);
 
   const totalWeight = useMemo(
@@ -176,14 +176,13 @@ export default function NewEventPage() {
           </div>
 
           <div className="flex items-center gap-3">
-            <Link href="/events">
-              <Button
-                variant="outline"
-                className="rounded-full border-[#263550] bg-[#0d1526] text-white hover:bg-[#1a2640] hover:text-white"
-              >
-                Cancelar
-              </Button>
-            </Link>
+            <Button
+              asChild
+              variant="outline"
+              className="rounded-full border-[#263550] bg-[#0d1526] text-white hover:bg-[#1a2640] hover:text-white"
+            >
+              <Link href="/events">Cancelar</Link>
+            </Button>
             <Button
               form="new-event-form"
               type="submit"
@@ -201,9 +200,7 @@ export default function NewEventPage() {
               Crear nuevo evento
             </h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-[#a9b3c9]">
-              Esta pantalla toma como referencia el flujo de `Desktop - Event Creation`
-              de `pencil.pen`: formulario principal a la izquierda y resumen de
-              criterios/configuracion a la derecha.
+              Define el nombre, la descripción y cómo se evaluarán los pitches.
             </p>
           </div>
 
@@ -215,12 +212,12 @@ export default function NewEventPage() {
             >
               <div className="flex flex-col gap-2 border-b border-[#263550] pb-5">
                 <p className="text-[11px] font-bold uppercase italic tracking-[0.3em] text-[#83ce00]">
-                  Informacion del evento
+                  Información del evento
                 </p>
                 <p className="text-sm text-[#a9b3c9]">
-                  Define el nombre y una descripcion clara para identificar el
-                  evento dentro del dashboard del organizer. Tambien puedes
-                  ajustar el peso de cada criterio de evaluacion.
+                  Define el nombre y una descripción clara para identificar el
+                  evento en tu dashboard. También puedes ajustar el peso de
+                  cada criterio de evaluación.
                 </p>
               </div>
 
@@ -260,7 +257,7 @@ export default function NewEventPage() {
                     htmlFor="event-description"
                     className="text-xs font-bold uppercase italic tracking-[0.24em] text-[#8899aa]"
                   >
-                    Descripcion
+                    Descripción
                   </label>
                   <textarea
                     id="event-description"
@@ -281,7 +278,7 @@ export default function NewEventPage() {
                   <div className="inline-flex items-center gap-2">
                     <Target className="size-4 text-[#a855f7]" />
                     <p className="text-[11px] font-bold uppercase italic tracking-[0.24em] text-[#a88cc8]">
-                      Criterios de evaluacion
+                      Criterios de evaluación
                     </p>
                   </div>
                   <div className="flex items-center gap-3">
@@ -367,19 +364,22 @@ export default function NewEventPage() {
                   ))}
                 </div>
                 <p className="mt-4 text-xs leading-5 text-[#8899aa]">
-                  Debe haber entre {MIN_CRITERIA} y {MAX_CRITERIA} criterios. Estos porcentajes se guardan y afectan el resultado final, asi que el total debe sumar 100%.
+                  Debe haber entre {MIN_CRITERIA} y {MAX_CRITERIA} criterios. Estos porcentajes se guardan y afectan el resultado final, así que el total debe sumar 100%.
                 </p>
               </section>
 
               <section className="rounded-[24px] border border-[#263550] bg-[#1a2640] p-6 shadow-[0_18px_45px_rgba(2,8,23,0.35)]">
                 <div className="inline-flex items-center gap-2">
-                  <Settings2 className="size-4 text-[#ff2d78]" />
+                  <Info className="size-4 text-[#ff2d78]" />
                   <p className="text-[11px] font-bold uppercase italic tracking-[0.24em] text-[#ff7aaa]">
-                    Configuracion
+                    Incluido en cada evento
                   </p>
                 </div>
+                <p className="mt-2 text-xs leading-5 text-[#8899aa]">
+                  No necesitas configurar nada: todos los eventos funcionan así.
+                </p>
 
-                <div className="mt-5 flex flex-col gap-4">
+                <div className="mt-4 flex flex-col gap-4">
                   {setupItems.map((item) => (
                     <div
                       key={item.title}

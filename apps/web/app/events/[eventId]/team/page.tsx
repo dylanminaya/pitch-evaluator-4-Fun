@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ArrowLeft, Mail, Users } from "lucide-react";
+import { ArrowLeft, Copy, Mail, Users } from "lucide-react";
 import { Button } from "@workspace/ui/components/button";
 import { Input } from "@workspace/ui/components/input";
 import {
@@ -14,10 +14,36 @@ import {
   useRemoveOrganizer,
 } from "@/hooks/dashboard";
 
+type InviteResult = {
+  email: string;
+  emailSent: boolean;
+  acceptUrl?: string;
+};
+
+// Copia el link; si el portapapeles falla, deja el texto seleccionado.
+async function copyLink(url: string, elementId: string) {
+  try {
+    await navigator.clipboard.writeText(url);
+    return true;
+  } catch {
+    const element = document.getElementById(elementId);
+    const selection = window.getSelection();
+    if (element && selection) {
+      const range = document.createRange();
+      range.selectNodeContents(element);
+      selection.removeAllRanges();
+      selection.addRange(range);
+    }
+    return false;
+  }
+}
+
 export default function EventTeamPage() {
   const params = useParams<{ eventId: string }>();
   const eventId = params.eventId;
   const [email, setEmail] = useState("");
+  const [inviteResult, setInviteResult] = useState<InviteResult | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
   const { mutateAsync, isPending, error } = useCreateOrganizerInvitation();
   const {
     mutateAsync: cancelInvitation,
@@ -39,7 +65,10 @@ export default function EventTeamPage() {
   async function handleInvite() {
     if (!email.trim()) return;
 
-    await mutateAsync({
+    setInviteResult(null);
+    setCopiedId(null);
+
+    const invitation = await mutateAsync({
       eventId,
       data: {
         email: email.trim(),
@@ -47,7 +76,17 @@ export default function EventTeamPage() {
       },
     });
 
+    setInviteResult({
+      email: invitation.email,
+      emailSent: invitation.emailSent ?? true,
+      acceptUrl: invitation.acceptUrl,
+    });
     setEmail("");
+  }
+
+  async function handleCopy(url: string, elementId: string) {
+    const copied = await copyLink(url, elementId);
+    setCopiedId(copied ? elementId : null);
   }
 
   async function handleCancelInvitation(invitationId: string) {
@@ -115,6 +154,47 @@ export default function EventTeamPage() {
                 </div>
               )}
 
+              {inviteResult && inviteResult.emailSent && (
+                <div className="rounded-2xl border border-[#3d5a12] bg-[#16240a] p-3 text-sm text-[#b8f05a]">
+                  Invitacion enviada a {inviteResult.email}
+                </div>
+              )}
+
+              {inviteResult && !inviteResult.emailSent && (
+                <div className="flex flex-col gap-3 rounded-2xl border border-[#6b5414] bg-[#2a210a] p-3 text-sm text-[#ffd666]">
+                  <p>
+                    No pudimos enviar el correo de invitación a{" "}
+                    {inviteResult.email}. Comparte este enlace manualmente:
+                  </p>
+                  {inviteResult.acceptUrl && (
+                    <>
+                      <p
+                        id="invite-result-url"
+                        className="break-all rounded-xl border border-[#263550] bg-[#0d1526] px-3 py-2 font-mono text-xs text-white select-all"
+                      >
+                        {inviteResult.acceptUrl}
+                      </p>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() =>
+                          handleCopy(
+                            inviteResult.acceptUrl!,
+                            "invite-result-url",
+                          )
+                        }
+                        className="self-start rounded-full border-[#263550] bg-transparent px-3 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-[#83ce00] hover:bg-[#121d30] hover:text-[#a7ea2e]"
+                      >
+                        <Copy className="size-3" />
+                        {copiedId === "invite-result-url"
+                          ? "Copiado"
+                          : "Copiar enlace"}
+                      </Button>
+                    </>
+                  )}
+                </div>
+              )}
+
               <Button
                 type="button"
                 onClick={handleInvite}
@@ -160,7 +240,7 @@ export default function EventTeamPage() {
 
                         <div className="flex items-center gap-2">
                           <div className="rounded-full border border-[#263550] bg-[#121d30] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-[#83ce00]">
-                            {organizer.role}
+                            {organizer.id.includes("-owner") ? "Organizador principal" : "Organizador"}
                           </div>
 
                           {!organizer.id.includes('-owner') && (
@@ -171,7 +251,7 @@ export default function EventTeamPage() {
                               onClick={() => handleRemoveOrganizer(organizer.id)}
                               className="rounded-full border-[#5a2433] bg-transparent px-3 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-[#ff8cab] hover:bg-[#2a1018] hover:text-[#ffb5c7]"
                             >
-                              {isRemovingOrganizer ? "Sacando..." : "Sacar"}
+                              {isRemovingOrganizer ? "Quitando..." : "Quitar"}
                             </Button>
                           )}
                         </div>
@@ -209,14 +289,41 @@ export default function EventTeamPage() {
                             {invitation.email}
                           </p>
                           <p className="mt-1 text-xs uppercase tracking-[0.2em] text-[#8899aa]">
-                            {invitation.status}
+                            {invitation.status === "PENDING" ? "Pendiente" : invitation.status}
                           </p>
+                          {invitation.acceptUrl && (
+                            <p
+                              id={`invite-url-${invitation.id}`}
+                              className="mt-1 max-w-[320px] truncate font-mono text-[11px] text-[#66738f] select-all"
+                            >
+                              {invitation.acceptUrl}
+                            </p>
+                          )}
                         </div>
 
                         <div className="flex items-center gap-2">
                           <div className="rounded-full border border-[#263550] bg-[#121d30] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-[#83ce00]">
-                            {invitation.role}
+                            {"Organizador"}
                           </div>
+
+                          {invitation.acceptUrl && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() =>
+                                handleCopy(
+                                  invitation.acceptUrl!,
+                                  `invite-url-${invitation.id}`,
+                                )
+                              }
+                              className="rounded-full border-[#263550] bg-transparent px-3 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-[#83ce00] hover:bg-[#121d30] hover:text-[#a7ea2e]"
+                            >
+                              <Copy className="size-3" />
+                              {copiedId === `invite-url-${invitation.id}`
+                                ? "Copiado"
+                                : "Copiar enlace"}
+                            </Button>
+                          )}
 
                           <Button
                             type="button"

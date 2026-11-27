@@ -10,7 +10,7 @@ export default async function Page({
 
   return (
     <AuthShell
-      eyebrow="Registro organizer"
+      eyebrow="Registro de organizadores"
       title="Crea tu base de control"
       description="Configura tu acceso para levantar hackathons, invitar equipos y mover el flujo completo desde un solo panel."
       ctaHref="/"

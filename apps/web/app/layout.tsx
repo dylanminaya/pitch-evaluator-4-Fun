@@ -1,4 +1,5 @@
 import "@workspace/ui/globals.css";
+import type { Metadata } from "next";
 import { Suspense } from "react";
 import { cn } from "@workspace/ui/lib/utils";
 import { QueryProvider } from "@/components/query-provider";
@@ -72,6 +73,15 @@ const obvia = localFont({
   variable: "--font-obvia",
 });
 
+export const metadata: Metadata = {
+  title: {
+    default: "Pitch 4 Fun",
+    template: "%s · Pitch 4 Fun",
+  },
+  description:
+    "Evalúa pitches en vivo: votación por QR, ranking en tiempo real y resultados listos para exportar.",
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -79,13 +89,13 @@ export default function RootLayout({
 }>) {
   return (
     <html
-      lang="en"
+      lang="es"
       suppressHydrationWarning
       className={cn(obvia.variable, "font-sans antialiased")}
     >
       <body>
         <QueryProvider>
-          <Suspense fallback={<div>Loading...</div>}>
+          <Suspense fallback={<div>Cargando...</div>}>
             <AuthGuard>{children}</AuthGuard>
           </Suspense>
         </QueryProvider>

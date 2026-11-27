@@ -9,7 +9,7 @@ Contexto del Proyecto: Es una plataforma para evaluar presentaciones de proyecto
 
 Para la Audiencia (Mobile-First extremo): Escanean un QR, ven el proyecto (con colores/logo personalizados) y votan del 1 al 5 en 4 criterios (Innovación, Viabilidad, Impacto, Presentación) y dejan un comentario. Cero fricción, sin registro.
 
-Para el Organizador (Dashboard Desktop): Crea el evento, genera los QR, ve el ranking en vivo y genera resúmenes del feedback del público usando Inteligencia Artificial.
+Para el Organizador (Dashboard Desktop): Crea el evento, genera los QR, ve el ranking en vivo y exporta los resultados y comentarios del público.
 
 Para asegurar que el diseño no se sienta generado por IA o como una plantilla genérica, DEBES seguir estrictamente estas reglas:
 
@@ -55,5 +55,5 @@ Fricción cero para el público: Quien evalúa no debe perder tiempo creando cue
 
 Resultados al instante: El sistema debe procesar las calificaciones en tiempo real para que, al terminar el evento, los organizadores tengan un ranking automático y puedan anunciar a los ganadores sin tener que calcular nada manualmente.
 
-Feedback inteligente: Más allá de los números, se espera que la plataforma use Inteligencia Artificial para leer todos los comentarios escritos por el público y generar un resumen ejecutivo con los puntos fuertes y áreas de mejora de cada proyecto.
+Feedback del público: Más allá de los números, los comentarios escritos por el público quedan disponibles para cada proyecto y se incluyen en las exportaciones.
 ```

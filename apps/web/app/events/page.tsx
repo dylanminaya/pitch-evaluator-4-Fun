@@ -53,6 +53,7 @@ export default function EventsPage() {
   const { mutateAsync: removeEvent, isPending: isDeleting } = useDeleteEvent();
   const [filter, setFilter] = useState<FilterKey>("all");
   const [search, setSearch] = useState("");
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const deferredSearch = useDeferredValue(search);
 
   const filteredEvents = useMemo(() => {
@@ -79,12 +80,24 @@ export default function EventsPage() {
 
   async function handleDelete(eventId: string, eventName: string) {
     const confirmed = window.confirm(
-      `Vas a eliminar "${eventName}". Esta accion no se puede deshacer.`
+      `Vas a eliminar "${eventName}". Esta acción no se puede deshacer.`
     );
 
     if (!confirmed) return;
 
-    await removeEvent(eventId);
+    setDeleteError(null);
+
+    try {
+      await removeEvent(eventId);
+    } catch (error) {
+      // Muestra el error en vez de dejar la promesa sin manejar.
+      const message = error instanceof Error ? error.message.toLowerCase() : "";
+      setDeleteError(
+        message.includes("owner") || message.includes("forbidden")
+          ? `No tienes permiso para eliminar "${eventName}". Solo el organizador principal puede hacerlo.`
+          : `No pudimos eliminar "${eventName}". Inténtalo de nuevo en unos segundos.`,
+      );
+    }
   }
 
   return (
@@ -97,7 +110,7 @@ export default function EventsPage() {
               <div className="flex items-center gap-2">
                 <span className="text-sm text-[#263550]">/</span>
                 <span className="text-xs font-bold uppercase italic tracking-[0.28em] text-[#83ce00]">
-                  Events Management
+                  Gestión de eventos
                 </span>
               </div>
               <span className="text-sm text-[#8899aa]">
@@ -109,21 +122,24 @@ export default function EventsPage() {
           <div className="flex flex-wrap items-center gap-3">
             <div className="inline-flex items-center gap-2 rounded-full border border-[#263550] bg-[#0d1526] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#83ce00]">
               <CircleDot className="size-3 fill-current" />
-              Organizer
+              Organizador
             </div>
-            <Link href="/events/new">
-              <Button className="h-10 rounded-full bg-[#83ce00] px-5 text-sm font-bold italic text-[#0d1526] hover:bg-[#a7ea2e]">
+            <Button
+              asChild
+              className="h-10 rounded-full bg-[#83ce00] px-5 text-sm font-bold italic text-[#0d1526] hover:bg-[#a7ea2e]"
+            >
+              <Link href="/events/new">
                 <Plus className="size-4" />
                 Nuevo evento
-              </Button>
-            </Link>
+              </Link>
+            </Button>
             <Button
               variant="outline"
               className="rounded-full border-[#263550] bg-[#0d1526] text-white hover:bg-[#1a2640] hover:text-white"
               onClick={() => logout()}
               disabled={isSigningOut}
             >
-              {isSigningOut ? "Cerrando..." : "Cerrar sesion"}
+              {isSigningOut ? "Cerrando..." : "Cerrar sesión"}
             </Button>
           </div>
         </header>
@@ -139,7 +155,7 @@ export default function EventsPage() {
               </h1>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-[#a9b3c9]">
                 Cada tarjeta te lleva al dashboard del evento para proyectar ranking,
-                revisar pitches y activar el QR de votacion.
+                revisar pitches y activar el QR de votación.
               </p>
             </div>
 
@@ -175,6 +191,15 @@ export default function EventsPage() {
             })}
           </div>
 
+          {deleteError ? (
+            <div
+              role="alert"
+              className="rounded-2xl border border-[#5a2433] bg-[#2a1018] p-3 text-sm text-[#ff8cab]"
+            >
+              {deleteError}
+            </div>
+          ) : null}
+
           {isLoading ? (
             <div className="grid gap-5 lg:grid-cols-2">
               {Array.from({ length: 4 }).map((_, index) => (
@@ -184,11 +209,27 @@ export default function EventsPage() {
                 />
               ))}
             </div>
+          ) : events.length === 0 ? (
+            <div className="flex flex-col items-center rounded-3xl border border-[#263550] bg-[#121d30] px-6 py-10 text-center shadow-[0_18px_45px_rgba(2,8,23,0.3)]">
+              <p className="text-lg font-semibold text-white">Aún no tienes eventos</p>
+              <p className="mt-2 text-sm text-[#8899aa]">
+                Crea tu primer evento para registrar pitches y abrir la votación.
+              </p>
+              <Button
+                asChild
+                className="mt-5 h-10 rounded-full bg-[#83ce00] px-5 text-sm font-bold italic text-[#0d1526] hover:bg-[#a7ea2e]"
+              >
+                <Link href="/events/new">
+                  <Plus className="size-4" />
+                  Crear mi primer evento
+                </Link>
+              </Button>
+            </div>
           ) : filteredEvents.length === 0 ? (
             <div className="rounded-3xl border border-[#263550] bg-[#121d30] px-6 py-10 text-center shadow-[0_18px_45px_rgba(2,8,23,0.3)]">
               <p className="text-lg font-semibold text-white">No encontramos eventos</p>
               <p className="mt-2 text-sm text-[#8899aa]">
-                Ajusta el filtro o crea un evento nuevo para empezar.
+                Ningún evento coincide con el filtro o la búsqueda. Prueba con otro.
               </p>
             </div>
           ) : (
@@ -245,7 +286,7 @@ export default function EventsPage() {
                           </div>
                           <div className="inline-flex items-center gap-2">
                             <CircleDot className="size-4" />
-                            <span>{isOpen ? "Recepcionando votos" : "Sesion cerrada"}</span>
+                            <span>{isOpen ? "Recibiendo votos" : "Sesión cerrada"}</span>
                           </div>
                           {event.accessRole === "CO_ORGANIZER" ? (
                             <div className="inline-flex items-center gap-2">
@@ -257,7 +298,7 @@ export default function EventsPage() {
 
                         <div className="flex items-center justify-between">
                           <span className="text-[11px] font-bold uppercase italic tracking-[0.28em] text-[#83ce00]">
-                            {event.accessRole === "CO_ORGANIZER" ? "Eres co-organizer" : "Abrir dashboard"}
+                            {event.accessRole === "CO_ORGANIZER" ? "Eres coorganizador" : "Abrir dashboard"}
                           </span>
                           <div className="inline-flex items-center gap-2 rounded-full border border-[#263550] bg-[#0d1526] px-4 py-2 text-sm font-semibold text-white">
                             Entrar
@@ -272,28 +313,30 @@ export default function EventsPage() {
                           Acciones del evento
                         </p>
                         <div className="flex flex-wrap items-center gap-3">
-                          <Link href={`/events/${event.id}/team`}>
+                          <Button
+                            asChild
+                            variant="outline"
+                            size="sm"
+                            className="rounded-full border-[#263550] bg-[#121d30] text-white hover:bg-[#1a2640] hover:text-white"
+                          >
+                            <Link href={`/events/${event.id}/team`}>
+                              <Users className="size-4" />
+                              Equipo
+                            </Link>
+                          </Button>
+                          {event.accessRole === "OWNER" ? (
                             <Button
                               type="button"
                               variant="outline"
                               size="sm"
-                              className="rounded-full border-[#263550] bg-[#121d30] text-white hover:bg-[#1a2640] hover:text-white"
+                              className="rounded-full border-[#5a2433] bg-[#23171b] text-[#ff8cab] hover:bg-[#2f1b21] hover:text-[#ff8cab]"
+                              disabled={isDeleting}
+                              onClick={() => handleDelete(event.id, event.name)}
                             >
-                              <Users className="size-4" />
-                              Equipo
+                              <Trash2 className="size-4" />
+                              Eliminar
                             </Button>
-                          </Link>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className="rounded-full border-[#5a2433] bg-[#23171b] text-[#ff8cab] hover:bg-[#2f1b21] hover:text-[#ff8cab]"
-                            disabled={isDeleting}
-                            onClick={() => handleDelete(event.id, event.name)}
-                          >
-                            <Trash2 className="size-4" />
-                            Eliminar
-                          </Button>
+                          ) : null}
                         </div>
                       </div>
                     </div>

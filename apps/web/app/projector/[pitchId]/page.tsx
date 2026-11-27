@@ -78,12 +78,14 @@ export default function ProjectorPitchPage() {
   const router = useRouter();
   const pitchId = params.pitchId;
 
-  const { data: pitch, isLoading, error } = usePublicPitch(pitchId);
+  const { data: pitch, isLoading } = usePublicPitch(pitchId);
   const { mutateAsync: updatePitchStatus, isPending: isUpdatingPitchStatus } =
     useUpdatePitchStatus();
   const pitchLogoUrl = pitch?.logoUrl ?? null;
   const pitchPresentationFileName = pitch?.presentationFileName ?? null;
   const [durationMinutes, setDurationMinutes] = useState(DEFAULT_MINUTES);
+  // Texto del input; puede quedar vacio mientras se escribe
+  const [minutesInput, setMinutesInput] = useState(String(DEFAULT_MINUTES));
   const [timeLeftSeconds, setTimeLeftSeconds] = useState(DEFAULT_MINUTES * 60);
   const [autoCloseDelaySeconds, setAutoCloseDelaySeconds] = useState(
     DEFAULT_AUTO_CLOSE_DELAY_SECONDS,
@@ -101,7 +103,10 @@ export default function ProjectorPitchPage() {
   const [currentSlide, setCurrentSlide] = useState(1);
   const [slidesCount, setSlidesCount] = useState(1);
   const [presentationError, setPresentationError] = useState<string | null>(null);
-  const [isSlideLoading, setIsSlideLoading] = useState(false);
+  // URL de la ultima diapositiva cargada / fallida, para derivar estado por diapositiva
+  const [loadedSlideUrl, setLoadedSlideUrl] = useState<string | null>(null);
+  const [failedSlideUrl, setFailedSlideUrl] = useState<string | null>(null);
+  const [lastAutoSlide, setLastAutoSlide] = useState<number | null>(null);
   const hasScheduledAutoCloseRef = useRef(false);
   const autoCloseDelaySecondsRef = useRef(DEFAULT_AUTO_CLOSE_DELAY_SECONDS);
 
@@ -239,17 +244,18 @@ export default function ProjectorPitchPage() {
     return (durationMinutes * 60) / slidesCount;
   }, [autoAdvanceSlidesEnabled, isShowingPresentation, slidesCount, durationMinutes]);
 
-  useEffect(() => {
-    if (!isRunning || !slideDurationSeconds || currentSlide >= slidesCount) {
-      return;
-    }
+  // Avance automatico: la diapositiva sale del tiempo transcurrido del cronometro
+  const elapsedSeconds = Math.max(durationMinutes * 60 - timeLeftSeconds, 0);
+  const autoSlide =
+    slideDurationSeconds && isTimerEnabled
+      ? Math.min(Math.floor(elapsedSeconds / slideDurationSeconds) + 1, slidesCount)
+      : null;
 
-    const timeoutId = window.setTimeout(() => {
-      setCurrentSlide((current) => Math.min(current + 1, slidesCount));
-    }, slideDurationSeconds * 1000);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [currentSlide, isRunning, slideDurationSeconds, slidesCount]);
+  // Solo se mueve al cruzar un limite, asi la navegacion manual se respeta entre limites
+  if (autoSlide != null && autoSlide !== lastAutoSlide) {
+    setLastAutoSlide(autoSlide);
+    setCurrentSlide(autoSlide);
+  }
 
   useEffect(() => {
     if (!presentationBaseUrl) {
@@ -296,13 +302,12 @@ export default function ProjectorPitchPage() {
     };
   }, [presentationBaseUrl]);
 
-  useEffect(() => {
-    if (!currentSlideImageUrl) {
-      return;
-    }
-
-    setIsSlideLoading(true);
-  }, [currentSlideImageUrl]);
+  const slideFailed = currentSlideImageUrl != null && failedSlideUrl === currentSlideImageUrl;
+  const isSlideLoading =
+    currentSlideImageUrl != null && loadedSlideUrl !== currentSlideImageUrl && !slideFailed;
+  const slideError =
+    presentationError ??
+    (slideFailed ? "No pudimos mostrar esta diapositiva del PowerPoint." : null);
 
   function goToPreviousSlide() {
     setCurrentSlide((current) => Math.max(current - 1, 1));
@@ -351,6 +356,7 @@ export default function ProjectorPitchPage() {
   function applyMinutes(nextMinutes: number) {
     const normalizedMinutes = clampDuration(nextMinutes);
     setDurationMinutes(normalizedMinutes);
+    setMinutesInput(String(normalizedMinutes));
     setTimeLeftSeconds(normalizedMinutes * 60);
     setIsRunning(false);
     setAutoCloseCountdownSeconds(null);
@@ -359,14 +365,7 @@ export default function ProjectorPitchPage() {
   }
 
   function handleMinutesChange(event: React.ChangeEvent<HTMLInputElement>) {
-    const nextValue = Number(event.target.value);
-
-    if (!Number.isFinite(nextValue)) {
-      setDurationMinutes(DEFAULT_MINUTES);
-      return;
-    }
-
-    setDurationMinutes(clampDuration(nextValue));
+    setMinutesInput(event.target.value);
   }
 
   function handleAutoCloseDelayChange(event: React.ChangeEvent<HTMLInputElement>) {
@@ -384,11 +383,18 @@ export default function ProjectorPitchPage() {
   }
 
   function handleApplyTimer() {
-    applyMinutes(durationMinutes);
+    const parsedMinutes = Number(minutesInput);
+    // Vacio o invalido: conservar la duracion actual
+    applyMinutes(
+      minutesInput.trim() !== "" && Number.isFinite(parsedMinutes)
+        ? Math.round(parsedMinutes)
+        : durationMinutes,
+    );
   }
 
   function handleResetTimer() {
     setTimeLeftSeconds(durationMinutes * 60);
+    setCurrentSlide(1);
     setIsRunning(false);
     setAutoCloseCountdownSeconds(null);
     setAutoCloseError(null);
@@ -408,16 +414,22 @@ export default function ProjectorPitchPage() {
     }
   }
 
-  async function handleBackToExports() {
+  async function handleBack() {
     try {
       if (document.fullscreenElement) {
         await document.exitFullscreen();
       }
     } catch {
-      // If the browser refuses to exit fullscreen here, still return to exports.
+      // Si el navegador no sale de pantalla completa, igual volvemos.
     }
 
-    router.push(`/events/${pitch?.eventId}/exports`);
+    // Volver a la pagina de origen; sin historial, ir al dashboard del evento
+    if (window.history.length > 1) {
+      router.back();
+      return;
+    }
+
+    router.push(pitch?.eventId ? `/dashboard?eventId=${pitch.eventId}` : "/dashboard");
   }
 
   if (isLoading) {
@@ -428,7 +440,8 @@ export default function ProjectorPitchPage() {
     );
   }
 
-  if (error || !pitch) {
+  // Un fallo puntual del sondeo no debe ocultar datos ya cargados
+  if (!pitch) {
     return (
       <main className="flex min-h-svh items-center justify-center bg-[#050816] px-6 text-center text-lg text-[#90a3bf]">
         No pudimos cargar este pitch para proyeccion.
@@ -442,7 +455,7 @@ export default function ProjectorPitchPage() {
         <Button
           type="button"
           variant="outline"
-          onClick={handleBackToExports}
+          onClick={handleBack}
           className="h-11 rounded-full border-white/15 bg-black/35 px-4 text-sm font-semibold text-white backdrop-blur hover:bg-black/50 hover:text-white"
         >
           <ArrowLeft className="size-4" />
@@ -467,7 +480,11 @@ export default function ProjectorPitchPage() {
               />
             </div>
             <p className="mt-3 text-right text-[11px] font-bold uppercase tracking-[0.18em] text-[#c2ccdc]">
-              {pitch.pitchStatus === "OPEN" ? "Votos abiertos" : "Votos cerrados"}
+              {pitch.eventStatus !== "OPEN"
+                ? "Evento cerrado"
+                : pitch.pitchStatus === "OPEN"
+                  ? "Votos abiertos"
+                  : "Votos cerrados"}
             </p>
             {autoCloseCountdownSeconds != null && pitch.pitchStatus === "OPEN" && (
               <p className="mt-1 text-right text-xs font-semibold text-[#ffcf6e]">
@@ -480,9 +497,9 @@ export default function ProjectorPitchPage() {
 
       {isShowingPresentation && currentSlideImageUrl ? (
         <div className="absolute inset-0 z-0 flex items-center justify-center bg-black">
-          {presentationError ? (
+          {slideError ? (
             <div className="mx-6 max-w-xl rounded-[28px] border border-[#5a2433] bg-[#2a1018]/90 px-6 py-5 text-center text-[#ffb7c9]">
-              {presentationError}
+              {slideError}
             </div>
           ) : (
             <>
@@ -499,14 +516,12 @@ export default function ProjectorPitchPage() {
                 </div>
               )}
               <img
+                key={currentSlideImageUrl}
                 src={currentSlideImageUrl}
                 alt={`Diapositiva ${currentSlide} de ${pitch.name}`}
                 className="h-full w-full object-contain"
-                onLoad={() => setIsSlideLoading(false)}
-                onError={() => {
-                  setIsSlideLoading(false);
-                  setPresentationError("No pudimos mostrar esta diapositiva del PowerPoint.");
-                }}
+                onLoad={() => setLoadedSlideUrl(currentSlideImageUrl)}
+                onError={() => setFailedSlideUrl(currentSlideImageUrl)}
               />
             </>
           )}
@@ -640,7 +655,7 @@ export default function ProjectorPitchPage() {
                   min={MIN_MINUTES}
                   max={MAX_MINUTES}
                   step={1}
-                  value={durationMinutes}
+                  value={minutesInput}
                   onChange={handleMinutesChange}
                   className="h-12 rounded-2xl border-white/10 bg-white/5 px-4 text-base text-white"
                 />
