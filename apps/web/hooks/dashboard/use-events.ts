@@ -8,6 +8,7 @@ export function useEvents() {
     return useQuery<DashboardEvent[]>({
         queryKey: ["events"],
         queryFn: getEvents,
+        refetchInterval: 5000,
     });
 }
 

@@ -279,6 +279,10 @@ export const dashboardEventOrganizerInvitationSchema = z.object({
   acceptedByUserId: z.string().nullable(),
   expiresAt: z.string(),
   createdAt: z.string().nullable(),
+  // Link para compartir la invitacion manualmente.
+  acceptUrl: z.string().url().optional(),
+  // Solo viene al crear: indica si el correo salio.
+  emailSent: z.boolean().optional(),
 });
 
 export const organizerInvitationDetailSchema = z.object({

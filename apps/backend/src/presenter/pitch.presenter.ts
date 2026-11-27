@@ -62,11 +62,11 @@ export const presentPitchDetail = (pitch: {
   logoUrl?: string | null;
   presentationUrl?: string | null;
   presentationFileName?: string | null;
-  votesCount: number;
-  innovationAvg: number;
-  viabilityAvg: number;
-  impactAvg: number;
-  presentationAvg: number;
+  votesCount: number | string;
+  innovationAvg: number | string;
+  viabilityAvg: number | string;
+  impactAvg: number | string;
+  presentationAvg: number | string;
 }) => ({
   id: pitch.id,
   eventId: pitch.eventId,
@@ -76,11 +76,12 @@ export const presentPitchDetail = (pitch: {
   logoUrl: pitch.logoUrl ?? null,
   presentationUrl: pitch.presentationUrl ?? null,
   presentationFileName: pitch.presentationFileName ?? null,
-  votesCount: pitch.votesCount,
-  innovationAvg: pitch.innovationAvg,
-  viabilityAvg: pitch.viabilityAvg,
-  impactAvg: pitch.impactAvg,
-  presentationAvg: pitch.presentationAvg,
+  // Postgres devuelve numeric/bigint como string.
+  votesCount: Number(pitch.votesCount),
+  innovationAvg: Number(pitch.innovationAvg),
+  viabilityAvg: Number(pitch.viabilityAvg),
+  impactAvg: Number(pitch.impactAvg),
+  presentationAvg: Number(pitch.presentationAvg),
 });
 
 // Normaliza un comentario individual.
@@ -94,25 +95,3 @@ export const presentPitchComment = (comment: {
   createdAt: comment.createdAt instanceof Date ? comment.createdAt.toISOString() : comment.createdAt,
 });
 
-// Agrupa el payload del resumen con la lista de comentarios.
-export const presentPitchSummary = (payload: {
-  pitchId: string;
-  pitchName: string;
-  commentsCount: number;
-  comments: Array<{
-    id: string;
-    comment: string;
-    createdAt: Date | string;
-  }>;
-  summary: string | null;
-  status: string;
-  message: string;
-}) => ({
-  pitchId: payload.pitchId,
-  pitchName: payload.pitchName,
-  commentsCount: payload.commentsCount,
-  comments: payload.comments.map(presentPitchComment),
-  summary: payload.summary,
-  status: payload.status,
-  message: payload.message,
-});

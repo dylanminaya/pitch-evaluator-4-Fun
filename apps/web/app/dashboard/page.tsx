@@ -25,6 +25,7 @@ import {
 import type { CriterionAverage, EventCriterion } from "@workspace/shared/api";
 // Utilidad para exportar resultados del evento.
 import { exportEvent } from "@/lib/dashboard-api";
+import { ConnectionBanner } from "@/components/connection-banner";
 
 const defaultCriteria: EventCriterion[] = [
   { id: "innovation", label: "Innovacion", weight: 25, isDefault: true },
@@ -111,7 +112,7 @@ function DashboardPageContent() {
   }, [pitches, requestedPitchId]);
   const selectedPitchId = selectedPitch?.id;
 
-  const { data: rankingData = [] } = useRanking(selectedEventId);
+  const { data: rankingData = [], isError: isRankingOffline } = useRanking(selectedEventId);
   const { data: eventStats } = useEventStats(selectedEventId);
   const { data: qrData } = useEventQr(selectedEventId);
 
@@ -121,6 +122,15 @@ function DashboardPageContent() {
 
   async function handleToggleEventStatus() {
     if (!selectedEventId || !selectedEvent) return;
+
+    if (
+      eventIsOpen &&
+      !window.confirm(
+        "¿Cerrar la votacion de todo el evento? Los asistentes ya no podran votar hasta que lo reabras.",
+      )
+    ) {
+      return;
+    }
 
     await mutateEventStatus({
       eventId: selectedEventId,
@@ -158,16 +168,24 @@ function DashboardPageContent() {
       accent: "text-lime-300",
     },
     {
-      label: "Puntuacion media",
-      value:
-        rankingData.length > 0
-          ? (
-              rankingData.reduce(
-                (sum: number, item: { scoreAvg: number }) => sum + item.scoreAvg,
-                0,
-              ) / rankingData.length
-            ).toFixed(1) // Muestra la media con un decimal.
-          : "0.0",
+      label: "Puntuación media",
+      // Solo promedia pitches que ya recibieron votos.
+      value: (() => {
+        const votedPitches = rankingData.filter(
+          (item: { votesCount: number }) => item.votesCount > 0,
+        );
+
+        if (votedPitches.length === 0) {
+          return "N/D";
+        }
+
+        return (
+          votedPitches.reduce(
+            (sum: number, item: { scoreAvg: number }) => sum + item.scoreAvg,
+            0,
+          ) / votedPitches.length
+        ).toFixed(1);
+      })(),
       accent: "text-cyan-400",
     },
     {
@@ -249,7 +267,7 @@ function DashboardPageContent() {
                 className="inline-flex items-center gap-2 text-sm font-semibold text-[#8899aa] transition hover:text-white"
               >
                 <ArrowLeft className="size-4" />
-                <span>Volver al dashboard</span>
+                <span>Volver a eventos</span>
               </Link>
 
               <div className="hidden h-8 w-px rounded-full bg-[#263550] md:block" />
@@ -260,7 +278,7 @@ function DashboardPageContent() {
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-[#263550]">/</span>
                     <span className="text-xs font-bold uppercase italic tracking-[0.28em] text-[#83ce00]">
-                      Organizer Dashboard
+                      Panel del organizador
                     </span>
                   </div>
                   <span className="text-sm text-[#8899aa]">
@@ -316,7 +334,7 @@ function DashboardPageContent() {
               onClick={() => logout()}
               disabled={isPending}
             >
-              {isPending ? "Cerrando..." : "Cerrar sesion"}
+              {isPending ? "Cerrando..." : "Cerrar sesión"}
             </Button>
           </div>
         </header>
@@ -340,6 +358,8 @@ function DashboardPageContent() {
               ))}
             </div>
 
+            <ConnectionBanner isOffline={isRankingOffline} />
+
             <section className={`${panelClass} min-w-0 overflow-hidden`}>
               <div className="flex items-center justify-between border-b border-[#263550] bg-[#0d1526] px-5 py-4">
                 <div>
@@ -347,11 +367,17 @@ function DashboardPageContent() {
                     Ranking en vivo
                   </p>
                   <p className="mt-1 text-sm text-[#a7a8be]">
-                    Tabla proyectable para moderacion y jurado.
+                    Tabla proyectable para moderación y jurado.
                   </p>
                 </div>
-                <div className="rounded-full border border-[#2a4a2a] bg-[#0a1a0a] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-[#ccff00]">
-                  Actualizado
+                <div
+                  className={`rounded-full border px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] ${
+                    isRankingOffline
+                      ? "border-[#5a4a24] bg-[#2a2210] text-[#ffd27a]"
+                      : "border-[#2a4a2a] bg-[#0a1a0a] text-[#ccff00]"
+                  }`}
+                >
+                  {isRankingOffline ? "Sin conexión" : "En vivo · cada 5 s"}
                 </div>
               </div>
 
@@ -473,7 +499,7 @@ function DashboardPageContent() {
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <p className={eyebrowClass}>
-                    Codigo QR del evento
+                    Código QR del evento
                   </p>
                   <h2 className="mt-2 text-xl font-semibold tracking-tight">{qrData?.name ?? selectedEvent?.name ?? "Sin evento seleccionado"}</h2>
                 </div>
@@ -494,24 +520,13 @@ function DashboardPageContent() {
               </div>
 
               <p className="mt-4 text-center text-xs text-[#8899aa]">
-                escanea para ver todos los pitches del evento
+                Escanea para ver todos los pitches del evento
               </p>
-
-              <div className="mt-4 flex flex-col gap-2 text-sm text-[#8899aa]">
-                <p className="flex items-center gap-2">
-                  <span className="h-2.5 w-2.5 rounded-full bg-[#83ce00]" />
-                  Mas votos.
-                </p>
-                <p className="flex items-center gap-2">
-                  <span className="h-2.5 w-2.5 rounded-full bg-[#0595f0]" />
-                  Pitch reciente.
-                </p>
-              </div>
 
               {qrData?.publicVoteUrl && (
                 <div className="mt-4 rounded-2xl border border-[#263550] bg-[#0d1526] p-4">
                   <p className="text-[10px] font-bold uppercase italic tracking-[0.24em] text-[#83ce00]">
-                    Link de invitacion
+                    Enlace de invitación
                   </p>
                   <p className="mt-3 break-all text-sm leading-6 text-[#a9b3c9]">
                     {qrData.publicVoteUrl}
@@ -519,7 +534,7 @@ function DashboardPageContent() {
                   <div className="mt-4">
                     <Link href={qrData.publicVoteUrl} target="_blank" rel="noreferrer">
                       <Button className="rounded-full bg-[#83ce00] text-sm font-bold italic text-[#0d1526] hover:bg-[#a7ea2e]">
-                        Abrir invitacion
+                        Abrir invitación
                       </Button>
                     </Link>
                   </div>
@@ -530,7 +545,9 @@ function DashboardPageContent() {
                 <div className="flex items-end justify-between gap-4">
                   <div>
                     <p className="text-2xl font-semibold text-[#ccff00]">{selectedPitchVotes}</p>
-                    <p className="text-xs text-[#97a093]">votos recibidos</p>
+                    <p className="text-xs text-[#97a093]">
+                      {selectedPitch ? `votos de ${selectedPitch.name}` : "votos recibidos"}
+                    </p>
                   </div>
                   <Link
                     href={selectedEventId ? `/events/${selectedEventId}/exports` : "#"}
@@ -546,23 +563,26 @@ function DashboardPageContent() {
                   </Link>
                 </div>
 
-                <div className="mt-4 flex justify-end">
-                  <Link
-                    href={
-                      selectedEventId && selectedPitchId
-                        ? `/events/${selectedEventId}/pitches/${selectedPitchId}/edit`
-                        : "#"
-                    }
-                  >
-                    {/* <Button
-                      variant="outline"
-                      disabled={!selectedEventId || !selectedPitchId}
-                      className="rounded-full border-[#263550] bg-transparent text-white hover:bg-[#1a2640] hover:text-white"
-                    >
-                      Editar pitch
-                    </Button> */}
-                  </Link>
-                </div>
+                {selectedEventId && selectedPitchId && (
+                  <div className="mt-4 flex flex-wrap justify-end gap-2">
+                    <Link href={`/projector/${selectedPitchId}`}>
+                      <Button
+                        variant="outline"
+                        className="rounded-full border-[#263550] bg-transparent text-white hover:bg-[#1a2640] hover:text-white"
+                      >
+                        Proyectar pitch
+                      </Button>
+                    </Link>
+                    <Link href={`/events/${selectedEventId}/pitches/${selectedPitchId}/edit`}>
+                      <Button
+                        variant="outline"
+                        className="rounded-full border-[#263550] bg-transparent text-white hover:bg-[#1a2640] hover:text-white"
+                      >
+                        Editar pitch
+                      </Button>
+                    </Link>
+                  </div>
+                )}
               </div>
 
               <div className="mt-4 flex items-center justify-end gap-2 text-[#7f8099]">
@@ -570,6 +590,8 @@ function DashboardPageContent() {
                   className="rounded-full border border-[#0595f0] p-2 transition hover:bg-[#0d1526] disabled:cursor-not-allowed disabled:opacity-40"
                   onClick={handlerExportEvent}
                   disabled={!selectedEventId}
+                  aria-label="Descargar resultados del evento (CSV)"
+                  title="Descargar resultados del evento (CSV)"
                 >
                   <ArrowUpRight className="size-4" />
                 </button>

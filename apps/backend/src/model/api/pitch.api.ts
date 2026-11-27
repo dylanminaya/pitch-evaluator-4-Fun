@@ -25,7 +25,7 @@ import {
 } from "../criteria.js";
 import { validateServerEnv } from "@workspace/shared/env/server";
 import { presentVote } from "../../presenter/vote.presenter.js";
-import { presentPitch, presentPitchComment, presentPitchDetail,presentPitchSummary, presentPublicPitch } from "../../presenter/pitch.presenter.js";
+import { presentPitch, presentPitchComment, presentPitchDetail, presentPublicPitch } from "../../presenter/pitch.presenter.js";
 import {
   dashboardPitchSchema,
   dashboardPitchDetailSchema,
@@ -201,6 +201,73 @@ function extractTextFromNode(node: unknown): string[] {
   });
 }
 
+// Reemplazos legibles para caracteres que Helvetica (WinAnsi) no soporta.
+const PDF_TEXT_REPLACEMENTS: Record<string, string> = {
+  "\u2192": "->",
+  "\u2190": "<-",
+  "\u2194": "<->",
+  "\u21D2": "=>",
+  "\u2191": "^",
+  "\u2193": "v",
+  "\u2018": "'",
+  "\u2019": "'",
+  "\u201A": "'",
+  "\u201B": "'",
+  "\u201C": '"',
+  "\u201D": '"',
+  "\u201E": '"',
+  "\u2022": "-",
+  "\u2023": "-",
+  "\u25AA": "-",
+  "\u25CF": "-",
+  "\u25E6": "-",
+  "\u2043": "-",
+  "\u2013": "-",
+  "\u2014": "-",
+  "\u2212": "-",
+  "\u2026": "...",
+  "\u2264": "<=",
+  "\u2265": ">=",
+  "\u2260": "!=",
+  "\u2248": "~",
+  "\u00A0": " ",
+  "\u2009": " ",
+  "\u200A": " ",
+  "\u202F": " ",
+  "\t": " ",
+  "\u2713": "v",
+  "\u2714": "v",
+  "\u2717": "x",
+  "\u2718": "x",
+};
+
+// Deja solo caracteres que la fuente puede codificar; el resto se mapea o se descarta.
+function sanitizePdfText(text: string, supported: Set<number>) {
+  let output = "";
+
+  for (const char of text.normalize("NFC")) {
+    if (char === "\n") {
+      output += char;
+      continue;
+    }
+
+    const codePoint = char.codePointAt(0) ?? 0;
+
+    if (supported.has(codePoint)) {
+      output += char;
+      continue;
+    }
+
+    const replacement = PDF_TEXT_REPLACEMENTS[char];
+
+    if (replacement && [...replacement].every((item) => supported.has(item.codePointAt(0) ?? 0))) {
+      output += replacement;
+    }
+  }
+
+  return output.replace(/[ ]{2,}/g, " ").replace(/\n{3,}/g, "\n\n");
+}
+
 async function convertPptxBufferToPdfPureJs(buffer: Buffer) {
   const zip = await JSZip.loadAsync(buffer);
   const slidePaths = Object.keys(zip.files)
@@ -217,6 +284,7 @@ async function convertPptxBufferToPdfPureJs(buffer: Buffer) {
 
   const pdfDoc = await PDFDocument.create();
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  const supportedCodePoints = new Set(font.getCharacterSet());
   const parser = new XMLParser({
     ignoreAttributes: false,
     attributeNamePrefix: "",
@@ -231,26 +299,34 @@ async function convertPptxBufferToPdfPureJs(buffer: Buffer) {
       continue;
     }
 
-    const slideXml = await file.async("string");
-    const slideJson = parser.parse(slideXml);
-    const slideText = extractTextFromNode(slideJson).join("\n\n");
-
     const page = pdfDoc.addPage([1123.2, 794.88]);
     const { width, height } = page.getSize();
     const margin = 40;
     const fontSize = 18;
-    const lineHeight = fontSize * 1.3;
-    const wrappedText = slideText || "(Empty slide)";
-
-    page.drawText(wrappedText, {
+    const textOptions = {
       x: margin,
       y: height - margin - fontSize,
       size: fontSize,
       font,
       color: rgb(0, 0, 0),
       maxWidth: width - margin * 2,
-      lineHeight,
-    });
+      lineHeight: fontSize * 1.3,
+    };
+
+    // Un slide con error no debe tumbar toda la presentacion.
+    try {
+      const slideXml = await file.async("string");
+      const slideJson = parser.parse(slideXml);
+      const slideText = sanitizePdfText(
+        extractTextFromNode(slideJson).join("\n\n"),
+        supportedCodePoints,
+      ).trim();
+
+      page.drawText(slideText || "(Empty slide)", textOptions);
+    } catch (error) {
+      console.error(`Failed to render ${slidePath} in fallback converter`, error);
+      page.drawText("(Slide could not be rendered)", textOptions);
+    }
   }
 
   return Buffer.from(await pdfDoc.save());
@@ -1364,77 +1440,6 @@ pitchRouter.get("/:pitchId/qr", async (req, res) => {
   }
 })
 
-// Prepara los comentarios que luego podria resumir una IA.
-pitchRouter.post("/:pitchId/summary", async (req, res) => {
-  const session = await requireSession(req, res)
-
-  if (!session) {
-    return;
-  }
-
-  try {
-    const eventId = await getEventIdForPitch(req.params.pitchId);
-
-    if (!eventId) {
-      return res.status(404).json({ message: "Pitch not found" });
-    }
-
-    const canManage = await canManageEvent(session.user.id, eventId);
-
-    if (!canManage) {
-      return res.status(403).json({ message: "Forbidden" });
-    }
-
-    const pitchResult = await db.query(
-      `
-      SELECT
-        p.id,
-        p.name
-      FROM pitch p
-      WHERE p.id = $1
-        `,
-        [req.params.pitchId],
-    )
-
-    if (pitchResult.rowCount === 0) {
-      return res.status(404).json({ message: "Pitch not found" })
-    }
-    
-    const commentsResult = await db.query(
-      `
-      SELECT
-        v.id,
-        v.comment,
-        v."createdAt"
-      FROM vote v
-      WHERE v."pitchId" = $1
-        AND v.comment IS NOT null
-        AND TRIM(v.comment) <> ''
-      ORDER by v."createdAt" DESC
-      `,
-      [req.params.pitchId],
-    )
-
-    const pitch = pitchResult.rows[0]
-    const comments = commentsResult.rows;
-
-    res.json(
-      presentPitchSummary({ 
-        pitchId: pitch.id,
-        pitchName: pitch.name,
-        commentsCount: comments.length,
-        comments,
-        summary: null,
-        status: "PENDING_AI",
-        message: "Comments collected successfully. AI summary not implemented yet"
-      })
-    )
-  }catch(error) {
-    console.error(error)
-    return res.status(500).json({ message: "Failed to prepare pitch summary"})
-  }
-})
-
 // Exporta el reporte de un pitch en CSV.
 pitchRouter.get("/:pitchId/export", async (req, res) => {
   const session = await requireSession(req, res)
@@ -1616,7 +1621,8 @@ pitchRouter.get("/:pitchId/export", async (req, res) => {
       ].join(",")
     })
 
-    const csv = [csvHeader, ...csvRows].join("\n")
+    // El BOM hace que Excel lea bien los acentos.
+    const csv = "\uFEFF" + [csvHeader, ...csvRows].join("\n")
 
     const pitchName = String(pitch.name)
       .toLowerCase()

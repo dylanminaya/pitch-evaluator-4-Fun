@@ -94,7 +94,7 @@ export default function NewPitchPage() {
                 Nuevo pitch
               </span>
               <span className="text-sm text-[#a9b3c9]">
-                Crea el proyecto y habilita su invitacion y QR.
+                Crea el proyecto y habilita su invitación y QR.
               </span>
             </div>
           </div>
@@ -117,7 +117,7 @@ export default function NewPitchPage() {
           >
             <div className="flex flex-col gap-2 border-b border-[#263550] pb-5">
               <p className="text-[11px] font-bold uppercase italic tracking-[0.3em] text-[#83ce00]">
-                Informacion del pitch
+                Información del pitch
               </p>
               {/* <p className="text-sm text-[#a9b3c9]">
                 Este formulario crea el pitch real en la base de datos y luego el
@@ -156,12 +156,12 @@ export default function NewPitchPage() {
 
               <div className="flex flex-col gap-3">
                 <label className="text-xs font-bold uppercase italic tracking-[0.24em] text-[#8899aa]">
-                  Descripcion
+                  Descripción
                 </label>
                 <textarea
                   value={description}
                   onChange={(event) => setDescription(event.target.value)}
-                  placeholder="Describe la solucion, el problema y el valor del pitch."
+                  placeholder="Describe la solución, el problema y el valor del pitch."
                   disabled={isSaving}
                   className="min-h-36 rounded-2xl border border-[#263550] bg-[#0d1526] px-4 py-3 text-sm text-white outline-none placeholder:text-[#66738f]"
                 />
@@ -189,12 +189,12 @@ export default function NewPitchPage() {
                     />
                   </div>
                   <p className="text-xs text-[#8899aa]">
-                    Usa el selector o escribe un HEX valido como `#83CE00` o `#0595F0`.
+                    Usa el selector o escribe un HEX válido como #83CE00 o #0595F0.
                   </p>
                 </div>
                 <div className="flex flex-col gap-3">
                   <label className="text-xs font-bold uppercase italic tracking-[0.24em] text-[#8899aa]">
-                    Logo URL opcional
+                    URL del logo (opcional)
                   </label>
                   <Input
                     value={logoUrl}
@@ -208,10 +208,10 @@ export default function NewPitchPage() {
 
               <div className="flex flex-col gap-3">
                 <label className="text-xs font-bold uppercase italic tracking-[0.24em] text-[#8899aa]">
-                  Presentación opcional
+                  Presentación (opcional)
                 </label>
                 <p className="rounded-2xl border border-[#263550] bg-[#0d1526] px-4 py-3 text-xs leading-5 text-[#a9b3c9]">
-                  Tamano maximo permitido: 50 MB. Usa archivos .ppt, .pptx o .pdf.
+                  Tamaño máximo permitido: 50 MB. Usa archivos .ppt, .pptx o .pdf.
                 </p>
                 <Input
                   type="file"
@@ -221,7 +221,7 @@ export default function NewPitchPage() {
                   className="h-12 rounded-2xl border-[#263550] bg-[#0d1526] px-4 py-2 text-white file:mr-4 file:rounded-full file:border-0 file:bg-[#83ce00] file:px-4 file:py-1.5 file:text-sm file:font-bold file:text-[#0d1526]"
                 />
                 <p className="text-xs text-[#8899aa]">
-                  La presentacion se preparara como diapositivas para proyectarla en el navegador.
+                  La presentación se preparará como diapositivas para proyectarla en el navegador.
                 </p>
               </div>
             </div>
@@ -231,7 +231,7 @@ export default function NewPitchPage() {
             <section className="rounded-[24px] border border-[#263550] bg-[#1a2640] p-6 shadow-[0_18px_45px_rgba(2,8,23,0.35)]">
               <div className="inline-flex items-center gap-2 text-[11px] font-bold uppercase italic tracking-[0.24em] text-[#83ce00]">
                 <Palette className="size-4 text-[#8899aa]" />
-                Preview
+                Vista previa
               </div>
               <div className="mt-5 rounded-[24px] border border-[#263550] bg-[#0d1526] p-5">
                 <div
@@ -244,7 +244,7 @@ export default function NewPitchPage() {
                   {name || "Nombre del pitch"}
                 </h2>
                 <p className="mt-3 text-sm leading-6 text-[#a9b3c9]">
-                  {description || "Descripcion del pitch."}
+                  {description || "Descripción del pitch."}
                 </p>
               </div>
             </section>
@@ -252,7 +252,7 @@ export default function NewPitchPage() {
             <section className="rounded-[24px] border border-[#263550] bg-[#1a2640] p-6 shadow-[0_18px_45px_rgba(2,8,23,0.35)]">
               <div className="inline-flex items-center gap-2 text-[11px] font-bold uppercase italic tracking-[0.24em] text-[#83ce00]">
                 <QrCode className="size-4 text-[#8899aa]" />
-                Despues de guardar
+                Después de guardar
               </div>
               <div className="mt-5 rounded-2xl border border-dashed border-[#263550] bg-[#0d1526] px-4 py-4 text-sm leading-6 text-[#a9b3c9]">
                 <div className="inline-flex items-center gap-2 font-semibold text-white">
@@ -260,9 +260,9 @@ export default function NewPitchPage() {
                   Tip
                 </div>
                 <p className="mt-2">
-                  Usa un nombre corto y una descripcion clara: explica el problema,
-                  la solucion y el beneficio principal en una o dos frases. Asi sera
-                  mas facil identificar el pitch en el dashboard y para quienes votan
+                  Usa un nombre corto y una descripción clara: explica el problema,
+                  la solución y el beneficio principal en una o dos frases. Así será
+                  más fácil identificar el pitch en el dashboard y para quienes votan
                   por primera vez.
                 </p>
               </div>

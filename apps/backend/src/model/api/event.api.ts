@@ -4,7 +4,7 @@ import { z } from "zod";
 import { requireSession } from "../../auth.js";
 import { db } from "../../db.js";
 import { createEventSchema, updateEventStatusSchema } from "../schema/event.schema.js";
-import { canManageEvent } from "../event.permissions.js";
+import { canManageEvent, isEventOwner } from "../event.permissions.js";
 import { presentEvent, presentEventQr } from "../../presenter/event.presenter.js";
 import {
   dashboardEventSchema,
@@ -287,7 +287,7 @@ eventRouter.patch("/:id/status", async (req, res) => {
   }
 });
 
-// Elimina un evento si el usuario tiene acceso.
+// Elimina un evento; solo el owner puede hacerlo.
 eventRouter.delete("/:id", async (req, res) => {
   const session = await requireSession(req, res);
 
@@ -296,10 +296,16 @@ eventRouter.delete("/:id", async (req, res) => {
   }
 
   try {
-    const canManage = await canManageEvent(session.user.id, req.params.id);
+    const isOwner = await isEventOwner(session.user.id, req.params.id);
 
-    if (!canManage) {
-      return res.status(403).json({ message: "Forbidden" });
+    if (!isOwner) {
+      const canManage = await canManageEvent(session.user.id, req.params.id);
+
+      return res.status(403).json({
+        message: canManage
+          ? "Forbidden: only the event owner can delete this event"
+          : "Forbidden",
+      });
     }
 
     const result = await db.query(
@@ -512,8 +518,8 @@ eventRouter.get("/:eventId/export", async (req, res) => {
       ].join(",");
     });
 
-    // Une encabezado y filas en un solo archivo.
-    const csv = [csvHeader, ...csvRows].join("\n");
+    // Une encabezado y filas; el BOM hace que Excel lea bien los acentos.
+    const csv = "\uFEFF" + [csvHeader, ...csvRows].join("\n");
 
     // Genera un nombre de archivo seguro.
     const eventName = String(eventResult.rows[0].name)

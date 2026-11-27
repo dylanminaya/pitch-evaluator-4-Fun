@@ -9,5 +9,6 @@ export function usePitches(eventId?: string) {
         queryKey: ["pitches", eventId],
         queryFn: () => getPitches(eventId!),
         enabled: Boolean(eventId),
+        refetchInterval: 5000,
     });
 }

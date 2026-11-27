@@ -4,10 +4,12 @@ import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { CalendarDays, Clock3, MapPin, Users } from "lucide-react";
+import { CheckCircle2, Clock3, MapPin, Users } from "lucide-react";
 import { Button } from "@workspace/ui/components/button";
 import { usePublicEventInvitation } from "@/hooks/dashboard";
 import { useSession } from "@/lib/better-auth/auth-client";
+import { ConnectionBanner } from "@/components/connection-banner";
+import { isNetworkError } from "@/lib/api/client";
 import {
   ArrowLeft,
 } from "lucide-react";
@@ -93,25 +95,26 @@ export default function EventInvitationPage() {
   if (isLoading || isLoadingSession) {
     return (
       <main className="flex min-h-svh items-center justify-center bg-[#0d1526] text-[#8899aa]">
-        Cargando invitacion...
+        Cargando invitación...
       </main>
     );
   }
 
-  if (error || !invitation) {
+  // Un fallo puntual del sondeo no debe ocultar datos ya cargados
+  if (!invitation) {
     return (
       <main className="flex min-h-svh items-center justify-center bg-[#0d1526] px-6 text-center text-[#8899aa]">
-        No pudimos cargar la invitacion del evento.
+        {isNetworkError(error)
+          ? "Sin conexión. Revisa tu internet y vuelve a abrir el enlace."
+          : "No encontramos este evento. Revisa el enlace o escanea de nuevo el QR."}
       </main>
     );
   }
 
   const votingOpen = invitation.status === "OPEN";
-  const formattedDate = new Intl.DateTimeFormat("es-DO", {
-    day: "2-digit",
-    month: "long",
-    year: "numeric",
-  }).format(new Date());
+  const availablePitchesCount = votingOpen
+    ? invitation.pitches.filter((pitch) => pitch.status === "OPEN").length
+    : 0;
 
   if (!effectiveEvaluatorEmail) {
     return (
@@ -121,12 +124,18 @@ export default function EventInvitationPage() {
           className="w-full max-w-md rounded-[24px] border border-[#263550] bg-[#121d30] p-6 shadow-[0_22px_60px_rgba(2,8,23,0.42)]"
         >
           <Image src="/logo.svg" alt="Pitch 4 Fun" width={110} height={46} className="h-11 w-auto" />
-          <div className="mt-8">
+          <h1 className="mt-8 text-2xl font-black tracking-tight text-white">
+            {invitation.name}
+          </h1>
+          <p className="mt-2 text-sm leading-6 text-[#a9b3c9]">
+            Ingresa tu correo para votar. Solo se usa para registrar un voto por pitch.
+          </p>
+          <div className="mt-6">
             <label
               htmlFor="evaluator-email"
               className="text-[11px] font-bold uppercase italic tracking-[0.24em] text-[#83ce00]"
             >
-              Correo electronico
+              Correo electrónico
             </label>
             <input
               id="evaluator-email"
@@ -134,7 +143,7 @@ export default function EventInvitationPage() {
               required
               value={emailInput}
               onChange={(event) => setEmailInput(event.target.value)}
-              placeholder="tu@email.com"
+              placeholder="tu@correo.com"
               className="mt-3 h-12 w-full rounded-2xl border border-[#263550] bg-[#0d1526] px-4 text-sm text-white outline-none placeholder:text-[#66738f] focus:border-[#83ce00]"
             />
           </div>
@@ -160,23 +169,31 @@ export default function EventInvitationPage() {
               </div>
               <div className="flex flex-wrap items-center justify-end gap-2">
                 <Button
-                  type="button"
+                  asChild
                   variant="outline"
-                  onClick={clearEvaluatorEmail}
                   className="rounded-full border-[#263550] bg-[#0d1526] text-white hover:bg-[#1a2640] hover:text-white"
                 >
-                  {effectiveEvaluatorEmail}
-                </Button>
-                <Link href="/">
-                  <Button
-                    variant="outline"
-                    className="rounded-full border-[#263550] bg-[#0d1526] text-white hover:bg-[#1a2640] hover:text-white"
-                  >
+                  <Link href="/">
                     <ArrowLeft className="size-4" />
                     Salir
-                  </Button>
-                </Link>
+                  </Link>
+                </Button>
               </div>
+            </div>
+            <div className="mt-6 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl border border-[#263550] bg-[#0d1526] px-4 py-3 text-sm">
+              <span className="text-[#a9b3c9]">
+                Votando como{" "}
+                <span className="break-all font-semibold text-white">
+                  {effectiveEvaluatorEmail}
+                </span>
+              </span>
+              <button
+                type="button"
+                onClick={clearEvaluatorEmail}
+                className="font-semibold text-[#83ce00] underline underline-offset-4 hover:text-[#a7ea2e]"
+              >
+                ¿No eres tú? Cambiar correo
+              </button>
             </div>
             <h1 className="mt-6 text-3xl font-black tracking-tight text-white">
               {invitation.name}
@@ -187,20 +204,23 @@ export default function EventInvitationPage() {
           </div>
 
           <div className="px-8 py-8">
+            <ConnectionBanner isOffline={Boolean(error)} className="mb-4" />
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
               <div className="rounded-2xl border border-[#263550] bg-[#0d1526] px-4 py-3">
                 <div className="inline-flex items-center gap-2 text-xs text-[#8899aa]">
-                  <CalendarDays className="size-4 text-[#83ce00]" />
-                  <span>Fecha</span>
+                  <CheckCircle2 className="size-4 text-[#83ce00]" />
+                  <span>Disponibles</span>
                 </div>
-                <p className="mt-2 text-sm font-medium capitalize text-white">{formattedDate}</p>
+                <p className="mt-2 text-sm font-medium text-white">
+                  {availablePitchesCount} de {invitation.pitches.length}
+                </p>
               </div>
               <div className="rounded-2xl border border-[#263550] bg-[#0d1526] px-4 py-3">
                 <div className="inline-flex items-center gap-2 text-xs text-[#8899aa]">
                   <MapPin className="size-4 text-[#00f0ff]" />
-                  <span>Ubicacion</span>
+                  <span>Ubicación</span>
                 </div>
-                <p className="mt-2 text-sm font-medium text-white">Votacion digital</p>
+                <p className="mt-2 text-sm font-medium text-white">Votación digital</p>
               </div>
               <div className="rounded-2xl border border-[#263550] bg-[#0d1526] px-4 py-3">
                 <div className="inline-flex items-center gap-2 text-xs text-[#8899aa]">
@@ -215,19 +235,19 @@ export default function EventInvitationPage() {
                   <span>Estado</span>
                 </div>
                 <p className="mt-2 text-sm font-medium text-white">
-                  {votingOpen ? "Votacion abierta" : "Votacion cerrada"}
+                  {votingOpen ? "Votación abierta" : "Votación cerrada"}
                 </p>
               </div>
             </div>
 
             <div className="mt-6 rounded-2xl border border-dashed border-[#263550] bg-[#0d1526] px-4 py-4 text-sm leading-6 text-[#a9b3c9]">
-              Selecciona el pitch que quieras revisar. {/* poner una descripcion util */}
+              Solo puedes abrir los pitches marcados como disponibles. Puedes votar una vez por pitch.
             </div>
 
             <div className="mt-6 grid gap-4 md:grid-cols-2">
               {invitation.pitches.length === 0 ? (
                 <div className="rounded-2xl border border-[#263550] bg-[#0d1526] px-4 py-6 text-sm text-[#8899aa]">
-                  Este evento todavia no tiene pitches publicados.
+                  Este evento todavía no tiene pitches publicados.
                 </div>
               ) : (
                 invitation.pitches.map((pitch) => {
@@ -240,18 +260,18 @@ export default function EventInvitationPage() {
                     >
                       <div
                         className={`inline-flex rounded-full px-3 py-1 text-[11px] font-bold uppercase italic tracking-[0.24em] ${
-                          pitch.status === "OPEN"
+                          canOpenPitch
                             ? "text-[#83ce00]"
                             : "text-[#ff6b6b]"
                         }`}
                         style={{
                           backgroundColor:
-                            pitch.status === "OPEN"
+                            canOpenPitch
                               ? `${pitch.color}22`
                               : "#ff6b6b22",
                         }}
                       >
-                        {pitch.status === "OPEN" ? "Disponible" : "Cerrado"}
+                        {canOpenPitch ? "Disponible" : "Cerrado"}
                       </div>
                       <h2 className="mt-4 text-xl font-bold text-white">{pitch.name}</h2>
                       <p
@@ -268,14 +288,24 @@ export default function EventInvitationPage() {
                         {pitch.description}
                       </p>
                       <div className="mt-5">
-                        <Link href={canOpenPitch ? `/vote/${pitch.id}${evaluatorEmailQuery}` : "#"} aria-disabled={!canOpenPitch}>
+                        {canOpenPitch ? (
                           <Button
+                            asChild
                             className="h-11 w-full rounded-full bg-[#83ce00] text-sm font-bold italic text-[#0d1526] hover:bg-[#a7ea2e]"
-                            disabled={!canOpenPitch}
+                          >
+                            <Link href={`/vote/${pitch.id}${evaluatorEmailQuery}`}>
+                              Ver pitch
+                            </Link>
+                          </Button>
+                        ) : (
+                          <Button
+                            type="button"
+                            className="h-11 w-full rounded-full bg-[#83ce00] text-sm font-bold italic text-[#0d1526] hover:bg-[#a7ea2e]"
+                            disabled
                           >
                             Ver pitch
                           </Button>
-                        </Link>
+                        )}
                       </div>
                     </article>
                   );
